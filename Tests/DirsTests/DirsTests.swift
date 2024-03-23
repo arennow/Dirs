@@ -1,8 +1,9 @@
 @testable import Dirs
+import DirsMockFSInterface
 import XCTest
 
 final class DirsTests: XCTestCase {
-	func testExample() throws {
+	func testMockFS() throws {
 		let mockFS = MockFilesystemInterface {
 			"a"
 			"b"
@@ -34,5 +35,45 @@ final class DirsTests: XCTestCase {
 
 		XCTAssertEqual(childDirIterator.next()?.path, "/f")
 		XCTAssertNil(childDirIterator.next())
+	}
+
+	func testSubgraphFinding() throws {
+		let fs = MockFilesystemInterface {
+			"a1"
+			dir("a2")
+			dir("a3") {
+				"a3b1"
+			}
+			dir("a4") {
+				dir("a4b1") {
+					"a4b1c1"
+				}
+			}
+		}
+
+		let d = try Dir(fs: fs, path: "/")
+
+		XCTAssertNotNil(d.childFile(named: "a1"))
+		XCTAssertNil(d.childFile(named: "a2"))
+		XCTAssertNil(d.childFile(named: "a3"))
+		XCTAssertNil(d.childFile(named: "a4"))
+
+		XCTAssertNil(d.childDir(named: "a1"))
+		XCTAssertNotNil(d.childDir(named: "a2"))
+		XCTAssertNotNil(d.childDir(named: "a3"))
+		XCTAssertNotNil(d.childDir(named: "a4"))
+
+		XCTAssertNotNil(d.descendentFile(at: "a1"))
+		XCTAssertNil(d.descendentFile(at: "a2"))
+		XCTAssertNil(d.descendentFile(at: "a3"))
+		XCTAssertNil(d.descendentFile(at: "a4"))
+		XCTAssertNotNil(d.descendentFile(at: "a4/a4b1/a4b1c1"))
+
+		XCTAssertNil(d.descendentDir(at: "a1"))
+		XCTAssertNotNil(d.descendentDir(at: "a2"))
+		XCTAssertNotNil(d.descendentDir(at: "a3"))
+		XCTAssertNotNil(d.descendentDir(at: "a4"))
+		XCTAssertNotNil(d.descendentDir(at: "a4/a4b1"))
+		XCTAssertNil(d.descendentDir(at: "a4/a4b1/a4b1c1"))
 	}
 }

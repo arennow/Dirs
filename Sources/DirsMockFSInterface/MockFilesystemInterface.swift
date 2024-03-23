@@ -1,13 +1,17 @@
-import Algorithms
-import CaseAccessors
 import Dirs
 import Foundation
 
-struct MockFilesystemInterface: FilesystemInterface {
-	@CaseConditionals
-	enum PartialNode {
+public struct MockFilesystemInterface: FilesystemInterface {
+	public enum PartialNode {
 		case file(name: String, content: String?)
 		case dir(name: String, children: Array<PartialNode>)
+
+		var isDir: Bool {
+			if case .dir = self {
+				return true
+			}
+			return false
+		}
 
 		var name: String {
 			switch self {
@@ -17,13 +21,13 @@ struct MockFilesystemInterface: FilesystemInterface {
 		}
 	}
 
-	let rootPartialNode: PartialNode
+	public let rootPartialNode: PartialNode
 
 	private init(rootPartialNode: PartialNode) {
 		self.rootPartialNode = rootPartialNode
 	}
 
-	static func empty() -> Self {
+	public static func empty() -> Self {
 		self.init(rootPartialNode: .dir(name: "/", children: []))
 	}
 
@@ -34,7 +38,7 @@ struct MockFilesystemInterface: FilesystemInterface {
 
 		var currentPartialNode = self.rootPartialNode
 
-		for (nextIsLast, nextComponent) in fp.components.positionEnumerated() {
+		for positionalElement in fp.positionalComponents {
 			switch currentPartialNode {
 				case .file:
 					// If there's a next and the current is a file,
@@ -42,9 +46,9 @@ struct MockFilesystemInterface: FilesystemInterface {
 					return nil
 
 				case .dir(_, let children):
-					guard let nextPartialNode = children.first(where: { $0.name == nextComponent.string }) else { return nil }
+					guard let nextPartialNode = children.first(where: { $0.name == positionalElement.element.string }) else { return nil }
 
-					if nextIsLast {
+					if positionalElement.position.contains(.last) {
 						return nextPartialNode
 					} else {
 						currentPartialNode = nextPartialNode
@@ -55,7 +59,7 @@ struct MockFilesystemInterface: FilesystemInterface {
 		return nil
 	}
 
-	func nodeType(at ifp: some IntoFilePath) -> NodeType? {
+	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
 		switch self.partialNode(at: ifp) {
 			case .dir: .dir
 			case .file: .file
@@ -63,7 +67,7 @@ struct MockFilesystemInterface: FilesystemInterface {
 		}
 	}
 
-	func contentsOf(file ifp: some Dirs.IntoFilePath) throws -> Data {
+	public func contentsOf(file ifp: some Dirs.IntoFilePath) throws -> Data {
 		switch self.partialNode(at: ifp) {
 			case .none: throw NoSuchNode(path: ifp)
 			case .dir: throw WrongNodeType(path: ifp, actualType: .dir)
@@ -71,7 +75,7 @@ struct MockFilesystemInterface: FilesystemInterface {
 		}
 	}
 
-	func contentsOf(directory ifp: some Dirs.IntoFilePath) throws -> Array<FilePathStat> {
+	public func contentsOf(directory ifp: some Dirs.IntoFilePath) throws -> Array<FilePathStat> {
 		switch self.partialNode(at: ifp) {
 			case .none: throw NoSuchNode(path: ifp)
 			case .file: throw WrongNodeType(path: ifp, actualType: .file)
@@ -83,17 +87,38 @@ struct MockFilesystemInterface: FilesystemInterface {
 	}
 }
 
-extension MockFilesystemInterface {
+public extension MockFilesystemInterface {
 	init(@MockFilesystemBuilder builder: () -> PartialNode) {
 		self.rootPartialNode = builder()
 	}
 }
 
-func dir(_ name: String) -> MockFilesystemInterface.PartialNode {
+public extension MockFilesystemInterface {
+	@resultBuilder
+	struct MockFilesystemBuilder {
+		public static func buildExpression(_ expression: String) -> PartialNode {
+			.file(name: expression, content: nil)
+		}
+
+		public static func buildExpression(_ expression: (String, content: String)) -> PartialNode {
+			.file(name: expression.0, content: expression.content)
+		}
+
+		public static func buildExpression(_ expression: PartialNode) -> PartialNode {
+			expression
+		}
+
+		public static func buildBlock(_ components: PartialNode...) -> PartialNode {
+			.dir(name: "/", children: components)
+		}
+	}
+}
+
+public func dir(_ name: String) -> MockFilesystemInterface.PartialNode {
 	.dir(name: name, children: [])
 }
 
-func dir(_ name: String, @MockFilesystemInterface.MockFilesystemBuilder _ builder: () -> MockFilesystemInterface.PartialNode) -> MockFilesystemInterface.PartialNode {
+public func dir(_ name: String, @MockFilesystemInterface.MockFilesystemBuilder _ builder: () -> MockFilesystemInterface.PartialNode) -> MockFilesystemInterface.PartialNode {
 	let res = builder()
 	let children = switch res {
 		case .file: [res]
@@ -101,25 +126,4 @@ func dir(_ name: String, @MockFilesystemInterface.MockFilesystemBuilder _ builde
 	}
 
 	return .dir(name: name, children: children)
-}
-
-extension MockFilesystemInterface {
-	@resultBuilder
-	struct MockFilesystemBuilder {
-		static func buildExpression(_ expression: String) -> PartialNode {
-			.file(name: expression, content: nil)
-		}
-
-		static func buildExpression(_ expression: (String, content: String)) -> PartialNode {
-			.file(name: expression.0, content: expression.content)
-		}
-
-		static func buildExpression(_ expression: PartialNode) -> PartialNode {
-			expression
-		}
-
-		static func buildBlock(_ components: PartialNode...) -> PartialNode {
-			.dir(name: "/", children: components)
-		}
-	}
 }

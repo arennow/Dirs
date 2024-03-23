@@ -8,23 +8,27 @@ let package = Package(name: "Dirs",
 					  	.macOS(.v10_15),
 					  ],
 					  products: [
-					  	// Products define the executables and libraries a package produces, making them visible to other packages.
 					  	.library(name: "Dirs",
 								   targets: ["Dirs"]),
+					  	.library(name: "DirsMockFSInterface",
+								   targets: ["DirsMockFSInterface"]),
 					  ],
 
 					  dependencies: [
 					  	.package(url: "https://github.com/apple/swift-algorithms.git", .upToNextMajor(from: "1.2.0")),
 					  	.package(url: "https://github.com/apple/swift-system", from: "1.0.0"),
-					  	.package(url: "https://github.com/rhysforyou/swift-case-accessors.git", "0.2.0"..<"0.3.0"),
 					  ],
 					  targets: [
 					  	.target(name: "Dirs",
 								  dependencies: [
 								  	.product(name: "Algorithms", package: "swift-algorithms"),
 								  	.product(name: "SystemPackage", package: "swift-system"),
-								  	.product(name: "CaseAccessors", package: "swift-case-accessors"),
 								  ]),
+					  	.target(name: "DirsMockFSInterface",
+								  dependencies: ["Dirs"]),
 					  	.testTarget(name: "DirsTests",
-									  dependencies: ["Dirs"]),
+									  dependencies: [
+									  	"Dirs",
+									  	"DirsMockFSInterface",
+									  ]),
 					  ])

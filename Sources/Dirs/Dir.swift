@@ -34,4 +34,49 @@ public extension Dir {
 
 		return Children(directories: dirs, files: files)
 	}
+
+	private func childNode<T: Node>(named component: FilePath.Component, in listKP: KeyPath<Children, Array<T>>) -> T? {
+		try? self.children()[keyPath: listKP]
+			.first { node in
+				node.path.lastComponent == component
+			}
+	}
+
+	func childFile(named component: FilePath.Component) -> File? {
+		self.childNode(named: component, in: \.files)
+	}
+
+	func childDir(named component: FilePath.Component) -> Dir? {
+		self.childNode(named: component, in: \.directories)
+	}
+
+	private func descendentNode<T: Node>(at relativePath: FilePath, extractor: (Dir) -> (FilePath.Component) -> T?) -> T? {
+		var currentDir = self
+
+		for posNextComp in relativePath.positionalComponents {
+			guard !posNextComp.position.hasLast else {
+				return extractor(currentDir)(posNextComp.element)
+			}
+
+			if let subDir = currentDir.childDir(named: posNextComp.element) {
+				currentDir = subDir
+			} else {
+				break
+			}
+		}
+
+		return nil
+	}
+
+	func descendentFile(at relativePath: FilePath) -> File? {
+		self.descendentNode(at: relativePath, extractor: Dir.childFile)
+	}
+
+	func descendentDir(at relativePath: FilePath) -> Dir? {
+		self.descendentNode(at: relativePath, extractor: Dir.childDir)
+	}
+}
+
+extension Dir: CustomStringConvertible {
+	public var description: String { self.path.string }
 }

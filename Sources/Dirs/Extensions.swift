@@ -1,8 +1,12 @@
 import Foundation
 import SystemPackage
 
-extension FilePath {
+public extension FilePath {
 	var url: URL { URL(string: self.string)! }
+
+	var positionalComponents: some Collection<PositionalElement<FilePath.Component>> {
+		self.components.positionEnumerated()
+	}
 }
 
 extension URL {
@@ -25,5 +29,22 @@ extension URL {
 		}
 
 		return number.boolValue
+	}
+}
+
+public extension Collection {
+	func positionEnumerated() -> some Collection<PositionalElement<Element>> {
+		let lastIndex = self.index(self.endIndex, offsetBy: -1)
+
+		func pos(for index: Index) -> CollectionPosition {
+			var out: CollectionPosition = []
+			if index == self.startIndex { out.insert(.first) }
+			if index == lastIndex { out.insert(.last) }
+			return out
+		}
+
+		return zip(self.indices, self)
+			.lazy
+			.map { PositionalElement(position: pos(for: $0), element: $1) }
 	}
 }
