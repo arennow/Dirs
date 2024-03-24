@@ -34,7 +34,7 @@ extension URL {
 
 public extension Collection {
 	func positionEnumerated() -> some Collection<PositionalElement<Element>> {
-		let lastIndex = self.index(self.endIndex, offsetBy: -1)
+		let lastIndex = self.index(self.endIndex, offsetBy: -1, limitedBy: self.startIndex)
 
 		func pos(for index: Index) -> CollectionPosition {
 			var out: CollectionPosition = []

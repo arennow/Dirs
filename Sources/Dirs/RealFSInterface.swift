@@ -1,7 +1,7 @@
 import Foundation
 import SystemPackage
 
-public struct RealFSInterface: FilesystemInterface {
+public final class RealFSInterface: FilesystemInterface {
 	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
 		var isDirectory: ObjCBool = false
 
@@ -21,5 +21,10 @@ public struct RealFSInterface: FilesystemInterface {
 													includingPropertiesForKeys: [.isDirectoryKey])
 			.map { FilePathStat(filePath: FilePath($0.path),
 								isDirectory: try $0.getBoolResourceValue(forKey: .isDirectoryKey)) }
+	}
+
+	public func createDir(at fp: FilePath) throws -> Dir {
+		try FileManager.default.createDirectory(at: fp.url, withIntermediateDirectories: true)
+		return try Dir(fs: self, path: fp)
 	}
 }

@@ -2,6 +2,10 @@ import Foundation
 import SystemPackage
 
 public struct Dir: Node {
+	public static func == (lhs: Dir, rhs: Dir) -> Bool {
+		lhs.fs === rhs.fs && lhs.path == rhs.path
+	}
+
 	public let fs: any FilesystemInterface
 	public let path: FilePath
 
@@ -14,6 +18,10 @@ public struct Dir: Node {
 
 		self.fs = fs
 		self.path = path
+	}
+
+	public func hash(into hasher: inout Hasher) {
+		hasher.combine(self.path)
 	}
 }
 
@@ -77,6 +85,9 @@ public extension Dir {
 	}
 }
 
-extension Dir: CustomStringConvertible {
-	public var description: String { self.path.string }
+public extension Dir {
+	@discardableResult
+	func createDir(at fp: FilePath) throws -> Dir {
+		try self.fs.createDir(at: self.path.appending(fp.components))
+	}
 }

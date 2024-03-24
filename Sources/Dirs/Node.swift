@@ -1,6 +1,6 @@
 import SystemPackage
 
-public protocol Node: IntoFilePath {
+public protocol Node: IntoFilePath, Hashable {
 	var path: FilePath { get }
 }
 

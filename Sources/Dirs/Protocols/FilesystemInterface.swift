@@ -15,9 +15,11 @@ public enum NodeType {
 	case dir, file
 }
 
-public protocol FilesystemInterface {
+public protocol FilesystemInterface: AnyObject {
 	func nodeType(at ifp: some IntoFilePath) -> NodeType?
 
 	func contentsOf(file ifp: some IntoFilePath) throws -> Data
 	func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat>
+
+	func createDir(at fp: FilePath) throws -> Dir
 }

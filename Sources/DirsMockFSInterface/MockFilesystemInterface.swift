@@ -1,29 +1,11 @@
 import Dirs
 import Foundation
+import SystemPackage
 
-public struct MockFilesystemInterface: FilesystemInterface {
-	public enum PartialNode {
-		case file(name: String, content: String?)
-		case dir(name: String, children: Array<PartialNode>)
+public final class MockFilesystemInterface: FilesystemInterface {
+	public private(set) var rootPartialNode: PartialNode
 
-		var isDir: Bool {
-			if case .dir = self {
-				return true
-			}
-			return false
-		}
-
-		var name: String {
-			switch self {
-				case .file(let name, _), .dir(let name, _):
-					name
-			}
-		}
-	}
-
-	public let rootPartialNode: PartialNode
-
-	private init(rootPartialNode: PartialNode) {
+	fileprivate init(rootPartialNode: PartialNode) {
 		self.rootPartialNode = rootPartialNode
 	}
 
@@ -85,11 +67,75 @@ public struct MockFilesystemInterface: FilesystemInterface {
 				}
 		}
 	}
+
+	public func createDir(at fp: FilePath) throws -> Dir {
+		let (pnPath, remainderComponents) = self.existingPartialNodePathAndRemainder(to: fp)
+
+		// This array should contain just one `.dir`, which is the first new directory (and all its children)
+		let newDirectoryHierarchy = remainderComponents.reversed().reduce(Array<PartialNode>()) { (partialResult, component) in
+			[.dir(name: component.string, children: partialResult)]
+		}
+
+		let newRoot = try PartialNode.add(children: newDirectoryHierarchy, to: pnPath)
+
+		self.rootPartialNode = newRoot
+
+		return try Dir(fs: self, path: fp)
+	}
+}
+
+private extension MockFilesystemInterface {
+	private func existingPartialNodePathAndRemainder(to ifp: IntoFilePath) -> (pnPath: Array<PartialNode>, remainderComponents: FilePath.ComponentView.SubSequence) {
+		let fp = ifp.into()
+		let fpComs = fp.components
+
+		var outPNPath = [self.rootPartialNode]
+		var lastExistingComponentIndex = fpComs.startIndex
+
+		while let pn = self.partialNode(at: fp[fragment: ..<lastExistingComponentIndex]) {
+			outPNPath.append(pn)
+			lastExistingComponentIndex = fpComs.index(after: lastExistingComponentIndex)
+		}
+
+		return (consume outPNPath, fpComs[lastExistingComponentIndex...])
+	}
 }
 
 public extension MockFilesystemInterface {
-	init(@MockFilesystemBuilder builder: () -> PartialNode) {
-		self.rootPartialNode = builder()
+	enum PartialNode {
+		struct WrongNodeType: Error {
+			let actualTypeName: String
+		}
+
+		case file(name: String, content: String?)
+		case dir(name: String, children: Array<PartialNode>)
+
+		var isDir: Bool {
+			if case .dir = self { true } else { false }
+		}
+
+		var name: String {
+			switch self {
+				case .file(let name, _), .dir(let name, _): name
+			}
+		}
+
+		fileprivate static func add(children: consuming Array<PartialNode>, to rootedGraph: consuming Array<PartialNode>) throws -> PartialNode {
+			try rootedGraph.reduce(children) { (childrenToAdd, currentPN) in
+				switch currentPN {
+					case .file: throw PartialNode.WrongNodeType(actualTypeName: "file")
+					case .dir(let name, var children):
+						children.append(contentsOf: childrenToAdd)
+						return [.dir(name: name, children: children)]
+				}
+			}.first!
+		}
+	}
+}
+
+public extension MockFilesystemInterface {
+	convenience init(@MockFilesystemBuilder builder: () -> PartialNode) {
+		self.init(rootPartialNode: builder())
 	}
 }
 

@@ -76,4 +76,14 @@ final class DirsTests: XCTestCase {
 		XCTAssertNotNil(d.descendentDir(at: "a4/a4b1"))
 		XCTAssertNil(d.descendentDir(at: "a4/a4b1/a4b1c1"))
 	}
+
+	func testCreateDir() throws {
+		let fs = MockFilesystemInterface.empty()
+		let created = try fs.createDir(at: "/a/b/c/d")
+
+		XCTAssertNoThrow(try Dir(fs: fs, path: "/a"))
+		XCTAssertEqual(try Dir(fs: fs, path: "/a/b/c/d"), created)
+
+		XCTAssertNoThrow(try fs.createDir(at: "/a/b/c/d"))
+	}
 }
