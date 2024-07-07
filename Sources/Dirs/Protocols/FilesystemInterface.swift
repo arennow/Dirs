@@ -36,3 +36,11 @@ public extension FilesystemInterface {
 		try File(fs: self, path: ifp.into())
 	}
 }
+
+public extension FilesystemInterface {
+	var rootDir: Dir {
+		get throws {
+			try self.dir(at: "/")
+		}
+	}
+}

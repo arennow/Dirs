@@ -165,4 +165,12 @@ final class DirsTests: XCTestCase {
 		try file.setContents("new content")
 		XCTAssertEqual(try file.stringContents(), "new content")
 	}
+
+	func testFileParent() throws {
+		let fs = MockFilesystemInterface(pathsToNodes: [
+			"/a": .file,
+		])
+
+		try XCTAssertEqual(fs.file(at: "/a").parent, fs.rootDir)
+	}
 }
