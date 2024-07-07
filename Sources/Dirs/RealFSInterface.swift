@@ -32,4 +32,8 @@ public final class RealFSInterface: FilesystemInterface {
 		try FileManager.default.createDirectory(at: fp.url, withIntermediateDirectories: true)
 		return try Dir(fs: self, path: fp)
 	}
+
+	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
+		try contents.into().write(to: ifp.into().url, options: .atomic)
+	}
 }

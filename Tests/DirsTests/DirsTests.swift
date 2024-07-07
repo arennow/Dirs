@@ -132,6 +132,7 @@ final class DirsTests: XCTestCase {
 
 		XCTAssertEqual(createdFile.path, "/a/file")
 		XCTAssertNoThrow(try File(fs: fs, path: "/a/file"))
+		XCTAssertEqual(try createdFile.contents(), Data())
 		XCTAssertEqual(try fs.contentsOf(file: "/a/file"), Data())
 	}
 
@@ -153,5 +154,15 @@ final class DirsTests: XCTestCase {
 		let root = try Dir(fs: fs, path: "/")
 		XCTAssertThrowsError(try root.createFile(at: "a"))
 		XCTAssertEqual(fs.nodeType(at: "/a"), .dir)
+	}
+
+	func testReplaceContentsOfFile() throws {
+		let fs = MockFilesystemInterface(pathsToNodes: [
+			"/a": .file("content"),
+		])
+
+		let file = try fs.file(at: "/a")
+		try file.setContents("new content")
+		XCTAssertEqual(try file.stringContents(), "new content")
 	}
 }

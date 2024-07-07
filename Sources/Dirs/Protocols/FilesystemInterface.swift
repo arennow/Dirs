@@ -23,4 +23,16 @@ public protocol FilesystemInterface: AnyObject {
 
 	func createFile(at fp: FilePath) throws -> File
 	func createDir(at fp: FilePath) throws -> Dir
+
+	func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws
+}
+
+public extension FilesystemInterface {
+	func dir(at ifp: some IntoFilePath) throws -> Dir {
+		try Dir(fs: self, path: ifp.into())
+	}
+
+	func file(at ifp: some IntoFilePath) throws -> File {
+		try File(fs: self, path: ifp.into())
+	}
 }

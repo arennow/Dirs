@@ -33,4 +33,8 @@ extension File {
 	func stringContents() throws -> String? {
 		String(data: try self.contents(), encoding: .utf8)
 	}
+
+	func setContents(_ content: some IntoData) throws {
+		try self.fs.replaceContentsOfFile(at: self, to: content)
+	}
 }

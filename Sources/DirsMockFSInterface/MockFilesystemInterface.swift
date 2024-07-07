@@ -93,4 +93,14 @@ public final class MockFilesystemInterface: FilesystemInterface {
 				return try File(fs: self, path: fp)
 		}
 	}
+
+	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
+		let fp = ifp.into()
+		switch self.pathsToNodes[fp] {
+			case .none: throw NoSuchNode(path: fp)
+			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
+			case .file:
+				self.pathsToNodes[fp] = .file(contents.into())
+		}
+	}
 }
