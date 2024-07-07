@@ -4,21 +4,13 @@ import SortAndFilter
 import XCTest
 
 final class DirsTests: XCTestCase {
-	func testMockCreatesIntermediateDirectories() throws {
-		let fs = MockFilesystemInterface(pathsToNodes: [
-			"/a/b/c": .dir,
-		])
-
-		XCTAssertEqual(fs.nodeType(at: "/a/b/c"), .dir)
-	}
-
 	func testBasicFSReading() throws {
 		let mockFS = MockFilesystemInterface(pathsToNodes: [
 			"/a": .file,
 			"/b": .file,
-			"/c": .file(Data("c content".utf8)),
+			"/c": .file("c content"),
 			"/d": .dir,
-			"/d/E": .file(Data("enough!".utf8)),
+			"/d/E": .file("enough!"),
 			"/f": .dir,
 		])
 		let root = try Dir(fs: mockFS, path: "/")
@@ -96,6 +88,42 @@ final class DirsTests: XCTestCase {
 		XCTAssertNoThrow(try fs.createDir(at: "/a/b/c/d"))
 	}
 
+	func testCreateIntermediateDirs() throws {
+		let fs = MockFilesystemInterface(pathsToNodes: [
+			"/a/b/c": .dir,
+		])
+
+		try fs.createDir(at: "/a/b/c/d/e")
+		XCTAssertEqual(fs.nodeType(at: "/a/b/c"), .dir)
+		XCTAssertEqual(fs.nodeType(at: "/a/b/c/d"), .dir)
+		XCTAssertEqual(fs.nodeType(at: "/a/b/c/d/e"), .dir)
+	}
+
+	func testCreateExistingDir() throws {
+		let fs = MockFilesystemInterface(pathsToNodes: [
+			"/a": .dir,
+		])
+
+		XCTAssertNoThrow(try fs.createDir(at: "/a"))
+	}
+
+	func testDirOverExistingFileFails() throws {
+		let fs = MockFilesystemInterface(pathsToNodes: [
+			"/a": .file,
+		])
+
+		XCTAssertThrowsError(try fs.createDir(at: "/a"))
+	}
+
+	func testCreateIntermediateDirsOverExistingFileFails() throws {
+		let fs = MockFilesystemInterface(pathsToNodes: [
+			"/a": .file("content"),
+		])
+
+		XCTAssertThrowsError(try fs.createDir(at: "/a/b"))
+		XCTAssertEqual(try fs.contentsOf(file: "/a"), Data("content".utf8))
+	}
+
 	func testCreateFile() throws {
 		let fs = MockFilesystemInterface.empty()
 		let subDir = try fs.createDir(at: "/a")
@@ -104,5 +132,26 @@ final class DirsTests: XCTestCase {
 
 		XCTAssertEqual(createdFile.path, "/a/file")
 		XCTAssertNoThrow(try File(fs: fs, path: "/a/file"))
+		XCTAssertEqual(try fs.contentsOf(file: "/a/file"), Data())
+	}
+
+	func testCreateExistingFileFails() throws {
+		let fs = MockFilesystemInterface(pathsToNodes: [
+			"/a": .file("content"),
+		])
+
+		let root = try Dir(fs: fs, path: "/")
+		XCTAssertThrowsError(try root.createFile(at: "a"))
+		XCTAssertEqual(try fs.contentsOf(file: "/a"), Data("content".utf8))
+	}
+
+	func testCreateFileAtExistingDirFails() throws {
+		let fs = MockFilesystemInterface(pathsToNodes: [
+			"/a": .dir,
+		])
+
+		let root = try Dir(fs: fs, path: "/")
+		XCTAssertThrowsError(try root.createFile(at: "a"))
+		XCTAssertEqual(fs.nodeType(at: "/a"), .dir)
 	}
 }

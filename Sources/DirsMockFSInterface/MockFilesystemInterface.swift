@@ -6,6 +6,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	public enum MockNode {
 		case dir
 		case file(Data)
+		public static func file(_ string: String) -> Self { .file(Data(string.utf8)) }
 		public static var file: Self { .file(Data()) }
 
 		var nodeType: NodeType {
@@ -57,29 +58,39 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		}
 	}
 
-	// TODO: Don't clobber existing nodes
+	@discardableResult
 	public func createDir(at fp: FilePath) throws -> Dir {
 		let comps = fp.components
 		let eachIndex = sequence(first: comps.startIndex) { ind in
 			comps.index(ind, offsetBy: 1, limitedBy: comps.endIndex)
 		}
-		let intermediaryDirectories = eachIndex.map { endIndex in
+		let allDirectories = eachIndex.map { endIndex in
 			FilePath(root: "/", fp.components[comps.startIndex..<endIndex])
 		}
-		for dirComponent in intermediaryDirectories {
-			self.pathsToNodes[dirComponent] = .dir
+		for dirComponent in allDirectories {
+			if case .file = self.pathsToNodes[dirComponent] {
+				throw NodeAlreadyExists(path: dirComponent, type: .file)
+			} else {
+				self.pathsToNodes[dirComponent] = .dir
+			}
 		}
 
 		return try Dir(fs: self, path: fp)
 	}
 
-	public func createFile(at fp: FilePath) throws -> Dirs.File {
+	@discardableResult
+	public func createFile(at fp: FilePath) throws -> File {
 		let containingDirFP = fp.removingLastComponent()
 		guard self.nodeType(at: containingDirFP) == .dir else {
 			throw NoSuchNode(path: containingDirFP)
 		}
 
-		self.pathsToNodes[fp] = .file
-		return try File(fs: self, path: fp)
+		switch self.pathsToNodes[fp] {
+			case .dir: throw NodeAlreadyExists(path: fp, type: .dir)
+			case .file: throw NodeAlreadyExists(path: fp, type: .file)
+			case .none:
+				self.pathsToNodes[fp] = .file
+				return try File(fs: self, path: fp)
+		}
 	}
 }

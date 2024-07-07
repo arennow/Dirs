@@ -17,3 +17,13 @@ public struct WrongNodeType: Error {
 		self.actualType = actualType
 	}
 }
+
+public struct NodeAlreadyExists: Error {
+	public let path: FilePath
+	public let type: NodeType
+
+	public init(path ifp: some IntoFilePath, type: NodeType) {
+		self.path = ifp.into()
+		self.type = type
+	}
+}
