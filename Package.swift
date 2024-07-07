@@ -17,6 +17,7 @@ let package = Package(name: "Dirs",
 					  dependencies: [
 					  	.package(url: "https://github.com/apple/swift-algorithms.git", .upToNextMajor(from: "1.2.0")),
 					  	.package(url: "https://github.com/apple/swift-system", from: "1.0.0"),
+					  	.package(url: "https://github.com/arennow/SortAndFilter.git", .upToNextMajor(from: "1.0.0")),
 					  ],
 					  targets: [
 					  	.target(name: "Dirs",
@@ -30,5 +31,6 @@ let package = Package(name: "Dirs",
 									  dependencies: [
 									  	"Dirs",
 									  	"DirsMockFSInterface",
+									  	"SortAndFilter",
 									  ]),
 					  ])

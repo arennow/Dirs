@@ -1,22 +1,25 @@
 @testable import Dirs
 import DirsMockFSInterface
+import SortAndFilter
 import XCTest
 
 final class DirsTests: XCTestCase {
 	func testMockFS() throws {
-		let mockFS = MockFilesystemInterface {
-			"a"
-			"b"
-			("c", "c content")
-			dir("d") {
-				("E", "enough!")
-			}
-			dir("f")
-		}
+		let mockFS = MockFilesystemInterface(pathsToNodes: [
+			"/": .dir,
+			"/a": .file,
+			"/b": .file,
+			"/c": .file(Data("c content".utf8)),
+			"/d": .dir,
+			"/d/E": .file(Data("enough!".utf8)),
+			"/f": .dir,
+		])
 		let root = try Dir(fs: mockFS, path: "/")
 
 		let children = try root.children()
-		var childFileIterator = children.files.makeIterator()
+		var childFileIterator = children.files
+			.sorted(by: Sort.asc(\.path.string))
+			.makeIterator()
 
 		XCTAssertEqual(childFileIterator.next()?.path, "/a")
 		XCTAssertEqual(childFileIterator.next()?.path, "/b")
@@ -27,7 +30,9 @@ final class DirsTests: XCTestCase {
 
 		XCTAssertNil(childFileIterator.next())
 
-		var childDirIterator = children.directories.makeIterator()
+		var childDirIterator = children.directories
+			.sorted(by: Sort.asc(\.path.string))
+			.makeIterator()
 
 		let dDir = childDirIterator.next()
 		XCTAssertEqual(dDir?.path, "/d")
@@ -38,18 +43,16 @@ final class DirsTests: XCTestCase {
 	}
 
 	func testSubgraphFinding() throws {
-		let fs = MockFilesystemInterface {
-			"a1"
-			dir("a2")
-			dir("a3") {
-				"a3b1"
-			}
-			dir("a4") {
-				dir("a4b1") {
-					"a4b1c1"
-				}
-			}
-		}
+		let fs = MockFilesystemInterface(pathsToNodes: [
+			"/": .dir,
+			"/a1": .file,
+			"/a2": .dir,
+			"/a3": .dir,
+			"/a3/a3b1": .file,
+			"/a4": .dir,
+			"/a4/a4b1": .dir,
+			"/a4/a4b1/a4b1c1": .file,
+		])
 
 		let d = try Dir(fs: fs, path: "/")
 
