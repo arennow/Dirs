@@ -70,4 +70,14 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 		return try Dir(fs: self, path: fp)
 	}
+
+	public func createFile(at fp: FilePath) throws -> Dirs.File {
+		let containingDirFP = fp.removingLastComponent()
+		guard self.nodeType(at: containingDirFP) == .dir else {
+			throw NoSuchNode(path: containingDirFP)
+		}
+
+		self.pathsToNodes[fp] = .file
+		return try File(fs: self, path: fp)
+	}
 }

@@ -3,8 +3,8 @@ import Algorithms
 public struct Children {
 	static var empty: Self { .init(directories: [], files: []) }
 
-	let directories: Array<Dir>
-	let files: Array<File>
+	public let directories: Array<Dir>
+	public let files: Array<File>
 
 	init(directories: consuming Array<Dir>, files: consuming Array<File>) {
 		self.directories = directories

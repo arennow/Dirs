@@ -23,6 +23,11 @@ public final class RealFSInterface: FilesystemInterface {
 								isDirectory: try $0.getBoolResourceValue(forKey: .isDirectoryKey)) }
 	}
 
+	public func createFile(at fp: FilePath) throws -> File {
+		FileManager.default.createFile(atPath: fp.string, contents: nil)
+		return try File(fs: self, path: fp)
+	}
+
 	public func createDir(at fp: FilePath) throws -> Dir {
 		try FileManager.default.createDirectory(at: fp.url, withIntermediateDirectories: true)
 		return try Dir(fs: self, path: fp)
