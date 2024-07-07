@@ -4,7 +4,15 @@ import SortAndFilter
 import XCTest
 
 final class DirsTests: XCTestCase {
-	func testMockFS() throws {
+	func testMockCreatesIntermediateDirectories() throws {
+		let fs = MockFilesystemInterface(pathsToNodes: [
+			"/a/b/c": .dir,
+		])
+
+		XCTAssertEqual(fs.nodeType(at: "/a/b/c"), .dir)
+	}
+
+	func testBasicFSReading() throws {
 		let mockFS = MockFilesystemInterface(pathsToNodes: [
 			"/": .dir,
 			"/a": .file,
