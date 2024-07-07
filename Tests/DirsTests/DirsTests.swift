@@ -14,7 +14,6 @@ final class DirsTests: XCTestCase {
 
 	func testBasicFSReading() throws {
 		let mockFS = MockFilesystemInterface(pathsToNodes: [
-			"/": .dir,
 			"/a": .file,
 			"/b": .file,
 			"/c": .file(Data("c content".utf8)),
@@ -52,7 +51,6 @@ final class DirsTests: XCTestCase {
 
 	func testSubgraphFinding() throws {
 		let fs = MockFilesystemInterface(pathsToNodes: [
-			"/": .dir,
 			"/a1": .file,
 			"/a2": .dir,
 			"/a3": .dir,

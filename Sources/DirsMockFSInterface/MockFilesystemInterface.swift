@@ -21,6 +21,8 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	private var pathsToNodes: Dictionary<FilePath, MockNode>
 
 	public init(pathsToNodes: Dictionary<FilePath, MockNode> = [:]) {
+		var pathsToNodes = pathsToNodes
+		pathsToNodes["/"] = .dir
 		self.pathsToNodes = pathsToNodes
 	}
 
