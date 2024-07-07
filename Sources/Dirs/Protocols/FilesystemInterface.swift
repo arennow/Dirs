@@ -21,8 +21,8 @@ public protocol FilesystemInterface: AnyObject {
 	func contentsOf(file ifp: some IntoFilePath) throws -> Data
 	func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat>
 
-	func createFile(at fp: FilePath) throws -> File
-	func createDir(at fp: FilePath) throws -> Dir
+	func createFile(at ifp: some IntoFilePath) throws -> File
+	func createDir(at ifp: some IntoFilePath) throws -> Dir
 
 	func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws
 }

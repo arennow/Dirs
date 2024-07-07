@@ -2,6 +2,8 @@ import Foundation
 import SystemPackage
 
 public final class RealFSInterface: FilesystemInterface {
+	public init() {}
+
 	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
 		var isDirectory: ObjCBool = false
 
@@ -23,12 +25,14 @@ public final class RealFSInterface: FilesystemInterface {
 								isDirectory: try $0.getBoolResourceValue(forKey: .isDirectoryKey)) }
 	}
 
-	public func createFile(at fp: FilePath) throws -> File {
+	public func createFile(at ifp: some IntoFilePath) throws -> File {
+		let fp = ifp.into()
 		FileManager.default.createFile(atPath: fp.string, contents: nil)
 		return try File(fs: self, path: fp)
 	}
 
-	public func createDir(at fp: FilePath) throws -> Dir {
+	public func createDir(at ifp: some IntoFilePath) throws -> Dir {
+		let fp = ifp.into()
 		try FileManager.default.createDirectory(at: fp.url, withIntermediateDirectories: true)
 		return try Dir(fs: self, path: fp)
 	}

@@ -59,7 +59,8 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	}
 
 	@discardableResult
-	public func createDir(at fp: FilePath) throws -> Dir {
+	public func createDir(at ifp: some IntoFilePath) throws -> Dir {
+		let fp = ifp.into()
 		let comps = fp.components
 		let eachIndex = sequence(first: comps.startIndex) { ind in
 			comps.index(ind, offsetBy: 1, limitedBy: comps.endIndex)
@@ -79,7 +80,8 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	}
 
 	@discardableResult
-	public func createFile(at fp: FilePath) throws -> File {
+	public func createFile(at ifp: some IntoFilePath) throws -> File {
+		let fp = ifp.into()
 		let containingDirFP = fp.removingLastComponent()
 		guard self.nodeType(at: containingDirFP) == .dir else {
 			throw NoSuchNode(path: containingDirFP)
