@@ -55,11 +55,15 @@ final class DirsTests: XCTestCase {
 		let d = try Dir(fs: fs, path: "/")
 
 		XCTAssertNotNil(d.childFile(named: "a1"))
+		// Make sure we don't just support literals ⬇️
+		XCTAssertNotNil(d.childFile(named: "a1" as String))
 		XCTAssertNil(d.childFile(named: "a2"))
 		XCTAssertNil(d.childFile(named: "a3"))
 		XCTAssertNil(d.childFile(named: "a4"))
 
 		XCTAssertNil(d.childDir(named: "a1"))
+		// Make sure we don't just support literals ⬇️
+		XCTAssertNil(d.childDir(named: "a1" as String))
 		XCTAssertNotNil(d.childDir(named: "a2"))
 		XCTAssertNotNil(d.childDir(named: "a3"))
 		XCTAssertNotNil(d.childDir(named: "a4"))

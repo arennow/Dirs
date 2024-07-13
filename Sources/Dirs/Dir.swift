@@ -54,6 +54,18 @@ public extension Dir {
 		self.childNode(named: component, in: \.files)
 	}
 
+	func childFile(named name: String) -> File? {
+		FilePath.Component(name).flatMap {
+			self.childNode(named: $0, in: \.files)
+		}
+	}
+
+	func childDir(named name: String) -> Dir? {
+		FilePath.Component(name).flatMap {
+			self.childNode(named: $0, in: \.directories)
+		}
+	}
+
 	func childDir(named component: FilePath.Component) -> Dir? {
 		self.childNode(named: component, in: \.directories)
 	}
