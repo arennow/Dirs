@@ -99,12 +99,12 @@ public extension Dir {
 
 public extension Dir {
 	@discardableResult
-	func createDir(at fp: FilePath) throws -> Dir {
-		try self.fs.createDir(at: self.path.appending(fp.components))
+	func createDir(at ifpcv: some IntoFilePathComponentView) throws -> Dir {
+		try self.fs.createDir(at: self.path.appending(ifpcv.into()))
 	}
 
 	@discardableResult
-	func createFile(at fp: FilePath) throws -> File {
-		try self.fs.createFile(at: self.path.appending(fp.components))
+	func createFile(at ifpcv: some IntoFilePathComponentView) throws -> File {
+		try self.fs.createFile(at: self.path.appending(ifpcv.into()))
 	}
 }

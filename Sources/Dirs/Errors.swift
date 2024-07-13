@@ -27,3 +27,7 @@ public struct NodeAlreadyExists: Error {
 		self.type = type
 	}
 }
+
+public enum InvalidPathForCall: Error {
+	case needAbsoluteWithComponent
+}

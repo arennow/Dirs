@@ -25,6 +25,15 @@ public final class RealFSInterface: FilesystemInterface {
 								isDirectory: try $0.getBoolResourceValue(forKey: .isDirectoryKey)) }
 	}
 
+	public func filePathOfNonexistantTemporaryFile(extension: String?) -> SystemPackage.FilePath {
+		var filename = UUID().uuidString
+		if let `extension` {
+			filename += ".\(`extension`.trimmingCharacters(in: ["."]))"
+		}
+
+		return FileManager.default.temporaryDirectory.appendingPathComponent(filename).into()
+	}
+
 	public func createFile(at ifp: some IntoFilePath) throws -> File {
 		let fp = ifp.into()
 		FileManager.default.createFile(atPath: fp.string, contents: nil)

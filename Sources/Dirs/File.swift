@@ -25,7 +25,7 @@ public struct File: Node {
 	}
 }
 
-extension File {
+public extension File {
 	func contents() throws -> Data {
 		try self.fs.contentsOf(file: self)
 	}

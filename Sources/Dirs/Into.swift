@@ -21,6 +21,22 @@ extension FilePath: IntoFilePath {
 	public func into() -> FilePath { self }
 }
 
+public protocol IntoFilePathComponentView {
+	func into() -> FilePath.ComponentView
+}
+
+public extension FilePath.ComponentView {
+	static func from(_ source: some IntoFilePathComponentView) -> FilePath.ComponentView { source.into() }
+}
+
+public extension Sequence where Element: IntoFilePathComponentView {
+	func mapInto() -> Array<FilePath.ComponentView> { map { $0.into() } }
+}
+
+extension FilePath.ComponentView: IntoFilePathComponentView {
+	public func into() -> FilePath.ComponentView { self }
+}
+
 public protocol IntoData {
 	func into() -> Data
 }

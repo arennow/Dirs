@@ -7,11 +7,3 @@ public extension Dir {
 		try filesystemInterface.createDir(at: FilePath(NSTemporaryDirectory()))
 	}
 }
-
-public extension Dir {
-	func createFile(at ifp: some IntoFilePath, contents: some IntoData) throws -> File {
-		let file = try self.createFile(at: ifp.into())
-		try file.setContents(contents)
-		return file
-	}
-}

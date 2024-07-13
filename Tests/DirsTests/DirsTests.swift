@@ -177,4 +177,28 @@ final class DirsTests: XCTestCase {
 
 		try XCTAssertEqual(fs.file(at: "/a").parent, fs.rootDir)
 	}
+
+	func testCreateFileAndIntermediaryDirs() throws {
+		let fs = MockFilesystemInterface()
+		_ = try fs.createFileAndIntermediaryDirs(at: "/a/b/c/d/file1", contents: "contents 1")
+		XCTAssertEqual(try fs.contentsOf(file: "/a/b/c/d/file1"), "contents 1".into())
+
+		_ = try fs.createFileAndIntermediaryDirs(at: "/file2", contents: "contents 2")
+		XCTAssertEqual(try fs.contentsOf(file: "/file2"), "contents 2".into())
+	}
+}
+
+extension DirsTests {
+	func testRandomPathDiffers() {
+		let fs = MockFilesystemInterface()
+
+		XCTAssertNotEqual(fs.filePathOfNonexistantTemporaryFile(), fs.filePathOfNonexistantTemporaryFile())
+	}
+
+	func testRandomPathHasExtension() {
+		let fs = MockFilesystemInterface()
+
+		XCTAssert(fs.filePathOfNonexistantTemporaryFile(extension: "abcd").string.hasSuffix("abcd"))
+		XCTAssert(fs.filePathOfNonexistantTemporaryFile(extension: ".abcd.").string.hasSuffix("abcd"))
+	}
 }
