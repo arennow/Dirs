@@ -1,5 +1,5 @@
 import Foundation
-import SystemPackage
+@preconcurrency import SystemPackage
 
 public struct Dir: Node {
 	public let fs: any FilesystemInterface

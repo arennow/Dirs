@@ -44,6 +44,7 @@ public extension FilesystemInterface {
 		try File(fs: self, path: ifp.into())
 	}
 
+	@discardableResult
 	func createFileAndIntermediaryDirs(at ifp: some IntoFilePath, contents: some IntoData = Data()) throws -> File {
 		guard let (path, leaf) = ifp.into().pathAndLeaf else {
 			throw InvalidPathForCall.needAbsoluteWithComponent

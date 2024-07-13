@@ -1,6 +1,6 @@
 import SystemPackage
 
-public protocol Node: IntoFilePath, Hashable {
+public protocol Node: IntoFilePath, Hashable, Sendable {
 	var fs: any FilesystemInterface { get }
 	var path: FilePath { get }
 }
