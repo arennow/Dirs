@@ -25,12 +25,12 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 	// To allow us to avoid traversing our fake FS for deep equality
 	private let id = UUID()
-	private var pathsToNodes: Dictionary<FilePath, MockNode>
+	private let pathsToNodes: Locked<Dictionary<FilePath, MockNode>>
 
 	public init(pathsToNodes: Dictionary<FilePath, MockNode> = [:]) {
 		var pathsToNodes = pathsToNodes
 		pathsToNodes["/"] = .dir
-		self.pathsToNodes = pathsToNodes
+		self.pathsToNodes = Locked(pathsToNodes)
 	}
 
 	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
@@ -50,7 +50,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	public func contentsOf(directory ifp: some Dirs.IntoFilePath) throws -> Array<Dirs.FilePathStat> {
 		let fp = ifp.into()
 
-		let childKeys = self.pathsToNodes.keys
+		let childKeys = self.pathsToNodes.read(in: \.keys)
 			.lazy
 			.filter { $0.starts(with: fp) }
 			.filter { $0 != fp } // This may only remove `/`
@@ -123,7 +123,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 	public func deleteNode(at ifp: some IntoFilePath) throws {
 		let fp = ifp.into()
-		let keysToDelete = self.pathsToNodes.keys
+		let keysToDelete = self.pathsToNodes.read(in: \.keys)
 			.filter { $0.starts(with: fp) }
 
 		for key in keysToDelete {

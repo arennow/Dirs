@@ -15,7 +15,7 @@ public enum NodeType {
 	case dir, file
 }
 
-public protocol FilesystemInterface: Equatable {
+public protocol FilesystemInterface: Equatable, Sendable {
 	func nodeType(at ifp: some IntoFilePath) -> NodeType?
 
 	func contentsOf(file ifp: some IntoFilePath) throws -> Data
