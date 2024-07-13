@@ -13,9 +13,8 @@ final class DirsTests: XCTestCase {
 			"/d/E": .file("enough!"),
 			"/f": .dir,
 		])
-		let root = try Dir(fs: mockFS, path: "/")
 
-		let children = try root.children()
+		let children = try mockFS.rootDir.children()
 		var childFileIterator = children.files
 			.sorted(by: Sort.asc(\.path.string))
 			.makeIterator()
@@ -168,6 +167,23 @@ final class DirsTests: XCTestCase {
 		let file = try fs.file(at: "/a")
 		try file.setContents("new content")
 		XCTAssertEqual(try file.stringContents(), "new content")
+	}
+
+	func testDeleteNode() throws {
+		let mockFS = MockFilesystemInterface(pathsToNodes: [
+			"/a": .file,
+			"/b": .file,
+			"/c": .file("c content"),
+			"/d": .dir,
+			"/d/E": .file("enough!"),
+			"/f": .dir,
+		])
+
+		try mockFS.deleteNode(at: "/a")
+		XCTAssertThrowsError(try mockFS.contentsOf(file: "/a"))
+
+		try mockFS.deleteNode(at: "/d")
+		XCTAssertThrowsError(try mockFS.contentsOf(file: "/d/E"))
 	}
 
 	func testFileParent() throws {

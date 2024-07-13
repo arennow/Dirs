@@ -49,4 +49,8 @@ public final class RealFSInterface: FilesystemInterface {
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
 		try contents.into().write(to: ifp.into().url, options: .atomic)
 	}
+
+	public func deleteNode(at ifp: some IntoFilePath) throws {
+		try FileManager.default.removeItem(at: ifp.into().url)
+	}
 }

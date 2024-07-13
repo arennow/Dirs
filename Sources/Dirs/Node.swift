@@ -13,4 +13,8 @@ public extension Node {
 	var parent: Dir? {
 		try? Dir(fs: self.fs, path: self.path.removingLastComponent())
 	}
+
+	func delete() throws {
+		try self.fs.deleteNode(at: self)
+	}
 }

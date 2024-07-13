@@ -27,6 +27,8 @@ public protocol FilesystemInterface: AnyObject {
 	func createDir(at ifp: some IntoFilePath) throws -> Dir
 
 	func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws
+
+	func deleteNode(at ifp: some IntoFilePath) throws
 }
 
 public extension FilesystemInterface {

@@ -114,4 +114,14 @@ public final class MockFilesystemInterface: FilesystemInterface {
 				self.pathsToNodes[fp] = .file(contents.into())
 		}
 	}
+
+	public func deleteNode(at ifp: some IntoFilePath) throws {
+		let fp = ifp.into()
+		let keysToDelete = self.pathsToNodes.keys
+			.filter { $0.starts(with: fp) }
+
+		for key in keysToDelete {
+			self.pathsToNodes[key] = nil
+		}
+	}
 }
