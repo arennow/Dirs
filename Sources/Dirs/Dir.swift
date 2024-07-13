@@ -2,10 +2,6 @@ import Foundation
 import SystemPackage
 
 public struct Dir: Node {
-	public static func == (lhs: Dir, rhs: Dir) -> Bool {
-		lhs.fs === rhs.fs && lhs.path == rhs.path
-	}
-
 	public let fs: any FilesystemInterface
 	public let path: FilePath
 

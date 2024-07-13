@@ -3,7 +3,7 @@ import Foundation
 import SystemPackage
 
 public final class MockFilesystemInterface: FilesystemInterface {
-	public enum MockNode {
+	public enum MockNode: Equatable {
 		case dir
 		case file(Data)
 		public static func file(_ string: String) -> Self { .file(Data(string.utf8)) }
@@ -17,8 +17,14 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		}
 	}
 
+	public static func == (lhs: MockFilesystemInterface, rhs: MockFilesystemInterface) -> Bool {
+		lhs.id == rhs.id
+	}
+
 	public static func empty() -> Self { Self() }
 
+	// To allow us to avoid traversing our fake FS for deep equality
+	private let id = UUID()
 	private var pathsToNodes: Dictionary<FilePath, MockNode>
 
 	public init(pathsToNodes: Dictionary<FilePath, MockNode> = [:]) {

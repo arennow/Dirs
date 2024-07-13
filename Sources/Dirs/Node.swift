@@ -6,6 +6,10 @@ public protocol Node: IntoFilePath, Hashable {
 }
 
 public extension Node {
+	static func == (lhs: Self, rhs: Self) -> Bool {
+		lhs.fs.isEqual(to: rhs.fs) && lhs.path == rhs.path
+	}
+
 	func into() -> FilePath { self.path }
 }
 

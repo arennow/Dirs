@@ -1,7 +1,12 @@
 import Foundation
 import SystemPackage
 
-public final class RealFSInterface: FilesystemInterface {
+public struct RealFSInterface: FilesystemInterface {
+	public func isEqual(to otherFSI: any FilesystemInterface) -> Bool {
+		// This type has no stored properties, so they're all the same
+		otherFSI is RealFSInterface
+	}
+
 	public init() {}
 
 	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {

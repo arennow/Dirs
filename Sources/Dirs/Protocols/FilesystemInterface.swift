@@ -15,7 +15,7 @@ public enum NodeType {
 	case dir, file
 }
 
-public protocol FilesystemInterface: AnyObject {
+public protocol FilesystemInterface: Equatable {
 	func nodeType(at ifp: some IntoFilePath) -> NodeType?
 
 	func contentsOf(file ifp: some IntoFilePath) throws -> Data
@@ -64,6 +64,11 @@ extension FilePath {
 }
 
 public extension FilesystemInterface {
+	func isEqual(to other: any FilesystemInterface) -> Bool {
+		guard let other = other as? Self else { return false }
+		return self == other
+	}
+
 	var rootDir: Dir {
 		get throws {
 			try self.dir(at: "/")
