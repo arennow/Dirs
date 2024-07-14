@@ -2,7 +2,7 @@ import Foundation
 import SystemPackage
 
 public extension FilePath {
-	var url: URL { URL(string: self.string)! }
+	var url: URL { URL(fileURLWithPath: self.string) }
 
 	var positionalComponents: some Collection<PositionalElement<FilePath.Component>> {
 		self.components.positionEnumerated()
