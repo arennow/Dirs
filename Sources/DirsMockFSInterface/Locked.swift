@@ -25,3 +25,32 @@ final class Locked<T>: @unchecked Sendable {
 		set { self.mutate { $0[key] = newValue }}
 	}
 }
+
+extension Locked {
+	struct AcquisitionHandle: ~Copyable {
+		private let parent: Locked
+		var resource: T {
+			_read {
+				yield self.parent.inner
+			}
+			nonmutating _modify {
+				yield &self.parent.inner
+			}
+		}
+
+		fileprivate init(parent: Locked) {
+			self.parent = parent
+		}
+
+		consuming func release() {}
+
+		deinit {
+			self.parent.lock.unlock()
+		}
+	}
+
+	func acquireIntoHandle() -> AcquisitionHandle {
+		self.lock.lock()
+		return AcquisitionHandle(parent: self)
+	}
+}

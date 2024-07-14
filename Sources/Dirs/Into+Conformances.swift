@@ -1,6 +1,12 @@
 import Foundation
 import SystemPackage
 
+public extension IntoFilePath {
+	func into() -> URL {
+		(self.into() as FilePath).url
+	}
+}
+
 extension String: IntoFilePath {
 	public func into() -> FilePath {
 		FilePath(self)
@@ -9,11 +15,7 @@ extension String: IntoFilePath {
 
 extension URL: IntoFilePath {
 	public func into() -> FilePath {
-		if #available(macOS 13.0, *) {
-			self.path(percentEncoded: false).into()
-		} else {
-			self.path.into()
-		}
+		self.pathNonPercentEncoded().into()
 	}
 }
 

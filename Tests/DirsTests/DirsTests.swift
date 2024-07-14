@@ -204,6 +204,96 @@ final class DirsTests: XCTestCase {
 	}
 }
 
+// MARK: - Moves
+
+extension DirsTests {
+	func testMoveNonexistantSourceFails() {
+		let mockFS = MockFilesystemInterface()
+		XCTAssertThrowsError(try mockFS.moveNode(from: "/a", to: "/b", replacingExisting: true))
+	}
+
+	func testMoveFileRenames() throws {
+		let mockFS = MockFilesystemInterface(pathsToNodes: [
+			"/c": .file("c content"),
+		])
+
+		try mockFS.moveNode(from: "/c", to: "/X", replacingExisting: true)
+		XCTAssertEqual(try mockFS.file(at: "/X").stringContents(), "c content")
+		XCTAssertNil(mockFS.nodeType(at: "/c"))
+	}
+
+	func testMoveFileReplaces() throws {
+		let mockFS = MockFilesystemInterface(pathsToNodes: [
+			"/c": .file("c content"),
+			"/d": .file,
+		])
+
+		try mockFS.moveNode(from: "/c", to: "/d", replacingExisting: true)
+		XCTAssertEqual(try mockFS.file(at: "/d").stringContents(), "c content")
+		XCTAssertNil(mockFS.nodeType(at: "/c"))
+	}
+
+	func testMoveFileDoesntReplace() throws {
+		let mockFS = MockFilesystemInterface(pathsToNodes: [
+			"/c": .file("c content"),
+			"/d": .file,
+		])
+
+		XCTAssertThrowsError(try mockFS.moveNode(from: "/c", to: "/d", replacingExisting: false))
+		XCTAssertEqual(try mockFS.file(at: "/c").stringContents(), "c content")
+		XCTAssertEqual(try mockFS.file(at: "/d").contents(), Data())
+	}
+
+	func testMoveFileChangesDir() throws {
+		let mockFS = MockFilesystemInterface(pathsToNodes: [
+			"/c": .file("c content"),
+			"/d": .dir,
+		])
+
+		try mockFS.moveNode(from: "/c", to: "/d", replacingExisting: true)
+		XCTAssertEqual(try mockFS.file(at: "/d/c").stringContents(), "c content")
+		XCTAssertNil(mockFS.nodeType(at: "/c"))
+	}
+
+	func testMoveDirRenames() throws {
+		let mockFS = MockFilesystemInterface(pathsToNodes: [
+			"/d": .dir,
+			"/d/a": .file("a content"),
+		])
+
+		try mockFS.moveNode(from: "/d", to: "/e", replacingExisting: true)
+		XCTAssertEqual(try mockFS.file(at: "/e/a").stringContents(), "a content")
+		XCTAssertNil(mockFS.nodeType(at: "/d"))
+		XCTAssertNil(mockFS.nodeType(at: "/d/a"))
+	}
+
+	func testMoveDirToFileFails() {
+		let mockFS = MockFilesystemInterface(pathsToNodes: [
+			"/a": .file,
+			"/d": .dir,
+		])
+
+		XCTAssertThrowsError(try mockFS.moveNode(from: "/d", to: "/a", replacingExisting: true))
+	}
+
+	func testMoveDirToDirIsRecursive() throws {
+		for re in [true, false] {
+			let mockFS = MockFilesystemInterface(pathsToNodes: [
+				"/d": .dir,
+				"/d/a": .file("a"),
+				"/d/b": .dir,
+				"/d/b/c": .file("c"),
+				"/e": .dir,
+			])
+
+			try mockFS.moveNode(from: "/d", to: "/e", replacingExisting: re)
+			XCTAssertEqual(try mockFS.file(at: "/e/d/a").stringContents(), "a")
+			XCTAssertEqual(try mockFS.file(at: "/e/d/b/c").stringContents(), "c")
+			XCTAssertNil(mockFS.nodeType(at: "/d"))
+		}
+	}
+}
+
 extension DirsTests {
 	func testRandomPathDiffers() {
 		let fs = MockFilesystemInterface()

@@ -30,6 +30,15 @@ extension URL {
 
 		return number.boolValue
 	}
+
+	@available(macOS, obsoleted: 13)
+	func pathNonPercentEncoded() -> String {
+		if #available(macOS 13, *) {
+			self.path(percentEncoded: false)
+		} else {
+			self.path
+		}
+	}
 }
 
 public extension Collection {

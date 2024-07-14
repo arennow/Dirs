@@ -5,7 +5,23 @@ import Foundation
 
 import SystemPackage
 
-public protocol IntoFilePath {
+public protocol IntoURL {
+	func into() -> URL
+}
+
+public extension URL {
+	static func from(_ source: some IntoURL) -> URL { source.into() }
+}
+
+public extension Sequence where Element: IntoURL {
+	func mapInto() -> Array<URL> { map { $0.into() } }
+}
+
+extension URL: IntoURL {
+	public func into() -> URL { self }
+}
+
+public protocol IntoFilePath: IntoURL {
 	func into() -> FilePath
 }
 

@@ -29,6 +29,7 @@ public protocol FilesystemInterface: Equatable, Sendable {
 	func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws
 
 	func deleteNode(at ifp: some IntoFilePath) throws
+	func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath, replacingExisting: Bool) throws
 }
 
 public extension FilesystemInterface {

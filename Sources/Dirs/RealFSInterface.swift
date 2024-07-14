@@ -47,15 +47,28 @@ public struct RealFSInterface: FilesystemInterface {
 
 	public func createDir(at ifp: some IntoFilePath) throws -> Dir {
 		let fp = ifp.into()
-		try FileManager.default.createDirectory(at: fp.url, withIntermediateDirectories: true)
+		try FileManager.default.createDirectory(at: fp.into(), withIntermediateDirectories: true)
 		return try Dir(fs: self, path: fp)
 	}
 
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
-		try contents.into().write(to: ifp.into().url, options: .atomic)
+		try contents.into().write(to: ifp.into(), options: .atomic)
 	}
 
 	public func deleteNode(at ifp: some IntoFilePath) throws {
-		try FileManager.default.removeItem(at: ifp.into().url)
+		try FileManager.default.removeItem(at: ifp.into())
+	}
+
+	public func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath, replacingExisting: Bool) throws {
+		let destURL: URL = destination.into()
+		let srcURL: URL = source.into()
+		let fm = FileManager.default
+
+		var isDirectory: ObjCBool = false
+		if fm.fileExists(atPath: destURL.pathNonPercentEncoded(), isDirectory: &isDirectory), !isDirectory.boolValue {
+			try fm.removeItem(at: destURL)
+		}
+
+		try fm.moveItem(at: srcURL, to: destURL)
 	}
 }

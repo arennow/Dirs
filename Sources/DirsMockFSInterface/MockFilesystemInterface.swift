@@ -33,8 +33,14 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		self.pathsToNodes = Locked(pathsToNodes)
 	}
 
+	private static func nodeType(at ifp: some IntoFilePath, in ptn: Dictionary<FilePath, MockNode>) -> NodeType? {
+		ptn[ifp.into()]?.nodeType
+	}
+
 	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
-		self.pathsToNodes[ifp.into()]?.nodeType
+		self.pathsToNodes.read { ptn in
+			Self.nodeType(at: ifp, in: ptn)
+		}
 	}
 
 	public func contentsOf(file ifp: some IntoFilePath) throws -> Data {
@@ -128,6 +134,67 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 		for key in keysToDelete {
 			self.pathsToNodes[key] = nil
+		}
+	}
+
+	public func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath, replacingExisting: Bool) throws {
+		let srcFP: FilePath = source.into()
+		let destFP: FilePath = destination.into()
+
+		let acquisitionLock = self.pathsToNodes.acquireIntoHandle()
+
+		let srcType = Self.nodeType(at: srcFP, in: acquisitionLock.resource)
+		let destType = Self.nodeType(at: destFP, in: acquisitionLock.resource)
+
+		switch srcType {
+			case .none:
+				throw NoSuchNode(path: srcFP)
+
+			case .file:
+				if !replacingExisting, destType == .file {
+					throw NodeAlreadyExists(path: destFP, type: .file)
+				}
+
+				let fileToMove = acquisitionLock.resource.removeValue(forKey: srcFP)
+
+				switch destType {
+					case .file, .none:
+						acquisitionLock.resource[destFP] = fileToMove
+
+					case .dir:
+						let resolvedDestFP = destFP.appending(srcFP.lastComponent!)
+						acquisitionLock.resource[resolvedDestFP] = fileToMove
+				}
+
+			case .dir:
+				let nodePathsToMove = acquisitionLock.resource.keys
+					.filter { $0.starts(with: srcFP) }
+
+				switch destType {
+					case .file:
+						throw WrongNodeType(path: destFP, actualType: .file)
+
+					case .dir:
+						let resolvedDestFPRoot = destFP.appending(srcFP.lastComponent!)
+						for var nodePath in nodePathsToMove {
+							let nodeToMove = acquisitionLock.resource.removeValue(forKey: nodePath)
+
+							let removed = nodePath.removePrefix(srcFP)
+							assert(removed)
+							let resolvedDestFP = resolvedDestFPRoot.appending(nodePath.components)
+							acquisitionLock.resource[resolvedDestFP] = nodeToMove
+						}
+
+					case .none:
+						for var nodePath in nodePathsToMove {
+							let nodeToMove = acquisitionLock.resource.removeValue(forKey: nodePath)
+
+							let removed = nodePath.removePrefix(srcFP)
+							assert(removed)
+							let resolvedDestFP = destFP.appending(nodePath.components)
+							acquisitionLock.resource[resolvedDestFP] = nodeToMove
+						}
+				}
 		}
 	}
 }
