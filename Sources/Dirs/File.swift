@@ -30,7 +30,11 @@ public extension File {
 		String(data: try self.contents(), encoding: .utf8)
 	}
 
-	func setContents(_ content: some IntoData) throws {
+	func replaceContents(_ content: some IntoData) throws {
 		try self.fs.replaceContentsOfFile(at: self, to: content)
+	}
+
+	func appendContents(_ addendum: some IntoData) throws {
+		try self.fs.appendContentsOfFile(at: self, with: addendum)
 	}
 }

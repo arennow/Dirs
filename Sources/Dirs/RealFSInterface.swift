@@ -55,6 +55,12 @@ public struct RealFSInterface: FilesystemInterface {
 		try contents.into().write(to: ifp.into(), options: .atomic)
 	}
 
+	public func appendContentsOfFile(at ifp: some IntoFilePath, with addendum: some IntoData) throws {
+		let fd = try FileDescriptor.open(ifp.into(), .writeOnly, options: .append, retryOnInterrupt: true)
+		defer { try? fd.close() }
+		try fd.writeAll(addendum.into())
+	}
+
 	public func deleteNode(at ifp: some IntoFilePath) throws {
 		try FileManager.default.removeItem(at: ifp.into())
 	}

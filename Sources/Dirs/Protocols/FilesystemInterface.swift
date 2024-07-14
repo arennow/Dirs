@@ -27,6 +27,7 @@ public protocol FilesystemInterface: Equatable, Sendable {
 	func createDir(at ifp: some IntoFilePath) throws -> Dir
 
 	func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws
+	func appendContentsOfFile(at ifp: some IntoFilePath, with addendum: some IntoData) throws
 
 	func deleteNode(at ifp: some IntoFilePath) throws
 	func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath, replacingExisting: Bool) throws
@@ -53,8 +54,17 @@ public extension FilesystemInterface {
 
 		let dir = try self.rootDir.createDir(at: path)
 		let file = try dir.createFile(at: leaf)
-		try file.setContents(contents)
+		try file.replaceContents(contents)
 		return file
+	}
+}
+
+public extension FilesystemInterface {
+	func appendContentsOfFile(at ifp: some IntoFilePath, with addendum: some IntoData) throws {
+		let fp = ifp.into()
+		var content = (try? self.contentsOf(file: fp)) ?? Data()
+		content.append(addendum.into())
+		try self.replaceContentsOfFile(at: fp, to: content)
 	}
 }
 

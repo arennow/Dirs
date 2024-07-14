@@ -165,8 +165,18 @@ final class DirsTests: XCTestCase {
 		])
 
 		let file = try fs.file(at: "/a")
-		try file.setContents("new content")
+		try file.replaceContents("new content")
 		XCTAssertEqual(try file.stringContents(), "new content")
+	}
+
+	func testAppendContentsOfFile() throws {
+		let fs = MockFilesystemInterface(pathsToNodes: [
+			"/a": .file("content"),
+		])
+
+		let file = try fs.file(at: "/a")
+		try file.appendContents(" is king")
+		XCTAssertEqual(try file.stringContents(), "content is king")
 	}
 
 	func testDeleteNode() throws {
