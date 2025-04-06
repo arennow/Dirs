@@ -14,6 +14,10 @@ public extension Node {
 }
 
 public extension Node {
+	var name: String {
+		self.path.lastComponent?.string ?? ""
+	}
+
 	var parent: Dir? {
 		try? Dir(fs: self.fs, path: self.path.removingLastComponent())
 	}

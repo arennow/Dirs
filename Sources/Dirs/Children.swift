@@ -14,4 +14,8 @@ public struct Children {
 	var all: some Sequence<any Node> {
 		chain(self.directories, self.files)
 	}
+
+	var isEmpty: Bool {
+		self.directories.isEmpty && self.files.isEmpty
+	}
 }
