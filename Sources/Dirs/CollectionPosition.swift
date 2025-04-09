@@ -1,4 +1,4 @@
-public struct CollectionPosition: RawRepresentable, OptionSet {
+public struct CollectionPosition: Sendable, RawRepresentable, OptionSet {
 	public let rawValue: UInt8
 
 	public init(rawValue: UInt8) { self.rawValue = rawValue }

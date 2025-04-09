@@ -11,7 +11,7 @@ public struct FilePathStat {
 	}
 }
 
-public enum NodeType {
+public enum NodeType: Sendable {
 	case dir, file
 }
 
