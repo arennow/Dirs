@@ -10,7 +10,9 @@ public struct Children {
 		self.directories = directories
 		self.files = files
 	}
+}
 
+public extension Children {
 	var all: some Sequence<any Node> {
 		chain(self.directories, self.files)
 	}
