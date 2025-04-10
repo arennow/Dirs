@@ -1,10 +1,11 @@
 @testable import Dirs
 import DirsMockFSInterface
+import Foundation
 import SortAndFilter
-import XCTest
+import Testing
 
-final class DirsTests: XCTestCase {
-	func testBasicFSReading() throws {
+struct DirsTests {
+	@Test func basicFSReading() throws {
 		let mockFS = MockFilesystemInterface(pathsToNodes: [
 			"/a": .file,
 			"/b": .file,
@@ -19,28 +20,33 @@ final class DirsTests: XCTestCase {
 			.sorted(by: Sort.asc(\.path.string))
 			.makeIterator()
 
-		XCTAssertEqual(childFileIterator.next()?.path, "/a")
-		XCTAssertEqual(childFileIterator.next()?.path, "/b")
+		#expect(childFileIterator.next()?.path == "/a")
+		#expect(childFileIterator.next()?.path == "/b")
 
-		let cFile = try XCTUnwrap(childFileIterator.next())
-		XCTAssertEqual(cFile.path, "/c")
-		XCTAssertEqual(try cFile.stringContents(), "c content")
+		/*
+		 This stupid indirection is due to the implicit autoclosure in the
+		 expansion of #require not being able to handle a mutating function
+		 */
+		// swiftformat:disable:next redundantClosure
+		let cFile = try #require({ childFileIterator.next() }())
+		#expect(cFile.path == "/c")
+		#expect(try cFile.stringContents() == "c content")
 
-		XCTAssertNil(childFileIterator.next())
+		#expect(childFileIterator.next() == nil)
 
 		var childDirIterator = children.directories
 			.sorted(by: Sort.asc(\.path.string))
 			.makeIterator()
 
 		let dDir = childDirIterator.next()
-		XCTAssertEqual(dDir?.path, "/d")
-		XCTAssertEqual(try dDir?.children().files.first?.stringContents(), "enough!")
+		#expect(dDir?.path == "/d")
+		#expect(try dDir?.children().files.first?.stringContents() == "enough!")
 
-		XCTAssertEqual(childDirIterator.next()?.path, "/f")
-		XCTAssertNil(childDirIterator.next())
+		#expect(childDirIterator.next()?.path == "/f")
+		#expect(childDirIterator.next() == nil)
 	}
 
-	func testSubgraphFinding() throws {
+	@Test func subgraphFinding() throws {
 		let fs = MockFilesystemInterface(pathsToNodes: [
 			"/a1": .file,
 			"/a2": .dir,
@@ -53,133 +59,133 @@ final class DirsTests: XCTestCase {
 
 		let d = try Dir(fs: fs, path: "/")
 
-		XCTAssertNotNil(d.childFile(named: "a1"))
+		#expect(d.childFile(named: "a1") != nil)
 		// Make sure we don't just support literals ⬇️
-		XCTAssertNotNil(d.childFile(named: "a1" as String))
-		XCTAssertNil(d.childFile(named: "a2"))
-		XCTAssertNil(d.childFile(named: "a3"))
-		XCTAssertNil(d.childFile(named: "a4"))
+		#expect(d.childFile(named: "a1" as String) != nil)
+		#expect(d.childFile(named: "a2") == nil)
+		#expect(d.childFile(named: "a3") == nil)
+		#expect(d.childFile(named: "a4") == nil)
 
-		XCTAssertNil(d.childDir(named: "a1"))
+		#expect(d.childDir(named: "a1") == nil)
 		// Make sure we don't just support literals ⬇️
-		XCTAssertNil(d.childDir(named: "a1" as String))
-		XCTAssertNotNil(d.childDir(named: "a2"))
-		XCTAssertNotNil(d.childDir(named: "a3"))
-		XCTAssertNotNil(d.childDir(named: "a4"))
+		#expect(d.childDir(named: "a1" as String) == nil)
+		#expect(d.childDir(named: "a2") != nil)
+		#expect(d.childDir(named: "a3") != nil)
+		#expect(d.childDir(named: "a4") != nil)
 
-		XCTAssertNotNil(d.descendentFile(at: "a1"))
-		XCTAssertNil(d.descendentFile(at: "a2"))
-		XCTAssertNil(d.descendentFile(at: "a3"))
-		XCTAssertNil(d.descendentFile(at: "a4"))
-		XCTAssertNotNil(d.descendentFile(at: "a4/a4b1/a4b1c1"))
+		#expect(d.descendentFile(at: "a1") != nil)
+		#expect(d.descendentFile(at: "a2") == nil)
+		#expect(d.descendentFile(at: "a3") == nil)
+		#expect(d.descendentFile(at: "a4") == nil)
+		#expect(d.descendentFile(at: "a4/a4b1/a4b1c1") != nil)
 
-		XCTAssertNil(d.descendentDir(at: "a1"))
-		XCTAssertNotNil(d.descendentDir(at: "a2"))
-		XCTAssertNotNil(d.descendentDir(at: "a3"))
-		XCTAssertNotNil(d.descendentDir(at: "a4"))
-		XCTAssertNotNil(d.descendentDir(at: "a4/a4b1"))
-		XCTAssertNil(d.descendentDir(at: "a4/a4b1/a4b1c1"))
+		#expect(d.descendentDir(at: "a1") == nil)
+		#expect(d.descendentDir(at: "a2") != nil)
+		#expect(d.descendentDir(at: "a3") != nil)
+		#expect(d.descendentDir(at: "a4") != nil)
+		#expect(d.descendentDir(at: "a4/a4b1") != nil)
+		#expect(d.descendentDir(at: "a4/a4b1/a4b1c1") == nil)
 	}
 
-	func testCreateDir() throws {
+	@Test func createDir() throws {
 		let fs = MockFilesystemInterface.empty()
 		let created = try fs.createDir(at: "/a/b/c/d")
 
-		XCTAssertNoThrow(try Dir(fs: fs, path: "/a"))
-		XCTAssertEqual(try Dir(fs: fs, path: "/a/b/c/d"), created)
+		#expect(throws: Never.self) { try Dir(fs: fs, path: "/a") }
+		#expect(try Dir(fs: fs, path: "/a/b/c/d") == created)
 
-		XCTAssertNoThrow(try fs.createDir(at: "/a/b/c/d"))
+		#expect(throws: Never.self) { try fs.createDir(at: "/a/b/c/d") }
 	}
 
-	func testCreateIntermediateDirs() throws {
+	@Test func createIntermediateDirs() throws {
 		let fs = MockFilesystemInterface(pathsToNodes: [
 			"/a/b/c": .dir,
 		])
 
 		try fs.createDir(at: "/a/b/c/d/e")
-		XCTAssertEqual(fs.nodeType(at: "/a/b/c"), .dir)
-		XCTAssertEqual(fs.nodeType(at: "/a/b/c/d"), .dir)
-		XCTAssertEqual(fs.nodeType(at: "/a/b/c/d/e"), .dir)
+		#expect(fs.nodeType(at: "/a/b/c") == .dir)
+		#expect(fs.nodeType(at: "/a/b/c/d") == .dir)
+		#expect(fs.nodeType(at: "/a/b/c/d/e") == .dir)
 	}
 
-	func testCreateExistingDir() throws {
+	@Test func createExistingDir() throws {
 		let fs = MockFilesystemInterface(pathsToNodes: [
 			"/a": .dir,
 		])
 
-		XCTAssertNoThrow(try fs.createDir(at: "/a"))
+		#expect(throws: Never.self) { try fs.createDir(at: "/a") }
 	}
 
-	func testDirOverExistingFileFails() throws {
+	@Test func dirOverExistingFileFails() throws {
 		let fs = MockFilesystemInterface(pathsToNodes: [
 			"/a": .file,
 		])
 
-		XCTAssertThrowsError(try fs.createDir(at: "/a"))
+		#expect(throws: (any Error).self) { try fs.createDir(at: "/a") }
 	}
 
-	func testCreateIntermediateDirsOverExistingFileFails() throws {
+	@Test func createIntermediateDirsOverExistingFileFails() throws {
 		let fs = MockFilesystemInterface(pathsToNodes: [
 			"/a": .file("content"),
 		])
 
-		XCTAssertThrowsError(try fs.createDir(at: "/a/b"))
-		XCTAssertEqual(try fs.contentsOf(file: "/a"), Data("content".utf8))
+		#expect(throws: (any Error).self) { try fs.createDir(at: "/a/b") }
+		#expect(try fs.contentsOf(file: "/a") == Data("content".utf8))
 	}
 
-	func testCreateFile() throws {
+	@Test func createFile() throws {
 		let fs = MockFilesystemInterface.empty()
 		let subDir = try fs.createDir(at: "/a")
 
 		let createdFile = try subDir.createFile(at: "file")
 
-		XCTAssertEqual(createdFile.path, "/a/file")
-		XCTAssertNoThrow(try File(fs: fs, path: "/a/file"))
-		XCTAssertEqual(try createdFile.contents(), Data())
-		XCTAssertEqual(try fs.contentsOf(file: "/a/file"), Data())
+		#expect(createdFile.path == "/a/file")
+		#expect(throws: Never.self) { try File(fs: fs, path: "/a/file") }
+		#expect(try createdFile.contents() == Data())
+		#expect(try fs.contentsOf(file: "/a/file") == Data())
 	}
 
-	func testCreateExistingFileFails() throws {
+	@Test func createExistingFileFails() throws {
 		let fs = MockFilesystemInterface(pathsToNodes: [
 			"/a": .file("content"),
 		])
 
 		let root = try Dir(fs: fs, path: "/")
-		XCTAssertThrowsError(try root.createFile(at: "a"))
-		XCTAssertEqual(try fs.contentsOf(file: "/a"), Data("content".utf8))
+		#expect(throws: (any Error).self) { try root.createFile(at: "a") }
+		#expect(try fs.contentsOf(file: "/a") == Data("content".utf8))
 	}
 
-	func testCreateFileAtExistingDirFails() throws {
+	@Test func createFileAtExistingDirFails() throws {
 		let fs = MockFilesystemInterface(pathsToNodes: [
 			"/a": .dir,
 		])
 
 		let root = try Dir(fs: fs, path: "/")
-		XCTAssertThrowsError(try root.createFile(at: "a"))
-		XCTAssertEqual(fs.nodeType(at: "/a"), .dir)
+		#expect(throws: (any Error).self) { try root.createFile(at: "a") }
+		#expect(fs.nodeType(at: "/a") == .dir)
 	}
 
-	func testReplaceContentsOfFile() throws {
+	@Test func replaceContentsOfFile() throws {
 		let fs = MockFilesystemInterface(pathsToNodes: [
 			"/a": .file("content"),
 		])
 
 		let file = try fs.file(at: "/a")
 		try file.replaceContents("new content")
-		XCTAssertEqual(try file.stringContents(), "new content")
+		#expect(try file.stringContents() == "new content")
 	}
 
-	func testAppendContentsOfFile() throws {
+	@Test func appendContentsOfFile() throws {
 		let fs = MockFilesystemInterface(pathsToNodes: [
 			"/a": .file("content"),
 		])
 
 		let file = try fs.file(at: "/a")
 		try file.appendContents(" is king")
-		XCTAssertEqual(try file.stringContents(), "content is king")
+		#expect(try file.stringContents() == "content is king")
 	}
 
-	func testDeleteNode() throws {
+	@Test func deleteNode() throws {
 		let mockFS = MockFilesystemInterface(pathsToNodes: [
 			"/a": .file,
 			"/b": .file,
@@ -190,103 +196,103 @@ final class DirsTests: XCTestCase {
 		])
 
 		try mockFS.deleteNode(at: "/a")
-		XCTAssertThrowsError(try mockFS.contentsOf(file: "/a"))
+		#expect(throws: (any Error).self) { try mockFS.contentsOf(file: "/a") }
 
 		try mockFS.deleteNode(at: "/d")
-		XCTAssertThrowsError(try mockFS.contentsOf(file: "/d/E"))
+		#expect(throws: (any Error).self) { try mockFS.contentsOf(file: "/d/E") }
 	}
 
-	func testFileParent() throws {
+	@Test func fileParent() throws {
 		let fs = MockFilesystemInterface(pathsToNodes: [
 			"/a": .file,
 		])
 
-		try XCTAssertEqual(fs.file(at: "/a").parent, fs.rootDir)
+		#expect(try fs.file(at: "/a").parent == fs.rootDir)
 	}
 
-	func testCreateFileAndIntermediaryDirs() throws {
+	@Test func createFileAndIntermediaryDirs() throws {
 		let fs = MockFilesystemInterface()
 		_ = try fs.createFileAndIntermediaryDirs(at: "/a/b/c/d/file1", contents: "contents 1")
-		XCTAssertEqual(try fs.contentsOf(file: "/a/b/c/d/file1"), "contents 1".into())
+		#expect(try fs.contentsOf(file: "/a/b/c/d/file1") == "contents 1".into())
 
 		_ = try fs.createFileAndIntermediaryDirs(at: "/file2", contents: "contents 2")
-		XCTAssertEqual(try fs.contentsOf(file: "/file2"), "contents 2".into())
+		#expect(try fs.contentsOf(file: "/file2") == "contents 2".into())
 	}
 }
 
 // MARK: - Moves
 
 extension DirsTests {
-	func testMoveNonexistantSourceFails() {
+	@Test func moveNonexistantSourceFails() {
 		let mockFS = MockFilesystemInterface()
-		XCTAssertThrowsError(try mockFS.moveNode(from: "/a", to: "/b", replacingExisting: true))
+		#expect(throws: (any Error).self) { try mockFS.moveNode(from: "/a", to: "/b", replacingExisting: true) }
 	}
 
-	func testMoveFileRenames() throws {
+	@Test func moveFileRenames() throws {
 		let mockFS = MockFilesystemInterface(pathsToNodes: [
 			"/c": .file("c content"),
 		])
 
 		try mockFS.moveNode(from: "/c", to: "/X", replacingExisting: true)
-		XCTAssertEqual(try mockFS.file(at: "/X").stringContents(), "c content")
-		XCTAssertNil(mockFS.nodeType(at: "/c"))
+		#expect(try mockFS.file(at: "/X").stringContents() == "c content")
+		#expect(mockFS.nodeType(at: "/c") == nil)
 	}
 
-	func testMoveFileReplaces() throws {
+	@Test func moveFileReplaces() throws {
 		let mockFS = MockFilesystemInterface(pathsToNodes: [
 			"/c": .file("c content"),
 			"/d": .file,
 		])
 
 		try mockFS.moveNode(from: "/c", to: "/d", replacingExisting: true)
-		XCTAssertEqual(try mockFS.file(at: "/d").stringContents(), "c content")
-		XCTAssertNil(mockFS.nodeType(at: "/c"))
+		#expect(try mockFS.file(at: "/d").stringContents() == "c content")
+		#expect(mockFS.nodeType(at: "/c") == nil)
 	}
 
-	func testMoveFileDoesntReplace() throws {
+	@Test func moveFileDoesntReplace() throws {
 		let mockFS = MockFilesystemInterface(pathsToNodes: [
 			"/c": .file("c content"),
 			"/d": .file,
 		])
 
-		XCTAssertThrowsError(try mockFS.moveNode(from: "/c", to: "/d", replacingExisting: false))
-		XCTAssertEqual(try mockFS.file(at: "/c").stringContents(), "c content")
-		XCTAssertEqual(try mockFS.file(at: "/d").contents(), Data())
+		#expect(throws: (any Error).self) { try mockFS.moveNode(from: "/c", to: "/d", replacingExisting: false) }
+		#expect(try mockFS.file(at: "/c").stringContents() == "c content")
+		#expect(try mockFS.file(at: "/d").contents() == Data())
 	}
 
-	func testMoveFileChangesDir() throws {
+	@Test func moveFileChangesDir() throws {
 		let mockFS = MockFilesystemInterface(pathsToNodes: [
 			"/c": .file("c content"),
 			"/d": .dir,
 		])
 
 		try mockFS.moveNode(from: "/c", to: "/d", replacingExisting: true)
-		XCTAssertEqual(try mockFS.file(at: "/d/c").stringContents(), "c content")
-		XCTAssertNil(mockFS.nodeType(at: "/c"))
+		#expect(try mockFS.file(at: "/d/c").stringContents() == "c content")
+		#expect(mockFS.nodeType(at: "/c") == nil)
 	}
 
-	func testMoveDirRenames() throws {
+	@Test func moveDirRenames() throws {
 		let mockFS = MockFilesystemInterface(pathsToNodes: [
 			"/d": .dir,
 			"/d/a": .file("a content"),
 		])
 
 		try mockFS.moveNode(from: "/d", to: "/e", replacingExisting: true)
-		XCTAssertEqual(try mockFS.file(at: "/e/a").stringContents(), "a content")
-		XCTAssertNil(mockFS.nodeType(at: "/d"))
-		XCTAssertNil(mockFS.nodeType(at: "/d/a"))
+		#expect(try mockFS.file(at: "/e/a").stringContents() == "a content")
+		#expect(mockFS.nodeType(at: "/d") == nil)
+		#expect(mockFS.nodeType(at: "/d/a") == nil)
 	}
 
-	func testMoveDirToFileFails() {
+	@Test func moveDirToFileFails() {
 		let mockFS = MockFilesystemInterface(pathsToNodes: [
 			"/a": .file,
 			"/d": .dir,
 		])
 
-		XCTAssertThrowsError(try mockFS.moveNode(from: "/d", to: "/a", replacingExisting: true))
+		#expect(throws: (any Error).self) { try mockFS.moveNode(from: "/d", to: "/a", replacingExisting: true) }
 	}
 
-	func testMoveDirToDirIsRecursive() throws {
+	@Test func moveDirToDirIsRecursive() throws {
 		for re in [true, false] {
 			let mockFS = MockFilesystemInterface(pathsToNodes: [
 				"/d": .dir,
@@ -297,24 +303,24 @@ extension DirsTests {
 			])
 
 			try mockFS.moveNode(from: "/d", to: "/e", replacingExisting: re)
-			XCTAssertEqual(try mockFS.file(at: "/e/d/a").stringContents(), "a")
-			XCTAssertEqual(try mockFS.file(at: "/e/d/b/c").stringContents(), "c")
-			XCTAssertNil(mockFS.nodeType(at: "/d"))
+			#expect(try mockFS.file(at: "/e/d/a").stringContents() == "a")
+			#expect(try mockFS.file(at: "/e/d/b/c").stringContents() == "c")
+			#expect(mockFS.nodeType(at: "/d") == nil)
 		}
 	}
 }
 
 extension DirsTests {
-	func testRandomPathDiffers() {
+	@Test func randomPathDiffers() {
 		let fs = MockFilesystemInterface()
 
-		XCTAssertNotEqual(fs.filePathOfNonexistantTemporaryFile(), fs.filePathOfNonexistantTemporaryFile())
+		#expect(fs.filePathOfNonexistantTemporaryFile() != fs.filePathOfNonexistantTemporaryFile())
 	}
 
-	func testRandomPathHasExtension() {
+	@Test func randomPathHasExtension() {
 		let fs = MockFilesystemInterface()
 
-		XCTAssert(fs.filePathOfNonexistantTemporaryFile(extension: "abcd").string.hasSuffix("abcd"))
-		XCTAssert(fs.filePathOfNonexistantTemporaryFile(extension: ".abcd.").string.hasSuffix("abcd"))
+		#expect(fs.filePathOfNonexistantTemporaryFile(extension: "abcd").string.hasSuffix("abcd"))
+		#expect(fs.filePathOfNonexistantTemporaryFile(extension: ".abcd.").string.hasSuffix("abcd"))
 	}
 }
