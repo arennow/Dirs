@@ -202,6 +202,11 @@ struct DirsTests {
 		#expect(throws: (any Error).self) { try mockFS.contentsOf(file: "/d/E") }
 	}
 
+	@Test func deleteNonexistentNodeFails() {
+		let mockFS = MockFilesystemInterface()
+		#expect(throws: (any Error).self) { try mockFS.deleteNode(at: "/a") }
+	}
+
 	@Test func fileParent() throws {
 		let fs = MockFilesystemInterface(pathsToNodes: [
 			"/a": .file,

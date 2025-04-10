@@ -129,11 +129,17 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 	public func deleteNode(at ifp: some IntoFilePath) throws {
 		let fp = ifp.into()
-		let keysToDelete = self.pathsToNodes.read(in: \.keys)
+		let acquisitionLock = self.pathsToNodes.acquireIntoHandle()
+
+		let keysToDelete = acquisitionLock.resource.keys
 			.filter { $0.starts(with: fp) }
 
+		guard !keysToDelete.isEmpty else {
+			throw NoSuchNode(path: fp)
+		}
+
 		for key in keysToDelete {
-			self.pathsToNodes[key] = nil
+			acquisitionLock.resource[key] = nil
 		}
 	}
 
