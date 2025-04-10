@@ -228,7 +228,7 @@ struct DirsTests {
 // MARK: - Moves
 
 extension DirsTests {
-	@Test func moveNonexistantSourceFails() {
+	@Test func moveNonexistentSourceFails() {
 		let mockFS = MockFilesystemInterface()
 		#expect(throws: (any Error).self) { try mockFS.moveNode(from: "/a", to: "/b", replacingExisting: true) }
 	}
@@ -319,13 +319,13 @@ extension DirsTests {
 	@Test func randomPathDiffers() {
 		let fs = MockFilesystemInterface()
 
-		#expect(fs.filePathOfNonexistantTemporaryFile() != fs.filePathOfNonexistantTemporaryFile())
+		#expect(fs.filePathOfNonexistentTemporaryFile() != fs.filePathOfNonexistentTemporaryFile())
 	}
 
 	@Test func randomPathHasExtension() {
 		let fs = MockFilesystemInterface()
 
-		#expect(fs.filePathOfNonexistantTemporaryFile(extension: "abcd").string.hasSuffix("abcd"))
-		#expect(fs.filePathOfNonexistantTemporaryFile(extension: ".abcd.").string.hasSuffix("abcd"))
+		#expect(fs.filePathOfNonexistentTemporaryFile(extension: "abcd").string.hasSuffix("abcd"))
+		#expect(fs.filePathOfNonexistentTemporaryFile(extension: ".abcd.").string.hasSuffix("abcd"))
 	}
 }

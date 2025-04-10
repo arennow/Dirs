@@ -30,7 +30,7 @@ public struct RealFSInterface: FilesystemInterface {
 								isDirectory: try $0.getBoolResourceValue(forKey: .isDirectoryKey)) }
 	}
 
-	public func filePathOfNonexistantTemporaryFile(extension: String?) -> SystemPackage.FilePath {
+	public func filePathOfNonexistentTemporaryFile(extension: String?) -> SystemPackage.FilePath {
 		var filename = UUID().uuidString
 		if let `extension` {
 			filename += ".\(`extension`.trimmingCharacters(in: ["."]))"

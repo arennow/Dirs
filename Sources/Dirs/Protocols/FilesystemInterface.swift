@@ -21,7 +21,7 @@ public protocol FilesystemInterface: Equatable, Sendable {
 	func contentsOf(file ifp: some IntoFilePath) throws -> Data
 	func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat>
 
-	func filePathOfNonexistantTemporaryFile(extension: String?) -> FilePath
+	func filePathOfNonexistentTemporaryFile(extension: String?) -> FilePath
 
 	func createFile(at ifp: some IntoFilePath) throws -> File
 	func createDir(at ifp: some IntoFilePath) throws -> Dir
@@ -34,8 +34,8 @@ public protocol FilesystemInterface: Equatable, Sendable {
 }
 
 public extension FilesystemInterface {
-	func filePathOfNonexistantTemporaryFile() -> FilePath {
-		self.filePathOfNonexistantTemporaryFile(extension: nil)
+	func filePathOfNonexistentTemporaryFile() -> FilePath {
+		self.filePathOfNonexistentTemporaryFile(extension: nil)
 	}
 
 	func dir(at ifp: some IntoFilePath) throws -> Dir {

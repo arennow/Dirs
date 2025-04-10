@@ -70,7 +70,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		}
 	}
 
-	public func filePathOfNonexistantTemporaryFile(extension: String?) -> FilePath {
+	public func filePathOfNonexistentTemporaryFile(extension: String?) -> FilePath {
 		var filename = UUID().uuidString
 		if let `extension` {
 			filename += ".\(`extension`.trimmingCharacters(in: ["."]))"
