@@ -32,8 +32,10 @@ extension URL {
 	}
 
 	@available(macOS, obsoleted: 13)
+	@available(iOS, obsoleted: 16)
+	@available(tvOS, obsoleted: 16)
 	func pathNonPercentEncoded() -> String {
-		if #available(macOS 13, *) {
+		if #available(macOS 13, iOS 16, tvOS 16, *) {
 			self.path(percentEncoded: false)
 		} else {
 			self.path
