@@ -5,10 +5,16 @@ public struct Dir: Node {
 	public let fs: any FilesystemInterface
 	public let path: FilePath
 
-	public init(fs: any FilesystemInterface, path: FilePath) throws {
+	public init(fs: any FilesystemInterface, path: FilePath, createIfNeeded: Bool = false) throws {
 		switch fs.nodeType(at: path) {
 			case .file: throw WrongNodeType(path: path, actualType: .file)
-			case .none: throw NoSuchNode(path: path)
+			case .none:
+				if createIfNeeded {
+					self = try fs.createDir(at: path)
+					return
+				} else {
+					throw NoSuchNode(path: path)
+				}
 			case .dir: break
 		}
 

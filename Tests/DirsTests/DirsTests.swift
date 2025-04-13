@@ -2,6 +2,7 @@
 import DirsMockFSInterface
 import Foundation
 import SortAndFilter
+import SystemPackage
 import Testing
 
 struct DirsTests {
@@ -222,6 +223,24 @@ struct DirsTests {
 
 		_ = try fs.createFileAndIntermediaryDirs(at: "/file2", contents: "contents 2")
 		#expect(try fs.contentsOf(file: "/file2") == "contents 2".into())
+	}
+
+	@Test(arguments: ["/new", "/existing"])
+	func dirInitWithCreation(path: FilePath) throws {
+		let fs = MockFilesystemInterface(pathsToNodes: [
+			"/existing": .dir,
+		])
+
+		let firstTime = try Dir(fs: fs, path: path, createIfNeeded: true)
+		let secondTime = try fs.dir(at: path)
+		#expect(firstTime == secondTime)
+	}
+
+	@Test func dirInitNonExisting() {
+		let fs = MockFilesystemInterface()
+		#expect(throws: (any Error).self) {
+			try Dir(fs: fs, path: "/a")
+		}
 	}
 }
 
