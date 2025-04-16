@@ -8,6 +8,12 @@ public struct RealFSInterface: FilesystemInterface {
 		self.chroot = chroot
 	}
 
+	public init(chroot: ChrootDirectory) throws {
+		try FileManager.default.createDirectory(atPath: chroot.path.string,
+												withIntermediateDirectories: true)
+		self.chroot = chroot.path
+	}
+
 	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
 		var isDirectory: ObjCBool = false
 
@@ -75,6 +81,16 @@ public struct RealFSInterface: FilesystemInterface {
 		}
 
 		try fm.moveItem(at: srcURL, to: destURL)
+	}
+}
+
+public extension RealFSInterface {
+	struct ChrootDirectory {
+		public static func temporaryUnique() -> Self {
+			self.init(path: FilePath(NSTemporaryDirectory() + UUID().uuidString))
+		}
+
+		public let path: FilePath
 	}
 }
 

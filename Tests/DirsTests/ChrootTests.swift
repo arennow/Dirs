@@ -4,14 +4,12 @@ import SystemPackage
 import Testing
 
 struct ChrootTests: ~Copyable {
-	let tempDirPath = NSTemporaryDirectory() + "/dirs-test-" + UUID().uuidString
+	let tempDirPath: String
 	let chrootFS: RealFSInterface
 
 	init() throws {
-		let fp = FilePath(self.tempDirPath)
-		try FileManager.default.createDirectory(at: fp.url,
-												withIntermediateDirectories: true)
-		self.chrootFS = RealFSInterface(chroot: fp)
+		self.chrootFS = try RealFSInterface(chroot: .temporaryUnique())
+		self.tempDirPath = self.chrootFS.chroot!.string
 	}
 
 	deinit {
