@@ -49,14 +49,13 @@ public extension FilesystemInterface {
 	}
 
 	@discardableResult
-	func createFileAndIntermediaryDirs(at ifp: some IntoFilePath, contents: some IntoData = Data()) throws -> File {
+	func createFileAndIntermediaryDirs(at ifp: some IntoFilePath) throws -> File {
 		guard let (path, leaf) = ifp.into().pathAndLeaf else {
 			throw InvalidPathForCall.needAbsoluteWithComponent
 		}
 
 		let dir = try self.rootDir.createDir(at: path)
 		let file = try dir.createFile(at: leaf)
-		try file.replaceContents(contents)
 		return file
 	}
 }

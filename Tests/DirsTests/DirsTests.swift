@@ -191,10 +191,10 @@ struct DirsTests {
 	}
 
 	@Test func createFileAndIntermediaryDirs() throws {
-		_ = try self.fs.createFileAndIntermediaryDirs(at: "/a/b/c/d/file1", contents: "contents 1")
+		_ = try self.fs.createFileAndIntermediaryDirs(at: "/a/b/c/d/file1").replaceContents("contents 1")
 		#expect(try self.fs.contentsOf(file: "/a/b/c/d/file1") == "contents 1".into())
 
-		_ = try self.fs.createFileAndIntermediaryDirs(at: "/file2", contents: "contents 2")
+		_ = try self.fs.createFileAndIntermediaryDirs(at: "/file2").replaceContents("contents 2")
 		#expect(try self.fs.contentsOf(file: "/file2") == "contents 2".into())
 	}
 
