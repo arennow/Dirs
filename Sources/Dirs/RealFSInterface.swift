@@ -38,8 +38,17 @@ public struct RealFSInterface: FilesystemInterface {
 	public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
 		try FileManager.default.contentsOfDirectory(at: self.resolve(ifp),
 													includingPropertiesForKeys: [.isDirectoryKey])
-			.map { FilePathStat(filePath: FilePath($0.path),
-								isDirectory: try $0.getBoolResourceValue(forKey: .isDirectoryKey)) }
+			.map { rawURL in
+				var chrootRelativeFilePath = FilePath(rawURL.path)
+				if let chroot = self.chroot {
+					precondition(chrootRelativeFilePath.removePrefix(chroot))
+					// removing the prefix also turns this into a relative path so:
+					chrootRelativeFilePath.root = "/"
+				}
+
+				return FilePathStat(filePath: chrootRelativeFilePath,
+									isDirectory: try rawURL.getBoolResourceValue(forKey: .isDirectoryKey))
+			}
 	}
 
 	public func filePathOfNonexistentTemporaryFile(extension: String?) -> SystemPackage.FilePath {
