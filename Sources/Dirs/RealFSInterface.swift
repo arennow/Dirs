@@ -41,7 +41,7 @@ public struct RealFSInterface: FilesystemInterface {
 
 	public func createFile(at ifp: some IntoFilePath) throws -> File {
 		let fp = ifp.into()
-		FileManager.default.createFile(atPath: fp.string, contents: nil)
+		try Data().write(to: fp.url)
 		return try File(fs: self, path: fp)
 	}
 
