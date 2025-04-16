@@ -9,9 +9,16 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public init(chroot: ChrootDirectory) throws {
-		try FileManager.default.createDirectory(atPath: chroot.path.string,
+		let rawPathString = chroot.path.string
+		try FileManager.default.createDirectory(atPath: rawPathString,
 												withIntermediateDirectories: true)
-		self.chroot = chroot.path
+		guard let resolvedCPathString = realpath(rawPathString, nil) else {
+			throw InvalidPathForCall.couldNotCanonicalize(rawPathString)
+		}
+		defer { free(resolvedCPathString) }
+		let resolvedPathString = String(cString: resolvedCPathString)
+
+		self.chroot = FilePath(resolvedPathString)
 	}
 
 	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {

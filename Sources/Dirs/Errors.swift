@@ -30,4 +30,5 @@ public struct NodeAlreadyExists: Error {
 
 public enum InvalidPathForCall: Error {
 	case needAbsoluteWithComponent
+	case couldNotCanonicalize(String)
 }
