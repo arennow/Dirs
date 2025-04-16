@@ -23,7 +23,9 @@ public protocol FilesystemInterface: Equatable, Sendable {
 
 	func filePathOfNonexistentTemporaryFile(extension: String?) -> FilePath
 
+	@discardableResult
 	func createFile(at ifp: some IntoFilePath) throws -> File
+	@discardableResult
 	func createDir(at ifp: some IntoFilePath) throws -> Dir
 
 	func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws
