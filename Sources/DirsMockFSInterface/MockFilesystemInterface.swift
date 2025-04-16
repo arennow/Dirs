@@ -27,10 +27,8 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	private let id = UUID()
 	private let pathsToNodes: Locked<Dictionary<FilePath, MockNode>>
 
-	public init(pathsToNodes: Dictionary<FilePath, MockNode> = [:]) {
-		var pathsToNodes = pathsToNodes
-		pathsToNodes["/"] = .dir
-		self.pathsToNodes = Locked(pathsToNodes)
+	private init() {
+		self.pathsToNodes = Locked(["/": .dir])
 	}
 
 	private static func nodeType(at ifp: some IntoFilePath, in ptn: Dictionary<FilePath, MockNode>) -> NodeType? {

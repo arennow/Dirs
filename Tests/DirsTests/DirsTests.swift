@@ -1,4 +1,4 @@
-@testable import Dirs
+import Dirs
 import DirsMockFSInterface
 import Foundation
 import SortAndFilter
@@ -7,14 +7,13 @@ import Testing
 
 struct DirsTests {
 	@Test func basicFSReading() throws {
-		let mockFS = MockFilesystemInterface(pathsToNodes: [
-			"/a": .file,
-			"/b": .file,
-			"/c": .file("c content"),
-			"/d": .dir,
-			"/d/E": .file("enough!"),
-			"/f": .dir,
-		])
+		let mockFS = MockFilesystemInterface.empty()
+		try mockFS.createFile(at: "/a")
+		try mockFS.createFile(at: "/b")
+		try mockFS.createFile(at: "/c").replaceContents("c content")
+		try mockFS.createDir(at: "/d")
+		try mockFS.createFile(at: "/d/E").replaceContents("enough!")
+		try mockFS.createDir(at: "/f")
 
 		let children = try mockFS.rootDir.children()
 		var childFileIterator = children.files
@@ -48,15 +47,14 @@ struct DirsTests {
 	}
 
 	@Test func subgraphFinding() throws {
-		let fs = MockFilesystemInterface(pathsToNodes: [
-			"/a1": .file,
-			"/a2": .dir,
-			"/a3": .dir,
-			"/a3/a3b1": .file,
-			"/a4": .dir,
-			"/a4/a4b1": .dir,
-			"/a4/a4b1/a4b1c1": .file,
-		])
+		let fs = MockFilesystemInterface.empty()
+		try fs.createFile(at: "/a1")
+		try fs.createDir(at: "/a2")
+		try fs.createDir(at: "/a3")
+		try fs.createDir(at: "/a3/a3b1")
+		try fs.createDir(at: "/a4")
+		try fs.createDir(at: "/a4/a4b1")
+		try fs.createFile(at: "/a4/a4b1/a4b1c1")
 
 		let d = try Dir(fs: fs, path: "/")
 
@@ -99,10 +97,9 @@ struct DirsTests {
 	}
 
 	@Test func createIntermediateDirs() throws {
-		let fs = MockFilesystemInterface(pathsToNodes: [
-			"/a/b/c": .dir,
-		])
+		let fs = MockFilesystemInterface.empty()
 
+		try fs.createDir(at: "/a/b")
 		try fs.createDir(at: "/a/b/c/d/e")
 		#expect(fs.nodeType(at: "/a/b/c") == .dir)
 		#expect(fs.nodeType(at: "/a/b/c/d") == .dir)
@@ -110,25 +107,22 @@ struct DirsTests {
 	}
 
 	@Test func createExistingDir() throws {
-		let fs = MockFilesystemInterface(pathsToNodes: [
-			"/a": .dir,
-		])
+		let fs = MockFilesystemInterface.empty()
 
+		try fs.createDir(at: "/a")
 		#expect(throws: Never.self) { try fs.createDir(at: "/a") }
 	}
 
 	@Test func dirOverExistingFileFails() throws {
-		let fs = MockFilesystemInterface(pathsToNodes: [
-			"/a": .file,
-		])
+		let fs = MockFilesystemInterface.empty()
+		try fs.createFile(at: "/a")
 
 		#expect(throws: (any Error).self) { try fs.createDir(at: "/a") }
 	}
 
 	@Test func createIntermediateDirsOverExistingFileFails() throws {
-		let fs = MockFilesystemInterface(pathsToNodes: [
-			"/a": .file("content"),
-		])
+		let fs = MockFilesystemInterface.empty()
+		try fs.createFile(at: "/a").replaceContents("content")
 
 		#expect(throws: (any Error).self) { try fs.createDir(at: "/a/b") }
 		#expect(try fs.contentsOf(file: "/a") == Data("content".utf8))
@@ -147,9 +141,8 @@ struct DirsTests {
 	}
 
 	@Test func createExistingFileFails() throws {
-		let fs = MockFilesystemInterface(pathsToNodes: [
-			"/a": .file("content"),
-		])
+		let fs = MockFilesystemInterface.empty()
+		try fs.createFile(at: "/a").replaceContents("content")
 
 		let root = try Dir(fs: fs, path: "/")
 		#expect(throws: (any Error).self) { try root.createFile(at: "a") }
@@ -157,9 +150,8 @@ struct DirsTests {
 	}
 
 	@Test func createFileAtExistingDirFails() throws {
-		let fs = MockFilesystemInterface(pathsToNodes: [
-			"/a": .dir,
-		])
+		let fs = MockFilesystemInterface.empty()
+		try fs.createDir(at: "/a")
 
 		let root = try Dir(fs: fs, path: "/")
 		#expect(throws: (any Error).self) { try root.createFile(at: "a") }
@@ -167,9 +159,8 @@ struct DirsTests {
 	}
 
 	@Test func replaceContentsOfFile() throws {
-		let fs = MockFilesystemInterface(pathsToNodes: [
-			"/a": .file("content"),
-		])
+		let fs = MockFilesystemInterface.empty()
+		try fs.rootDir.createFile(at: "a").replaceContents("content")
 
 		let file = try fs.file(at: "/a")
 		try file.replaceContents("new content")
@@ -177,9 +168,9 @@ struct DirsTests {
 	}
 
 	@Test func appendContentsOfFile() throws {
-		let fs = MockFilesystemInterface(pathsToNodes: [
-			"/a": .file("content"),
-		])
+		let fs = MockFilesystemInterface.empty()
+
+		try fs.rootDir.createFile(at: "a").replaceContents("content")
 
 		let file = try fs.file(at: "/a")
 		try file.appendContents(" is king")
@@ -187,14 +178,13 @@ struct DirsTests {
 	}
 
 	@Test func deleteNode() throws {
-		let mockFS = MockFilesystemInterface(pathsToNodes: [
-			"/a": .file,
-			"/b": .file,
-			"/c": .file("c content"),
-			"/d": .dir,
-			"/d/E": .file("enough!"),
-			"/f": .dir,
-		])
+		let mockFS = MockFilesystemInterface.empty()
+		try mockFS.createFile(at: "/a")
+		try mockFS.createFile(at: "/b")
+		try mockFS.createFile(at: "/c").replaceContents("c content")
+		try mockFS.createDir(at: "/d")
+		try mockFS.createFile(at: "/d/E").replaceContents("enough!")
+		try mockFS.createDir(at: "/f")
 
 		try mockFS.deleteNode(at: "/a")
 		#expect(throws: (any Error).self) { try mockFS.contentsOf(file: "/a") }
@@ -204,20 +194,19 @@ struct DirsTests {
 	}
 
 	@Test func deleteNonexistentNodeFails() {
-		let mockFS = MockFilesystemInterface()
+		let mockFS = MockFilesystemInterface.empty()
 		#expect(throws: (any Error).self) { try mockFS.deleteNode(at: "/a") }
 	}
 
 	@Test func fileParent() throws {
-		let fs = MockFilesystemInterface(pathsToNodes: [
-			"/a": .file,
-		])
+		let fs = MockFilesystemInterface.empty()
+		try fs.createFile(at: "/a")
 
 		#expect(try fs.file(at: "/a").parent == fs.rootDir)
 	}
 
 	@Test func createFileAndIntermediaryDirs() throws {
-		let fs = MockFilesystemInterface()
+		let fs = MockFilesystemInterface.empty()
 		_ = try fs.createFileAndIntermediaryDirs(at: "/a/b/c/d/file1", contents: "contents 1")
 		#expect(try fs.contentsOf(file: "/a/b/c/d/file1") == "contents 1".into())
 
@@ -227,9 +216,9 @@ struct DirsTests {
 
 	@Test(arguments: ["/new", "/existing"])
 	func dirInitWithCreation(path: FilePath) throws {
-		let fs = MockFilesystemInterface(pathsToNodes: [
-			"/existing": .dir,
-		])
+		let fs = MockFilesystemInterface.empty()
+
+		try fs.createDir(at: "/existing")
 
 		let firstTime = try Dir(fs: fs, path: path, createIfNeeded: true)
 		let secondTime = try fs.dir(at: path)
@@ -237,7 +226,7 @@ struct DirsTests {
 	}
 
 	@Test func dirInitNonExisting() {
-		let fs = MockFilesystemInterface()
+		let fs = MockFilesystemInterface.empty()
 		#expect(throws: (any Error).self) {
 			try Dir(fs: fs, path: "/a")
 		}
@@ -248,14 +237,14 @@ struct DirsTests {
 
 extension DirsTests {
 	@Test func moveNonexistentSourceFails() {
-		let mockFS = MockFilesystemInterface()
+		let mockFS = MockFilesystemInterface.empty()
 		#expect(throws: (any Error).self) { try mockFS.moveNode(from: "/a", to: "/b", replacingExisting: true) }
 	}
 
 	@Test func moveFileRenames() throws {
-		let mockFS = MockFilesystemInterface(pathsToNodes: [
-			"/c": .file("c content"),
-		])
+		let mockFS = MockFilesystemInterface.empty()
+
+		try mockFS.rootDir.createFile(at: "c").replaceContents("c content")
 
 		try mockFS.moveNode(from: "/c", to: "/X", replacingExisting: true)
 		#expect(try mockFS.file(at: "/X").stringContents() == "c content")
@@ -263,10 +252,10 @@ extension DirsTests {
 	}
 
 	@Test func moveFileReplaces() throws {
-		let mockFS = MockFilesystemInterface(pathsToNodes: [
-			"/c": .file("c content"),
-			"/d": .file,
-		])
+		let mockFS = MockFilesystemInterface.empty()
+
+		try mockFS.rootDir.createFile(at: "c").replaceContents("c content")
+		try mockFS.rootDir.createFile(at: "d")
 
 		try mockFS.moveNode(from: "/c", to: "/d", replacingExisting: true)
 		#expect(try mockFS.file(at: "/d").stringContents() == "c content")
@@ -274,10 +263,10 @@ extension DirsTests {
 	}
 
 	@Test func moveFileDoesntReplace() throws {
-		let mockFS = MockFilesystemInterface(pathsToNodes: [
-			"/c": .file("c content"),
-			"/d": .file,
-		])
+		let mockFS = MockFilesystemInterface.empty()
+
+		try mockFS.rootDir.createFile(at: "c").replaceContents("c content")
+		try mockFS.rootDir.createFile(at: "d")
 
 		#expect(throws: (any Error).self) { try mockFS.moveNode(from: "/c", to: "/d", replacingExisting: false) }
 		#expect(try mockFS.file(at: "/c").stringContents() == "c content")
@@ -285,10 +274,10 @@ extension DirsTests {
 	}
 
 	@Test func moveFileChangesDir() throws {
-		let mockFS = MockFilesystemInterface(pathsToNodes: [
-			"/c": .file("c content"),
-			"/d": .dir,
-		])
+		let mockFS = MockFilesystemInterface.empty()
+
+		try mockFS.rootDir.createFile(at: "c").replaceContents("c content")
+		try mockFS.rootDir.createDir(at: "d")
 
 		try mockFS.moveNode(from: "/c", to: "/d", replacingExisting: true)
 		#expect(try mockFS.file(at: "/d/c").stringContents() == "c content")
@@ -296,10 +285,9 @@ extension DirsTests {
 	}
 
 	@Test func moveDirRenames() throws {
-		let mockFS = MockFilesystemInterface(pathsToNodes: [
-			"/d": .dir,
-			"/d/a": .file("a content"),
-		])
+		let mockFS = MockFilesystemInterface.empty()
+
+		try mockFS.rootDir.createDir(at: "d").createFile(at: "a").replaceContents("a content")
 
 		try mockFS.moveNode(from: "/d", to: "/e", replacingExisting: true)
 		#expect(try mockFS.file(at: "/e/a").stringContents() == "a content")
@@ -307,42 +295,40 @@ extension DirsTests {
 		#expect(mockFS.nodeType(at: "/d/a") == nil)
 	}
 
-	@Test func moveDirToFileFails() {
-		let mockFS = MockFilesystemInterface(pathsToNodes: [
-			"/a": .file,
-			"/d": .dir,
-		])
+	@Test func moveDirToFileFails() throws {
+		let mockFS = MockFilesystemInterface.empty()
+
+		try mockFS.rootDir.createFile(at: "a")
+		try mockFS.rootDir.createDir(at: "d")
 
 		#expect(throws: (any Error).self) { try mockFS.moveNode(from: "/d", to: "/a", replacingExisting: true) }
 	}
 
-	@Test func moveDirToDirIsRecursive() throws {
-		for re in [true, false] {
-			let mockFS = MockFilesystemInterface(pathsToNodes: [
-				"/d": .dir,
-				"/d/a": .file("a"),
-				"/d/b": .dir,
-				"/d/b/c": .file("c"),
-				"/e": .dir,
-			])
+	@Test(arguments: [true, false])
+	func moveDirToDirIsRecursive(replacingExisting: Bool) throws {
+		let mockFS = MockFilesystemInterface.empty()
+		try mockFS.createDir(at: "/d")
+		try mockFS.createFile(at: "/d/a").replaceContents("a")
+		try mockFS.createDir(at: "/d/b")
+		try mockFS.createFile(at: "/d/b/c").replaceContents("c")
+		try mockFS.createDir(at: "/e")
 
-			try mockFS.moveNode(from: "/d", to: "/e", replacingExisting: re)
-			#expect(try mockFS.file(at: "/e/d/a").stringContents() == "a")
-			#expect(try mockFS.file(at: "/e/d/b/c").stringContents() == "c")
-			#expect(mockFS.nodeType(at: "/d") == nil)
-		}
+		try mockFS.moveNode(from: "/d", to: "/e", replacingExisting: replacingExisting)
+		#expect(try mockFS.file(at: "/e/d/a").stringContents() == "a")
+		#expect(try mockFS.file(at: "/e/d/b/c").stringContents() == "c")
+		#expect(mockFS.nodeType(at: "/d") == nil)
 	}
 }
 
 extension DirsTests {
 	@Test func randomPathDiffers() {
-		let fs = MockFilesystemInterface()
+		let fs = MockFilesystemInterface.empty()
 
 		#expect(fs.filePathOfNonexistentTemporaryFile() != fs.filePathOfNonexistentTemporaryFile())
 	}
 
 	@Test func randomPathHasExtension() {
-		let fs = MockFilesystemInterface()
+		let fs = MockFilesystemInterface.empty()
 
 		#expect(fs.filePathOfNonexistentTemporaryFile(extension: "abcd").string.hasSuffix("abcd"))
 		#expect(fs.filePathOfNonexistentTemporaryFile(extension: ".abcd.").string.hasSuffix("abcd"))
