@@ -170,31 +170,28 @@ public final class MockFilesystemInterface: FilesystemInterface {
 				let nodePathsToMove = acquisitionLock.resource.keys
 					.filter { $0.starts(with: srcFP) }
 
+				func recursivelyMove(destFP: FilePath) {
+					for var nodePath in nodePathsToMove {
+						let nodeToMove = acquisitionLock.resource.removeValue(forKey: nodePath)
+
+						let removed = nodePath.removePrefix(srcFP)
+						assert(removed)
+						let resolvedDestFP = destFP.appending(nodePath.components)
+						acquisitionLock.resource[resolvedDestFP] = nodeToMove
+					}
+				}
+
 				switch destType {
 					case .file:
 						acquisitionLock.resource.removeValue(forKey: destFP)
-						fallthrough
-
-					case .none:
-						for var nodePath in nodePathsToMove {
-							let nodeToMove = acquisitionLock.resource.removeValue(forKey: nodePath)
-
-							let removed = nodePath.removePrefix(srcFP)
-							assert(removed)
-							let resolvedDestFP = destFP.appending(nodePath.components)
-							acquisitionLock.resource[resolvedDestFP] = nodeToMove
-						}
+						recursivelyMove(destFP: destFP)
 
 					case .dir:
 						let resolvedDestFPRoot = destFP.appending(srcFP.lastComponent!)
-						for var nodePath in nodePathsToMove {
-							let nodeToMove = acquisitionLock.resource.removeValue(forKey: nodePath)
+						recursivelyMove(destFP: resolvedDestFPRoot)
 
-							let removed = nodePath.removePrefix(srcFP)
-							assert(removed)
-							let resolvedDestFP = resolvedDestFPRoot.appending(nodePath.components)
-							acquisitionLock.resource[resolvedDestFP] = nodeToMove
-						}
+					case .none:
+						recursivelyMove(destFP: destFP)
 				}
 		}
 	}
