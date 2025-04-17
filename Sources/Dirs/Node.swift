@@ -26,7 +26,7 @@ public extension Node {
 		try self.fs.deleteNode(at: self)
 	}
 
-	func moveNode(to destination: some IntoFilePath, replacingExisting: Bool = false) throws {
-		try self.fs.moveNode(from: self, to: destination, replacingExisting: replacingExisting)
+	func moveNode(to destination: some IntoFilePath) throws {
+		try self.fs.moveNode(from: self, to: destination)
 	}
 }

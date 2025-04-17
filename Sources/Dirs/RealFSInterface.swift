@@ -61,15 +61,14 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func createFile(at ifp: some IntoFilePath) throws -> File {
-		let fp = self.resolveToRaw(ifp)
-		try Data().write(to: fp.url)
-		return try File(fs: self, path: fp)
+		try Data().write(to: self.resolveToRaw(ifp), options: .withoutOverwriting)
+		return try File(fs: self, path: self.resolveToProjected(ifp))
 	}
 
 	public func createDir(at ifp: some IntoFilePath) throws -> Dir {
-		let fp = self.resolveToRaw(ifp)
-		try FileManager.default.createDirectory(at: fp.into(), withIntermediateDirectories: true)
-		return try Dir(fs: self, path: fp)
+		try FileManager.default.createDirectory(at: self.resolveToRaw(ifp),
+												withIntermediateDirectories: true)
+		return try Dir(fs: self, path: self.resolveToProjected(ifp))
 	}
 
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
@@ -86,14 +85,18 @@ public struct RealFSInterface: FilesystemInterface {
 		try FileManager.default.removeItem(at: self.resolveToRaw(ifp))
 	}
 
-	public func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath, replacingExisting: Bool) throws {
-		let destURL: URL = self.resolveToRaw(destination)
+	public func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws {
+		var destURL: URL = self.resolveToRaw(destination)
 		let srcURL: URL = self.resolveToRaw(source)
 		let fm = FileManager.default
 
 		var isDirectory: ObjCBool = false
-		if fm.fileExists(atPath: destURL.pathNonPercentEncoded(), isDirectory: &isDirectory), !isDirectory.boolValue {
-			try fm.removeItem(at: destURL)
+		if fm.fileExists(atPath: destURL.pathNonPercentEncoded(), isDirectory: &isDirectory) {
+			if isDirectory.boolValue {
+				destURL.appendPathComponent(srcURL.lastPathComponent)
+			} else {
+				try fm.removeItem(at: destURL)
+			}
 		}
 
 		try fm.moveItem(at: srcURL, to: destURL)
@@ -111,6 +114,18 @@ public extension RealFSInterface {
 }
 
 private extension RealFSInterface {
+	func resolveToProjected(_ ifp: some IntoFilePath) -> FilePath {
+		var fp = ifp.into()
+		guard let chroot = self.chroot else {
+			return fp
+		}
+
+		if fp.removePrefix(chroot) {
+			fp.root = "/"
+		}
+		return fp
+	}
+
 	func resolveToRaw(_ ifp: some IntoFilePath) -> FilePath {
 		if let chroot = self.chroot {
 			let fp = ifp.into()

@@ -141,7 +141,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		}
 	}
 
-	public func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath, replacingExisting: Bool) throws {
+	public func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws {
 		let srcFP: FilePath = source.into()
 		let destFP: FilePath = destination.into()
 
@@ -155,10 +155,6 @@ public final class MockFilesystemInterface: FilesystemInterface {
 				throw NoSuchNode(path: srcFP)
 
 			case .file:
-				if !replacingExisting, destType == .file {
-					throw NodeAlreadyExists(path: destFP, type: .file)
-				}
-
 				let fileToMove = acquisitionLock.resource.removeValue(forKey: srcFP)
 
 				switch destType {
@@ -176,7 +172,18 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 				switch destType {
 					case .file:
-						throw WrongNodeType(path: destFP, actualType: .file)
+						acquisitionLock.resource.removeValue(forKey: destFP)
+						fallthrough
+
+					case .none:
+						for var nodePath in nodePathsToMove {
+							let nodeToMove = acquisitionLock.resource.removeValue(forKey: nodePath)
+
+							let removed = nodePath.removePrefix(srcFP)
+							assert(removed)
+							let resolvedDestFP = destFP.appending(nodePath.components)
+							acquisitionLock.resource[resolvedDestFP] = nodeToMove
+						}
 
 					case .dir:
 						let resolvedDestFPRoot = destFP.appending(srcFP.lastComponent!)
@@ -186,16 +193,6 @@ public final class MockFilesystemInterface: FilesystemInterface {
 							let removed = nodePath.removePrefix(srcFP)
 							assert(removed)
 							let resolvedDestFP = resolvedDestFPRoot.appending(nodePath.components)
-							acquisitionLock.resource[resolvedDestFP] = nodeToMove
-						}
-
-					case .none:
-						for var nodePath in nodePathsToMove {
-							let nodeToMove = acquisitionLock.resource.removeValue(forKey: nodePath)
-
-							let removed = nodePath.removePrefix(srcFP)
-							assert(removed)
-							let resolvedDestFP = destFP.appending(nodePath.components)
 							acquisitionLock.resource[resolvedDestFP] = nodeToMove
 						}
 				}

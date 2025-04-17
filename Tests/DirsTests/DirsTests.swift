@@ -5,16 +5,41 @@ import SortAndFilter
 import SystemPackage
 import Testing
 
-struct DirsTests {
-	let fs: any FilesystemInterface = MockFilesystemInterface.empty()
+struct DirsTests: ~Copyable {
+	let mockFS: any FilesystemInterface = MockFilesystemInterface.empty()
+	let realFS: any FilesystemInterface
+	let pathToDelete: FilePath?
 
-	@Test func basicFSReading() throws {
-		try self.fs.createFile(at: "/a")
-		try self.fs.createFile(at: "/b")
-		try self.fs.createFile(at: "/c").replaceContents("c content")
-		try self.fs.createDir(at: "/d")
-		try self.fs.createFile(at: "/d/E").replaceContents("enough!")
-		try self.fs.createDir(at: "/f")
+	init() throws {
+		let realFS = try RealFSInterface(chroot: .temporaryUnique())
+		self.pathToDelete = realFS.chroot
+		self.realFS = realFS
+	}
+
+	deinit {
+		guard let pathToDelete = self.pathToDelete else { return }
+		try? FileManager.default.removeItem(at: pathToDelete.url)
+	}
+
+	enum FSKind: CaseIterable { case mock, real }
+
+	private func fs(for kind: FSKind) -> any FilesystemInterface {
+		switch kind {
+			case .mock: self.mockFS
+			case .real: self.realFS
+		}
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func basicFSReading(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createFile(at: "/a")
+		try fs.createFile(at: "/b")
+		try fs.createFile(at: "/c").replaceContents("c content")
+		try fs.createDir(at: "/d")
+		try fs.createFile(at: "/d/E").replaceContents("enough!")
+		try fs.createDir(at: "/f")
 
 		let children = try fs.rootDir.children()
 		var childFileIterator = children.files
@@ -47,14 +72,17 @@ struct DirsTests {
 		#expect(childDirIterator.next() == nil)
 	}
 
-	@Test func subgraphFinding() throws {
-		try self.fs.createFile(at: "/a1")
-		try self.fs.createDir(at: "/a2")
-		try self.fs.createDir(at: "/a3")
-		try self.fs.createDir(at: "/a3/a3b1")
-		try self.fs.createDir(at: "/a4")
-		try self.fs.createDir(at: "/a4/a4b1")
-		try self.fs.createFile(at: "/a4/a4b1/a4b1c1")
+	@Test(arguments: FSKind.allCases)
+	func subgraphFinding(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createFile(at: "/a1")
+		try fs.createDir(at: "/a2")
+		try fs.createDir(at: "/a3")
+		try fs.createDir(at: "/a3/a3b1")
+		try fs.createDir(at: "/a4")
+		try fs.createDir(at: "/a4/a4b1")
+		try fs.createFile(at: "/a4/a4b1/a4b1c1")
 
 		let d = try Dir(fs: fs, path: "/")
 
@@ -86,128 +114,174 @@ struct DirsTests {
 		#expect(d.descendentDir(at: "a4/a4b1/a4b1c1") == nil)
 	}
 
-	@Test func createDir() throws {
+	@Test(arguments: FSKind.allCases)
+	func createDir(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
 		let created = try fs.createDir(at: "/a/b/c/d")
 
 		#expect(throws: Never.self) { try Dir(fs: fs, path: "/a") }
-		#expect(try Dir(fs: self.fs, path: "/a/b/c/d") == created)
+		#expect(try Dir(fs: fs, path: "/a/b/c/d") == created)
 
 		#expect(throws: Never.self) { try fs.createDir(at: "/a/b/c/d") }
 	}
 
-	@Test func createIntermediateDirs() throws {
-		try self.fs.createDir(at: "/a/b")
-		try self.fs.createDir(at: "/a/b/c/d/e")
+	@Test(arguments: FSKind.allCases)
+	func createIntermediateDirs(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-		#expect(self.fs.nodeType(at: "/a/b/c") == .dir)
-		#expect(self.fs.nodeType(at: "/a/b/c/d") == .dir)
-		#expect(self.fs.nodeType(at: "/a/b/c/d/e") == .dir)
+		try fs.createDir(at: "/a/b")
+		try fs.createDir(at: "/a/b/c/d/e")
+
+		#expect(fs.nodeType(at: "/a/b/c") == .dir)
+		#expect(fs.nodeType(at: "/a/b/c/d") == .dir)
+		#expect(fs.nodeType(at: "/a/b/c/d/e") == .dir)
 	}
 
-	@Test func createExistingDir() throws {
-		try self.fs.createDir(at: "/a")
+	@Test(arguments: FSKind.allCases)
+	func createExistingDir(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/a")
 
 		#expect(throws: Never.self) { try fs.createDir(at: "/a") }
 	}
 
-	@Test func dirOverExistingFileFails() throws {
-		try self.fs.createFile(at: "/a")
+	@Test(arguments: FSKind.allCases)
+	func dirOverExistingFileFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createFile(at: "/a")
 
 		#expect(throws: (any Error).self) { try fs.createDir(at: "/a") }
 	}
 
-	@Test func createIntermediateDirsOverExistingFileFails() throws {
-		try self.fs.createFile(at: "/a").replaceContents("content")
+	@Test(arguments: FSKind.allCases)
+	func createIntermediateDirsOverExistingFileFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createFile(at: "/a").replaceContents("content")
 
 		#expect(throws: (any Error).self) { try fs.createDir(at: "/a/b") }
-		#expect(try self.fs.contentsOf(file: "/a") == Data("content".utf8))
+		#expect(try fs.contentsOf(file: "/a") == Data("content".utf8))
 	}
 
-	@Test func createFile() throws {
+	@Test(arguments: FSKind.allCases)
+	func createFile(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
 		let subDir = try fs.createDir(at: "/a")
 		let createdFile = try subDir.createFile(at: "file")
 
 		#expect(createdFile.path == "/a/file")
 		#expect(throws: Never.self) { try File(fs: fs, path: "/a/file") }
 		#expect(try createdFile.contents() == Data())
-		#expect(try self.fs.contentsOf(file: "/a/file") == Data())
+		#expect(try fs.contentsOf(file: "/a/file") == Data())
 	}
 
-	@Test func createExistingFileFails() throws {
-		try self.fs.createFile(at: "/a").replaceContents("content")
+	@Test(arguments: FSKind.allCases)
+	func createExistingFileFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createFile(at: "/a").replaceContents("content")
+
+		let root = try fs.rootDir
+		#expect(throws: (any Error).self) { try root.createFile(at: "a") }
+		#expect(try fs.contentsOf(file: "/a") == Data("content".utf8))
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func createFileAtExistingDirFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/a")
 
 		let root = try Dir(fs: fs, path: "/")
 		#expect(throws: (any Error).self) { try root.createFile(at: "a") }
-		#expect(try self.fs.contentsOf(file: "/a") == Data("content".utf8))
+		#expect(fs.nodeType(at: "/a") == .dir)
 	}
 
-	@Test func createFileAtExistingDirFails() throws {
-		try self.fs.createDir(at: "/a")
+	@Test(arguments: FSKind.allCases)
+	func replaceContentsOfFile(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-		let root = try Dir(fs: fs, path: "/")
-		#expect(throws: (any Error).self) { try root.createFile(at: "a") }
-		#expect(self.fs.nodeType(at: "/a") == .dir)
-	}
-
-	@Test func replaceContentsOfFile() throws {
-		try self.fs.rootDir.createFile(at: "a").replaceContents("content")
+		try fs.rootDir.createFile(at: "a").replaceContents("content")
 
 		let file = try fs.file(at: "/a")
 		try file.replaceContents("new content")
 		#expect(try file.stringContents() == "new content")
 	}
 
-	@Test func appendContentsOfFile() throws {
-		try self.fs.rootDir.createFile(at: "a").replaceContents("content")
+	@Test(arguments: FSKind.allCases)
+	func appendContentsOfFile(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createFile(at: "a").replaceContents("content")
 
 		let file = try fs.file(at: "/a")
 		try file.appendContents(" is king")
 		#expect(try file.stringContents() == "content is king")
 	}
 
-	@Test func deleteNode() throws {
-		try self.fs.createFile(at: "/a")
-		try self.fs.createFile(at: "/b")
-		try self.fs.createFile(at: "/c").replaceContents("c content")
-		try self.fs.createDir(at: "/d")
-		try self.fs.createFile(at: "/d/E").replaceContents("enough!")
-		try self.fs.createDir(at: "/f")
+	@Test(arguments: FSKind.allCases)
+	func deleteNode(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-		try self.fs.deleteNode(at: "/a")
+		try fs.createFile(at: "/a")
+		try fs.createFile(at: "/b")
+		try fs.createFile(at: "/c").replaceContents("c content")
+		try fs.createDir(at: "/d")
+		try fs.createFile(at: "/d/E").replaceContents("enough!")
+		try fs.createDir(at: "/f")
+
+		try fs.deleteNode(at: "/a")
 		#expect(throws: (any Error).self) { try fs.contentsOf(file: "/a") }
 
-		try self.fs.deleteNode(at: "/d")
+		try fs.deleteNode(at: "/d")
 		#expect(throws: (any Error).self) { try fs.contentsOf(file: "/d/E") }
 	}
 
-	@Test func deleteNonexistentNodeFails() {
+	@Test(arguments: FSKind.allCases)
+	func deleteNonexistentNodeFails(fsKind: FSKind) {
+		let fs = self.fs(for: fsKind)
 		#expect(throws: (any Error).self) { try fs.deleteNode(at: "/a") }
 	}
 
-	@Test func fileParent() throws {
-		try self.fs.createFile(at: "/a")
+	@Test(arguments: FSKind.allCases)
+	func fileParent(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-		#expect(try self.fs.file(at: "/a").parent == self.fs.rootDir)
+		try fs.createFile(at: "/a")
+
+		#expect(try fs.file(at: "/a").parent == fs.rootDir)
 	}
 
-	@Test func createFileAndIntermediaryDirs() throws {
-		_ = try self.fs.createFileAndIntermediaryDirs(at: "/a/b/c/d/file1").replaceContents("contents 1")
-		#expect(try self.fs.contentsOf(file: "/a/b/c/d/file1") == "contents 1".into())
+	@Test(arguments: FSKind.allCases)
+	func createFileAndIntermediaryDirs(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-		_ = try self.fs.createFileAndIntermediaryDirs(at: "/file2").replaceContents("contents 2")
-		#expect(try self.fs.contentsOf(file: "/file2") == "contents 2".into())
+		_ = try fs.createFileAndIntermediaryDirs(at: "/a/b/c/d/file1").replaceContents("contents 1")
+		#expect(try fs.contentsOf(file: "/a/b/c/d/file1") == "contents 1".into())
+
+		_ = try fs.createFileAndIntermediaryDirs(at: "/file2").replaceContents("contents 2")
+		#expect(try fs.contentsOf(file: "/file2") == "contents 2".into())
 	}
 
-	@Test(arguments: ["/new", "/existing"])
-	func dirInitWithCreation(path: FilePath) throws {
-		try self.fs.createDir(at: "/existing")
+	@Test(arguments: FSKind.allCases, ["/new", "/existing"])
+	func dirInitWithCreation(fsKind: FSKind, path: FilePath) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/existing")
 
 		let firstTime = try Dir(fs: fs, path: path, createIfNeeded: true)
 		let secondTime = try fs.dir(at: path)
 		#expect(firstTime == secondTime)
 	}
 
-	@Test func dirInitNonExisting() {
+	@Test(arguments: FSKind.allCases)
+	func dirInitNonExisting(fsKind: FSKind) {
+		let fs = self.fs(for: fsKind)
+
 		#expect(throws: (any Error).self) {
 			try Dir(fs: fs, path: "/a")
 		}
@@ -217,85 +291,103 @@ struct DirsTests {
 // MARK: - Moves
 
 extension DirsTests {
-	@Test func moveNonexistentSourceFails() {
+	@Test(arguments: FSKind.allCases)
+	func moveNonexistentSourceFails(fsKind: FSKind) {
+		let fs = self.fs(for: fsKind)
+
 		#expect(throws: (any Error).self) {
-			try fs.moveNode(from: "/a", to: "/b", replacingExisting: true)
+			try fs.moveNode(from: "/a", to: "/b")
 		}
 	}
 
-	@Test func moveFileRenames() throws {
-		try self.fs.rootDir.createFile(at: "c").replaceContents("c content")
+	@Test(arguments: FSKind.allCases)
+	func moveFileRenames(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-		try self.fs.moveNode(from: "/c", to: "/X", replacingExisting: true)
-		#expect(try self.fs.file(at: "/X").stringContents() == "c content")
-		#expect(self.fs.nodeType(at: "/c") == nil)
+		try fs.rootDir.createFile(at: "c").replaceContents("c content")
+
+		try fs.moveNode(from: "/c", to: "/X")
+		#expect(try fs.file(at: "/X").stringContents() == "c content")
+		#expect(fs.nodeType(at: "/c") == nil)
 	}
 
-	@Test func moveFileReplaces() throws {
-		try self.fs.rootDir.createFile(at: "c").replaceContents("c content")
-		try self.fs.rootDir.createFile(at: "d")
+	@Test(arguments: FSKind.allCases)
+	func moveFileReplaces(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-		try self.fs.moveNode(from: "/c", to: "/d", replacingExisting: true)
-		#expect(try self.fs.file(at: "/d").stringContents() == "c content")
-		#expect(self.fs.nodeType(at: "/c") == nil)
+		try fs.rootDir.createFile(at: "c").replaceContents("c content")
+		try fs.rootDir.createFile(at: "d")
+
+		try fs.moveNode(from: "/c", to: "/d")
+		#expect(try fs.file(at: "/d").stringContents() == "c content")
+		#expect(fs.nodeType(at: "/c") == nil)
 	}
 
-	@Test func moveFileDoesntReplace() throws {
-		try self.fs.rootDir.createFile(at: "c").replaceContents("c content")
-		try self.fs.rootDir.createFile(at: "d")
+	@Test(arguments: FSKind.allCases)
+	func moveFileChangesDir(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-		#expect(throws: (any Error).self) { try fs.moveNode(from: "/c", to: "/d", replacingExisting: false) }
-		#expect(try self.fs.file(at: "/c").stringContents() == "c content")
-		#expect(try self.fs.file(at: "/d").contents() == Data())
+		try fs.rootDir.createFile(at: "c").replaceContents("c content")
+		try fs.rootDir.createDir(at: "d")
+
+		try fs.moveNode(from: "/c", to: "/d")
+		#expect(try fs.file(at: "/d/c").stringContents() == "c content")
+		#expect(fs.nodeType(at: "/c") == nil)
 	}
 
-	@Test func moveFileChangesDir() throws {
-		try self.fs.rootDir.createFile(at: "c").replaceContents("c content")
-		try self.fs.rootDir.createDir(at: "d")
+	@Test(arguments: FSKind.allCases)
+	func moveDirRenames(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-		try self.fs.moveNode(from: "/c", to: "/d", replacingExisting: true)
-		#expect(try self.fs.file(at: "/d/c").stringContents() == "c content")
-		#expect(self.fs.nodeType(at: "/c") == nil)
+		try fs.rootDir.createDir(at: "d").createFile(at: "a").replaceContents("a content")
+
+		try fs.moveNode(from: "/d", to: "/e")
+		#expect(try fs.file(at: "/e/a").stringContents() == "a content")
+		#expect(fs.nodeType(at: "/d") == nil)
+		#expect(fs.nodeType(at: "/d/a") == nil)
 	}
 
-	@Test func moveDirRenames() throws {
-		try self.fs.rootDir.createDir(at: "d").createFile(at: "a").replaceContents("a content")
+	@Test(arguments: FSKind.allCases)
+	func moveDirToFileReplaces(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-		try self.fs.moveNode(from: "/d", to: "/e", replacingExisting: true)
-		#expect(try self.fs.file(at: "/e/a").stringContents() == "a content")
-		#expect(self.fs.nodeType(at: "/d") == nil)
-		#expect(self.fs.nodeType(at: "/d/a") == nil)
+		try fs.rootDir.createFile(at: "a")
+		try fs.rootDir.createDir(at: "d")
+
+		try fs.moveNode(from: "/d", to: "/a")
+
+		try #expect(fs.rootDir.childDir(named: "d") == nil)
+		try #expect(fs.rootDir.childDir(named: "a") != nil)
 	}
 
-	@Test func moveDirToFileFails() throws {
-		try self.fs.rootDir.createFile(at: "a")
-		try self.fs.rootDir.createDir(at: "d")
+	@Test(arguments: FSKind.allCases)
+	func moveDirToDirIsRecursive(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-		#expect(throws: (any Error).self) { try fs.moveNode(from: "/d", to: "/a", replacingExisting: true) }
-	}
+		try fs.createDir(at: "/d")
+		try fs.createFile(at: "/d/a").replaceContents("a")
+		try fs.createDir(at: "/d/b")
+		try fs.createFile(at: "/d/b/c").replaceContents("c")
+		try fs.createDir(at: "/e")
 
-	@Test(arguments: [true, false])
-	func moveDirToDirIsRecursive(replacingExisting: Bool) throws {
-		try self.fs.createDir(at: "/d")
-		try self.fs.createFile(at: "/d/a").replaceContents("a")
-		try self.fs.createDir(at: "/d/b")
-		try self.fs.createFile(at: "/d/b/c").replaceContents("c")
-		try self.fs.createDir(at: "/e")
-
-		try self.fs.moveNode(from: "/d", to: "/e", replacingExisting: replacingExisting)
-		#expect(try self.fs.file(at: "/e/d/a").stringContents() == "a")
-		#expect(try self.fs.file(at: "/e/d/b/c").stringContents() == "c")
-		#expect(self.fs.nodeType(at: "/d") == nil)
+		try fs.moveNode(from: "/d", to: "/e")
+		#expect(try fs.file(at: "/e/d/a").stringContents() == "a")
+		#expect(try fs.file(at: "/e/d/b/c").stringContents() == "c")
+		#expect(fs.nodeType(at: "/d") == nil)
 	}
 }
 
 extension DirsTests {
-	@Test func randomPathDiffers() {
-		#expect(self.fs.filePathOfNonexistentTemporaryFile() != self.fs.filePathOfNonexistentTemporaryFile())
+	@Test(arguments: FSKind.allCases)
+	func randomPathDiffers(fsKind: FSKind) {
+		let fs = self.fs(for: fsKind)
+		#expect(fs.filePathOfNonexistentTemporaryFile() != fs.filePathOfNonexistentTemporaryFile())
 	}
 
-	@Test func randomPathHasExtension() {
-		#expect(self.fs.filePathOfNonexistentTemporaryFile(extension: "abcd").string.hasSuffix("abcd"))
-		#expect(self.fs.filePathOfNonexistentTemporaryFile(extension: ".abcd.").string.hasSuffix("abcd"))
+	@Test(arguments: FSKind.allCases)
+	func randomPathHasExtension(fsKind: FSKind) {
+		let fs = self.fs(for: fsKind)
+		#expect(fs.filePathOfNonexistentTemporaryFile(extension: "abcd").string.hasSuffix("abcd"))
+		#expect(fs.filePathOfNonexistentTemporaryFile(extension: ".abcd.").string.hasSuffix("abcd"))
 	}
 }
