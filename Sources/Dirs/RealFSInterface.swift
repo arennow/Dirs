@@ -81,6 +81,23 @@ public struct RealFSInterface: FilesystemInterface {
 		try fd.writeAll(addendum.into())
 	}
 
+	public func copyNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws {
+		var destURL: URL = self.resolveToRaw(destination)
+		let srcURL: URL = self.resolveToRaw(source)
+		let fm = FileManager.default
+
+		var isDirectory: ObjCBool = false
+		if fm.fileExists(atPath: destURL.pathNonPercentEncoded(), isDirectory: &isDirectory) {
+			if isDirectory.boolValue {
+				destURL.appendPathComponent(srcURL.lastPathComponent)
+			} else {
+				try fm.removeItem(at: destURL)
+			}
+		}
+
+		try fm.copyItem(at: srcURL, to: destURL)
+	}
+
 	public func deleteNode(at ifp: some IntoFilePath) throws {
 		try FileManager.default.removeItem(at: self.resolveToRaw(ifp))
 	}

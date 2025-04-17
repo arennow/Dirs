@@ -17,6 +17,8 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		}
 	}
 
+	typealias PTN = Dictionary<FilePath, MockNode>
+
 	public static func == (lhs: MockFilesystemInterface, rhs: MockFilesystemInterface) -> Bool {
 		lhs.id == rhs.id
 	}
@@ -25,7 +27,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 	// To allow us to avoid traversing our fake FS for deep equality
 	private let id = UUID()
-	private let pathsToNodes: Locked<Dictionary<FilePath, MockNode>>
+	private let pathsToNodes: Locked<PTN>
 
 	private init() {
 		self.pathsToNodes = Locked(["/": .dir])
@@ -120,32 +122,21 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		switch self.pathsToNodes[fp] {
 			case .none: throw NoSuchNode(path: fp)
 			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
-			case .file:
-				self.pathsToNodes[fp] = .file(contents.into())
+			case .file: self.pathsToNodes[fp] = .file(contents.into())
 		}
 	}
 
-	public func deleteNode(at ifp: some IntoFilePath) throws {
-		let fp = ifp.into()
+	public func copyNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws {
 		let acquisitionLock = self.pathsToNodes.acquireIntoHandle()
-
-		let keysToDelete = acquisitionLock.resource.keys
-			.filter { $0.starts(with: fp) }
-
-		guard !keysToDelete.isEmpty else {
-			throw NoSuchNode(path: fp)
-		}
-
-		for key in keysToDelete {
-			acquisitionLock.resource[key] = nil
-		}
+		try self.copyNode(from: source, to: destination, using: acquisitionLock)
 	}
 
-	public func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws {
+	func copyNode(from source: some IntoFilePath,
+				  to destination: some IntoFilePath,
+				  using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws
+	{
 		let srcFP: FilePath = source.into()
 		let destFP: FilePath = destination.into()
-
-		let acquisitionLock = self.pathsToNodes.acquireIntoHandle()
 
 		let srcType = Self.nodeType(at: srcFP, in: acquisitionLock.resource)
 		let destType = Self.nodeType(at: destFP, in: acquisitionLock.resource)
@@ -155,15 +146,15 @@ public final class MockFilesystemInterface: FilesystemInterface {
 				throw NoSuchNode(path: srcFP)
 
 			case .file:
-				let fileToMove = acquisitionLock.resource.removeValue(forKey: srcFP)
+				let fileToCopy = acquisitionLock.resource[srcFP]
 
 				switch destType {
 					case .file, .none:
-						acquisitionLock.resource[destFP] = fileToMove
+						acquisitionLock.resource[destFP] = fileToCopy
 
 					case .dir:
 						let resolvedDestFP = destFP.appending(srcFP.lastComponent!)
-						acquisitionLock.resource[resolvedDestFP] = fileToMove
+						acquisitionLock.resource[resolvedDestFP] = fileToCopy
 				}
 
 			case .dir:
@@ -172,7 +163,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 				func recursivelyMove(destFP: FilePath) {
 					for var nodePath in nodePathsToMove {
-						let nodeToMove = acquisitionLock.resource.removeValue(forKey: nodePath)
+						let nodeToMove = acquisitionLock.resource[nodePath]
 
 						let removed = nodePath.removePrefix(srcFP)
 						assert(removed)
@@ -193,6 +184,41 @@ public final class MockFilesystemInterface: FilesystemInterface {
 					case .none:
 						recursivelyMove(destFP: destFP)
 				}
+		}
+	}
+
+	public func deleteNode(at ifp: some IntoFilePath) throws {
+		let acquisitionLock = self.pathsToNodes.acquireIntoHandle()
+		try self.deleteNode(at: ifp, using: acquisitionLock)
+	}
+
+	func deleteNode(at ifp: some IntoFilePath,
+					using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws
+	{
+		let fp = ifp.into()
+
+		let keysToDelete = acquisitionLock.resource.keys
+			.filter { $0.starts(with: fp) }
+
+		guard !keysToDelete.isEmpty else {
+			throw NoSuchNode(path: fp)
+		}
+
+		for key in keysToDelete {
+			acquisitionLock.resource[key] = nil
+		}
+	}
+
+	public func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws {
+		let acquisitionLock = self.pathsToNodes.acquireIntoHandle()
+		let before = acquisitionLock.resource
+
+		do {
+			try self.copyNode(from: source, to: destination, using: acquisitionLock)
+			try self.deleteNode(at: source, using: acquisitionLock)
+		} catch {
+			acquisitionLock.resource = before
+			throw error
 		}
 	}
 }

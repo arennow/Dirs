@@ -377,6 +377,98 @@ extension DirsTests {
 	}
 }
 
+// MARK: - Copies
+
+extension DirsTests {
+	@Test(arguments: FSKind.allCases)
+	func copyNonexistentSourceFails(fsKind: FSKind) {
+		let fs = self.fs(for: fsKind)
+
+		#expect(throws: (any Error).self) {
+			try fs.copyNode(from: "/a", to: "/b")
+		}
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func copyFileToFileDuplicates(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createFile(at: "a").replaceContents("a content")
+		try fs.copyNode(from: "/a", to: "/b")
+		try #expect(fs.file(at: "/b").stringContents() == "a content")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func copyFileToFileReplaces(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createFile(at: "c").replaceContents("c content")
+		try fs.rootDir.createFile(at: "d")
+
+		try fs.copyNode(from: "/c", to: "/d")
+
+		try #expect(fs.file(at: "/c").stringContents() == "c content")
+		try #expect(fs.file(at: "/d").stringContents() == "c content")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func copyFileToDirRehomes(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createFile(at: "c").replaceContents("c content")
+		try fs.rootDir.createDir(at: "d")
+
+		try fs.copyNode(from: "/c", to: "/d")
+
+		try #expect(fs.file(at: "/c").stringContents() == "c content")
+		try #expect(fs.file(at: "/d/c").stringContents() == "c content")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func copyDirToNothingRenames(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createDir(at: "d").createFile(at: "a").replaceContents("a content")
+
+		try fs.copyNode(from: "/d", to: "/e")
+
+		try #expect(fs.file(at: "/d/a").stringContents() == "a content")
+		try #expect(fs.file(at: "/e/a").stringContents() == "a content")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func copyDirToFileReplaces(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createFile(at: "a")
+		try fs.rootDir.createDir(at: "d")
+
+		try fs.copyNode(from: "/d", to: "/a")
+
+		try #expect(fs.rootDir.childDir(named: "d") != nil)
+		try #expect(fs.rootDir.childDir(named: "a") != nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func copyDirToDirRehomes(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/d")
+		try fs.createFile(at: "/d/a").replaceContents("a")
+		try fs.createDir(at: "/d/b")
+		try fs.createFile(at: "/d/b/c").replaceContents("c")
+		try fs.createDir(at: "/e")
+
+		try fs.copyNode(from: "/d", to: "/e")
+
+		try #expect(fs.file(at: "/d/a").stringContents() == "a")
+		try #expect(fs.file(at: "/d/b/c").stringContents() == "c")
+
+		try #expect(fs.file(at: "/e/d/a").stringContents() == "a")
+		try #expect(fs.file(at: "/e/d/b/c").stringContents() == "c")
+	}
+}
+
 extension DirsTests {
 	@Test(arguments: FSKind.allCases)
 	func randomPathDiffers(fsKind: FSKind) {
