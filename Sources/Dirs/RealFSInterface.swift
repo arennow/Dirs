@@ -24,7 +24,7 @@ public struct RealFSInterface: FilesystemInterface {
 	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
 		var isDirectory: ObjCBool = false
 
-		if FileManager.default.fileExists(atPath: self.resolve(ifp).string, isDirectory: &isDirectory) {
+		if FileManager.default.fileExists(atPath: self.resolveToRaw(ifp).string, isDirectory: &isDirectory) {
 			return isDirectory.boolValue ? .dir : .file
 		} else {
 			return nil
@@ -32,11 +32,11 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func contentsOf(file ifp: some IntoFilePath) throws -> Data {
-		try Data(contentsOf: self.resolve(ifp))
+		try Data(contentsOf: self.resolveToRaw(ifp))
 	}
 
 	public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
-		try FileManager.default.contentsOfDirectory(at: self.resolve(ifp),
+		try FileManager.default.contentsOfDirectory(at: self.resolveToRaw(ifp),
 													includingPropertiesForKeys: [.isDirectoryKey])
 			.map { rawURL in
 				var chrootRelativeFilePath = FilePath(rawURL.path)
@@ -61,34 +61,34 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func createFile(at ifp: some IntoFilePath) throws -> File {
-		let fp = self.resolve(ifp)
+		let fp = self.resolveToRaw(ifp)
 		try Data().write(to: fp.url)
 		return try File(fs: self, path: fp)
 	}
 
 	public func createDir(at ifp: some IntoFilePath) throws -> Dir {
-		let fp = self.resolve(ifp)
+		let fp = self.resolveToRaw(ifp)
 		try FileManager.default.createDirectory(at: fp.into(), withIntermediateDirectories: true)
 		return try Dir(fs: self, path: fp)
 	}
 
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
-		try contents.into().write(to: self.resolve(ifp), options: .atomic)
+		try contents.into().write(to: self.resolveToRaw(ifp), options: .atomic)
 	}
 
 	public func appendContentsOfFile(at ifp: some IntoFilePath, with addendum: some IntoData) throws {
-		let fd = try FileDescriptor.open(self.resolve(ifp), .writeOnly, options: .append, retryOnInterrupt: true)
+		let fd = try FileDescriptor.open(self.resolveToRaw(ifp), .writeOnly, options: .append, retryOnInterrupt: true)
 		defer { try? fd.close() }
 		try fd.writeAll(addendum.into())
 	}
 
 	public func deleteNode(at ifp: some IntoFilePath) throws {
-		try FileManager.default.removeItem(at: self.resolve(ifp))
+		try FileManager.default.removeItem(at: self.resolveToRaw(ifp))
 	}
 
 	public func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath, replacingExisting: Bool) throws {
-		let destURL: URL = self.resolve(destination)
-		let srcURL: URL = self.resolve(source)
+		let destURL: URL = self.resolveToRaw(destination)
+		let srcURL: URL = self.resolveToRaw(source)
 		let fm = FileManager.default
 
 		var isDirectory: ObjCBool = false
@@ -111,7 +111,7 @@ public extension RealFSInterface {
 }
 
 private extension RealFSInterface {
-	func resolve(_ ifp: some IntoFilePath) -> FilePath {
+	func resolveToRaw(_ ifp: some IntoFilePath) -> FilePath {
 		if let chroot = self.chroot {
 			let fp = ifp.into()
 			if fp.starts(with: chroot) {
@@ -125,7 +125,7 @@ private extension RealFSInterface {
 	}
 
 	@_disfavoredOverload
-	func resolve(_ ifp: some IntoFilePath) -> URL {
-		(self.resolve(ifp) as FilePath).url
+	func resolveToRaw(_ ifp: some IntoFilePath) -> URL {
+		(self.resolveToRaw(ifp) as FilePath).url
 	}
 }
