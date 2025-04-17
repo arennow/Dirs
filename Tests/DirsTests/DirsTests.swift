@@ -56,7 +56,7 @@ struct DirsTests: ~Copyable {
 		// swiftformat:disable:next redundantClosure
 		let cFile = try #require({ childFileIterator.next() }())
 		#expect(cFile.path == "/c")
-		#expect(try cFile.stringContents() == "c content")
+		try #expect(cFile.stringContents() == "c content")
 
 		#expect(childFileIterator.next() == nil)
 
@@ -66,7 +66,7 @@ struct DirsTests: ~Copyable {
 
 		let dDir = childDirIterator.next()
 		#expect(dDir?.path == "/d")
-		#expect(try dDir?.children().files.first?.stringContents() == "enough!")
+		try #expect(dDir?.children().files.first?.stringContents() == "enough!")
 
 		#expect(childDirIterator.next()?.path == "/f")
 		#expect(childDirIterator.next() == nil)
@@ -121,7 +121,7 @@ struct DirsTests: ~Copyable {
 		let created = try fs.createDir(at: "/a/b/c/d")
 
 		#expect(throws: Never.self) { try Dir(fs: fs, path: "/a") }
-		#expect(try Dir(fs: fs, path: "/a/b/c/d") == created)
+		try #expect(Dir(fs: fs, path: "/a/b/c/d") == created)
 
 		#expect(throws: Never.self) { try fs.createDir(at: "/a/b/c/d") }
 	}
@@ -163,7 +163,7 @@ struct DirsTests: ~Copyable {
 		try fs.createFile(at: "/a").replaceContents("content")
 
 		#expect(throws: (any Error).self) { try fs.createDir(at: "/a/b") }
-		#expect(try fs.contentsOf(file: "/a") == Data("content".utf8))
+		try #expect(fs.contentsOf(file: "/a") == Data("content".utf8))
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -175,8 +175,8 @@ struct DirsTests: ~Copyable {
 
 		#expect(createdFile.path == "/a/file")
 		#expect(throws: Never.self) { try File(fs: fs, path: "/a/file") }
-		#expect(try createdFile.contents() == Data())
-		#expect(try fs.contentsOf(file: "/a/file") == Data())
+		try #expect(createdFile.contents() == Data())
+		try #expect(fs.contentsOf(file: "/a/file") == Data())
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -187,7 +187,7 @@ struct DirsTests: ~Copyable {
 
 		let root = try fs.rootDir
 		#expect(throws: (any Error).self) { try root.createFile(at: "a") }
-		#expect(try fs.contentsOf(file: "/a") == Data("content".utf8))
+		try #expect(fs.contentsOf(file: "/a") == Data("content".utf8))
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -209,7 +209,7 @@ struct DirsTests: ~Copyable {
 
 		let file = try fs.file(at: "/a")
 		try file.replaceContents("new content")
-		#expect(try file.stringContents() == "new content")
+		try #expect(file.stringContents() == "new content")
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -220,7 +220,7 @@ struct DirsTests: ~Copyable {
 
 		let file = try fs.file(at: "/a")
 		try file.appendContents(" is king")
-		#expect(try file.stringContents() == "content is king")
+		try #expect(file.stringContents() == "content is king")
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -261,10 +261,10 @@ struct DirsTests: ~Copyable {
 		let fs = self.fs(for: fsKind)
 
 		_ = try fs.createFileAndIntermediaryDirs(at: "/a/b/c/d/file1").replaceContents("contents 1")
-		#expect(try fs.contentsOf(file: "/a/b/c/d/file1") == "contents 1".into())
+		try #expect(fs.contentsOf(file: "/a/b/c/d/file1") == "contents 1".into())
 
 		_ = try fs.createFileAndIntermediaryDirs(at: "/file2").replaceContents("contents 2")
-		#expect(try fs.contentsOf(file: "/file2") == "contents 2".into())
+		try #expect(fs.contentsOf(file: "/file2") == "contents 2".into())
 	}
 
 	@Test(arguments: FSKind.allCases, ["/new", "/existing"])
@@ -307,7 +307,7 @@ extension DirsTests {
 		try fs.rootDir.createFile(at: "c").replaceContents("c content")
 
 		try fs.moveNode(from: "/c", to: "/X")
-		#expect(try fs.file(at: "/X").stringContents() == "c content")
+		try #expect(fs.file(at: "/X").stringContents() == "c content")
 		#expect(fs.nodeType(at: "/c") == nil)
 	}
 
@@ -319,7 +319,7 @@ extension DirsTests {
 		try fs.rootDir.createFile(at: "d")
 
 		try fs.moveNode(from: "/c", to: "/d")
-		#expect(try fs.file(at: "/d").stringContents() == "c content")
+		try #expect(fs.file(at: "/d").stringContents() == "c content")
 		#expect(fs.nodeType(at: "/c") == nil)
 	}
 
@@ -331,7 +331,7 @@ extension DirsTests {
 		try fs.rootDir.createDir(at: "d")
 
 		try fs.moveNode(from: "/c", to: "/d")
-		#expect(try fs.file(at: "/d/c").stringContents() == "c content")
+		try #expect(fs.file(at: "/d/c").stringContents() == "c content")
 		#expect(fs.nodeType(at: "/c") == nil)
 	}
 
@@ -342,7 +342,7 @@ extension DirsTests {
 		try fs.rootDir.createDir(at: "d").createFile(at: "a").replaceContents("a content")
 
 		try fs.moveNode(from: "/d", to: "/e")
-		#expect(try fs.file(at: "/e/a").stringContents() == "a content")
+		try #expect(fs.file(at: "/e/a").stringContents() == "a content")
 		#expect(fs.nodeType(at: "/d") == nil)
 		#expect(fs.nodeType(at: "/d/a") == nil)
 	}
@@ -371,8 +371,8 @@ extension DirsTests {
 		try fs.createDir(at: "/e")
 
 		try fs.moveNode(from: "/d", to: "/e")
-		#expect(try fs.file(at: "/e/d/a").stringContents() == "a")
-		#expect(try fs.file(at: "/e/d/b/c").stringContents() == "c")
+		try #expect(fs.file(at: "/e/d/a").stringContents() == "a")
+		try #expect(fs.file(at: "/e/d/b/c").stringContents() == "c")
 		#expect(fs.nodeType(at: "/d") == nil)
 	}
 }
