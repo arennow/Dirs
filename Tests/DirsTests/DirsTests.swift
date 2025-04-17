@@ -301,7 +301,7 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func moveFileRenames(fsKind: FSKind) throws {
+	func moveFileToNothingRenames(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
 		try fs.rootDir.createFile(at: "c").replaceContents("c content")
@@ -312,7 +312,7 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func moveFileReplaces(fsKind: FSKind) throws {
+	func moveFileToFileReplaces(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
 		try fs.rootDir.createFile(at: "c").replaceContents("c content")
@@ -324,7 +324,7 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func moveFileChangesDir(fsKind: FSKind) throws {
+	func moveFileToDirRehomes(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
 		try fs.rootDir.createFile(at: "c").replaceContents("c content")
@@ -336,7 +336,7 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func moveDirRenames(fsKind: FSKind) throws {
+	func moveDirToNothingRenames(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
 		try fs.rootDir.createDir(at: "d").createFile(at: "a").replaceContents("a content")
@@ -361,7 +361,7 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func moveDirToDirIsRecursive(fsKind: FSKind) throws {
+	func moveDirToDirRehomes(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
 		try fs.createDir(at: "/d")
