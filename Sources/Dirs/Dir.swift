@@ -106,7 +106,15 @@ public extension Dir {
 			var files: Array<File>
 		}
 
-		return sequence(state: State(dirs: [self], files: [])) { state -> Optional<any Node> in
+		let state = if let children = try? self.children() {
+			State(dirs: children.directories,
+				  files: children.files)
+		} else {
+			State(dirs: [],
+				  files: [])
+		}
+
+		return sequence(state: state) { state -> Optional<any Node> in
 			if let nextFile = state.files.popLast() {
 				return nextFile
 			} else if let nextDir = state.dirs.popLast() {

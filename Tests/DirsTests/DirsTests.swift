@@ -502,7 +502,7 @@ extension DirsTests {
 
 		let names = Set(try fs.rootDir.allDescendantNodes().map(\.name))
 		#expect(names == [
-			"", "a1", "a2", "a3", "b1", "b2", "b3",
+			"a1", "a2", "a3", "b1", "b2", "b3",
 			"a1f", "a2f", "a1a2f", "a1a2a3f", "b1b2b3f",
 		])
 	}
@@ -513,7 +513,7 @@ extension DirsTests {
 		try Self.prepareForRecursiveNodesTests(fs)
 
 		let names = Set(try fs.rootDir.allDescendantDirs().map(\.name))
-		#expect(names == ["", "a1", "a2", "a3", "b1", "b2", "b3"])
+		#expect(names == ["a1", "a2", "a3", "b1", "b2", "b3"])
 	}
 
 	@Test(arguments: FSKind.allCases)
