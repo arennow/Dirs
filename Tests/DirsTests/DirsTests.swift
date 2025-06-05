@@ -483,3 +483,45 @@ extension DirsTests {
 		#expect(fs.filePathOfNonexistentTemporaryFile(extension: ".abcd.").string.hasSuffix("abcd"))
 	}
 }
+
+// MARK: - Descendant Nodes
+
+extension DirsTests {
+	private static func prepareForRecursiveNodesTests(_ fs: any FilesystemInterface) throws {
+		try fs.createFileAndIntermediaryDirs(at: "/a1/a1f")
+		try fs.createFileAndIntermediaryDirs(at: "/a1/a2f")
+		try fs.createFileAndIntermediaryDirs(at: "/a1/a2/a1a2f")
+		try fs.createFileAndIntermediaryDirs(at: "/a1/a2/a3/a1a2a3f")
+		try fs.createFileAndIntermediaryDirs(at: "/b1/b2/b3/b1b2b3f")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func descendantNodeSequenceYieldsAll(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForRecursiveNodesTests(fs)
+
+		let names = Set(try fs.rootDir.allDescendantNodes().map(\.name))
+		#expect(names == [
+			"", "a1", "a2", "a3", "b1", "b2", "b3",
+			"a1f", "a2f", "a1a2f", "a1a2a3f", "b1b2b3f",
+		])
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func descendantDirSequenceYieldsAll(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForRecursiveNodesTests(fs)
+
+		let names = Set(try fs.rootDir.allDescendantDirs().map(\.name))
+		#expect(names == ["", "a1", "a2", "a3", "b1", "b2", "b3"])
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func descendantFileSequenceYieldsAll(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForRecursiveNodesTests(fs)
+
+		let names = Set(try fs.rootDir.allDescendantFiles().map(\.name))
+		#expect(names == ["a1f", "a2f", "a1a2f", "a1a2a3f", "b1b2b3f"])
+	}
+}

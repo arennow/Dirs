@@ -100,6 +100,37 @@ public extension Dir {
 }
 
 public extension Dir {
+	func allDescendantNodes() -> some Sequence<any Node> {
+		struct State {
+			var dirs: Array<Dir>
+			var files: Array<File>
+		}
+
+		return sequence(state: State(dirs: [self], files: [])) { state -> Optional<any Node> in
+			if let nextFile = state.files.popLast() {
+				return nextFile
+			} else if let nextDir = state.dirs.popLast() {
+				if let children = try? nextDir.children() {
+					state.dirs.append(contentsOf: children.directories)
+					state.files.append(contentsOf: children.files)
+				}
+				return nextDir
+			} else {
+				return nil
+			}
+		}
+	}
+
+	func allDescendantFiles() -> some Sequence<File> {
+		self.allDescendantNodes().compactMap { $0 as? File }
+	}
+
+	func allDescendantDirs() -> some Sequence<Dir> {
+		self.allDescendantNodes().compactMap { $0 as? Dir }
+	}
+}
+
+public extension Dir {
 	@discardableResult
 	func createDir(at ifpcv: some IntoFilePathComponentView) throws -> Dir {
 		try self.fs.createDir(at: self.path.appending(ifpcv.into()))
