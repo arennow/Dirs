@@ -3,6 +3,8 @@ import SystemPackage
 public protocol Node: IntoFilePath, Hashable, Sendable {
 	var fs: any FilesystemInterface { get }
 	var path: FilePath { get }
+
+	mutating func move(to destination: some IntoFilePath) throws
 }
 
 public extension Node {
@@ -24,9 +26,5 @@ public extension Node {
 
 	func delete() throws {
 		try self.fs.deleteNode(at: self)
-	}
-
-	func moveNode(to destination: some IntoFilePath) throws {
-		try self.fs.moveNode(from: self, to: destination)
 	}
 }

@@ -375,6 +375,30 @@ extension DirsTests {
 		try #expect(fs.file(at: "/e/d/b/c").stringContents() == "c")
 		#expect(fs.nodeType(at: "/d") == nil)
 	}
+
+	@Test(arguments: FSKind.allCases)
+	func moveFileUpdatesReceiverPath(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		var file = try fs.createFile(at: "/f1")
+		try file.replaceContents("content")
+
+		try file.move(to: "/f2")
+
+		#expect(file.path == "/f2")
+		try #expect(file.stringContents() == "content")
+		try #expect(File(fs: fs, path: "/f2").stringContents() == "content")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func moveDirUpdatesReceiverPath(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		var dir = try fs.createDir(at: "/d1")
+		try dir.move(to: "/d2")
+
+		#expect(dir.path == "/d2")
+	}
 }
 
 // MARK: - Copies

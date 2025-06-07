@@ -3,27 +3,35 @@ import Foundation
 
 public struct Dir: Node {
 	public let fs: any FilesystemInterface
-	public let path: FilePath
+	public private(set) var path: FilePath
 
-	public init(fs: any FilesystemInterface, path: FilePath, createIfNeeded: Bool = false) throws {
-		switch fs.nodeType(at: path) {
-			case .file: throw WrongNodeType(path: path, actualType: .file)
+	public init(fs: any FilesystemInterface, path: some IntoFilePath, createIfNeeded: Bool = false) throws {
+		let fp = path.into()
+
+		switch fs.nodeType(at: fp) {
+			case .file: throw WrongNodeType(path: fp, actualType: .file)
 			case .none:
 				if createIfNeeded {
-					self = try fs.createDir(at: path)
+					self = try fs.createDir(at: fp)
 					return
 				} else {
-					throw NoSuchNode(path: path)
+					throw NoSuchNode(path: fp)
 				}
 			case .dir: break
 		}
 
 		self.fs = fs
-		self.path = path
+		self.path = fp
 	}
 
 	public func hash(into hasher: inout Hasher) {
 		hasher.combine(self.path)
+	}
+
+	public mutating func move(to destination: some IntoFilePath) throws {
+		let destFP = destination.into()
+		try self.fs.moveNode(from: self, to: destFP)
+		self.path = destFP
 	}
 }
 
