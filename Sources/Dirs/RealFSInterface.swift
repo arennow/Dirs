@@ -22,12 +22,13 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
-		var isDirectory: ObjCBool = false
+		let attrs = try? FileManager.default.attributesOfItem(atPath: self.resolveToRaw(ifp).string)
 
-		if FileManager.default.fileExists(atPath: self.resolveToRaw(ifp).string, isDirectory: &isDirectory) {
-			return isDirectory.boolValue ? .dir : .file
-		} else {
-			return nil
+		switch attrs?[.type] as? FileAttributeType {
+			case .typeDirectory: return .dir
+			case .typeSymbolicLink: return .symlink
+			case .none: return nil
+			default: return .file
 		}
 	}
 
@@ -69,6 +70,12 @@ public struct RealFSInterface: FilesystemInterface {
 		try FileManager.default.createDirectory(at: self.resolveToRaw(ifp),
 												withIntermediateDirectories: true)
 		return try Dir(fs: self, path: self.resolveToProjected(ifp))
+	}
+
+	public func createSymlink(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> Symlink {
+		try FileManager.default.createSymbolicLink(at: self.resolveToRaw(linkIFP),
+												   withDestinationURL: self.resolveToRaw(destIFP))
+		return try Symlink(fs: self, path: self.resolveToProjected(linkIFP))
 	}
 
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {

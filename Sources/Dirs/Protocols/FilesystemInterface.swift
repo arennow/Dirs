@@ -12,7 +12,7 @@ public struct FilePathStat {
 }
 
 public enum NodeType: Sendable {
-	case dir, file
+	case dir, file, symlink
 }
 
 public protocol FilesystemInterface: Equatable, Sendable {
@@ -27,6 +27,8 @@ public protocol FilesystemInterface: Equatable, Sendable {
 	func createFile(at ifp: some IntoFilePath) throws -> File
 	@discardableResult
 	func createDir(at ifp: some IntoFilePath) throws -> Dir
+	@discardableResult
+	func createSymlink(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> Symlink
 
 	func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws
 	func appendContentsOfFile(at ifp: some IntoFilePath, with addendum: some IntoData) throws

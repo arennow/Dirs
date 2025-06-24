@@ -2,6 +2,16 @@ import Dirs
 import Foundation
 import SystemPackage
 
+struct UnimplementedError: Error {
+	let file: String
+	let line: Int
+	
+	init(file: String = #file, line: Int = #line) {
+		self.file = file
+		self.line = line
+	}
+}
+
 public final class MockFilesystemInterface: FilesystemInterface {
 	public enum MockNode: Equatable {
 		case dir
@@ -117,6 +127,10 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		}
 	}
 
+	public func createSymlink(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> Symlink {
+		throw UnimplementedError()
+	}
+
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
 		let fp = ifp.into()
 		switch self.pathsToNodes[fp] {
@@ -142,6 +156,8 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		let destType = Self.nodeType(at: destFP, in: acquisitionLock.resource)
 
 		switch srcType {
+			case .symlink: throw UnimplementedError()
+
 			case .none:
 				throw NoSuchNode(path: srcFP)
 
@@ -149,6 +165,8 @@ public final class MockFilesystemInterface: FilesystemInterface {
 				let fileToCopy = acquisitionLock.resource[srcFP]
 
 				switch destType {
+					case .symlink: throw UnimplementedError()
+
 					case .file, .none:
 						acquisitionLock.resource[destFP] = fileToCopy
 
@@ -173,6 +191,8 @@ public final class MockFilesystemInterface: FilesystemInterface {
 				}
 
 				switch destType {
+					case .symlink: throw UnimplementedError()
+
 					case .file:
 						acquisitionLock.resource.removeValue(forKey: destFP)
 						recursivelyMove(destFP: destFP)

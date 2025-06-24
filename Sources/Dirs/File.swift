@@ -9,9 +9,9 @@ public struct File: Node {
 		let fp = path.into()
 
 		switch fs.nodeType(at: fp) {
-			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
 			case .none: throw NoSuchNode(path: fp)
 			case .file: break
+			case .some(let x): throw WrongNodeType(path: fp, actualType: x)
 		}
 
 		self.fs = fs

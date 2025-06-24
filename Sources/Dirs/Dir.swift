@@ -9,7 +9,6 @@ public struct Dir: Node {
 		let fp = path.into()
 
 		switch fs.nodeType(at: fp) {
-			case .file: throw WrongNodeType(path: fp, actualType: .file)
 			case .none:
 				if createIfNeeded {
 					self = try fs.createDir(at: fp)
@@ -18,6 +17,7 @@ public struct Dir: Node {
 					throw NoSuchNode(path: fp)
 				}
 			case .dir: break
+			case .some(let x): throw WrongNodeType(path: fp, actualType: x)
 		}
 
 		self.fs = fs
