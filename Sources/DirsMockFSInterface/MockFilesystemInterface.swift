@@ -5,7 +5,7 @@ import SystemPackage
 struct UnimplementedError: Error {
 	let file: String
 	let line: Int
-	
+
 	init(file: String = #file, line: Int = #line) {
 		self.file = file
 		self.line = line
@@ -78,6 +78,10 @@ public final class MockFilesystemInterface: FilesystemInterface {
 				case .file: .init(filePath: childFilePath, isDirectory: false)
 			}
 		}
+	}
+
+	public func destinationOf(symlink ifp: some Dirs.IntoFilePath) throws -> SystemPackage.FilePath {
+		throw UnimplementedError()
 	}
 
 	public func filePathOfNonexistentTemporaryFile(extension: String?) -> FilePath {

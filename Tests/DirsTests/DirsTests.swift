@@ -390,8 +390,7 @@ extension DirsTests {
 
 		try fs.moveNode(from: "/s", to: "/s2")
 		#expect(fs.nodeType(at: "/s2") == .symlink)
-		try #expect(fs.contentsOf(file: "/s2") == Data("abc".utf8))
-//		try #expect(fs.file(at: "/s2").stringContents() == "abc")
+		try #expect(fs.file(at: "/s2").stringContents() == "abc")
 		#expect(fs.nodeType(at: "/s") == nil)
 	}
 
@@ -602,19 +601,21 @@ extension DirsTests {
 	}
 }
 
-//// MARK: - Symlinks
-//
-// extension DirsTests {
-//	@Test(arguments: FSKind.allCases)
-//	func symlinkRedirectsToFile(fsKind: FSKind) throws {
-//		let fs = self.fs(for: fsKind)
-//		let a = try fs.createFile(at: "/a")
-//		try fs.createSymlink(at: "/s", to: "/a")
-//
-//		try a.replaceContents("abc")
-//		try #expect(fs.contentsOf(file: "/s") == Data("abc".utf8))
-//
-//		try a.replaceContents("xyz")
-//		try #expect(fs.contentsOf(file: "/s") == Data("xyz".utf8))
-//	}
-// }
+// MARK: - Symlinks
+
+extension DirsTests {
+	@Test(arguments: FSKind.allCases)
+	func symlinkRedirectsToFile(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let a = try fs.createFile(at: "/a")
+		try fs.createSymlink(at: "/s", to: "/a")
+
+		try a.replaceContents("abc")
+		try #expect(fs.contentsOf(file: "/s") == Data("abc".utf8))
+		try #expect(fs.file(at: "/s").stringContents() == "abc")
+
+		try a.replaceContents("xyz")
+		try #expect(fs.contentsOf(file: "/s") == Data("xyz".utf8))
+		try #expect(fs.file(at: "/s").stringContents() == "xyz")
+	}
+}

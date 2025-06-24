@@ -52,6 +52,10 @@ public struct RealFSInterface: FilesystemInterface {
 			}
 	}
 
+	public func destinationOf(symlink ifp: some IntoFilePath) throws -> FilePath {
+		try FileManager.default.destinationOfSymbolicLink(atPath: self.resolveToRaw(ifp).string).into()
+	}
+
 	public func filePathOfNonexistentTemporaryFile(extension: String?) -> SystemPackage.FilePath {
 		var filename = UUID().uuidString
 		if let `extension` {
