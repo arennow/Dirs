@@ -194,12 +194,10 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		let destType = Self.nodeType(at: destFP, in: acquisitionLock.resource)
 
 		switch srcType {
-			case .symlink: throw UnimplementedError()
-
 			case .none:
 				throw NoSuchNode(path: srcFP)
 
-			case .file:
+			case .file, .symlink:
 				let fileToCopy = acquisitionLock.resource[srcFP]
 
 				switch destType {
