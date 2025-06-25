@@ -424,6 +424,63 @@ extension DirsTests {
 		#expect(fs.nodeType(at: "/d") == nil)
 	}
 
+	@Test(arguments: FSKind.allCases)
+	func moveDirToBrokenSymlinkReplaces(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let d = try fs.rootDir.createDir(at: "d")
+		try d.createFile(at: "a").replaceContents("d/a content")
+		try fs.rootDir.createSymlink(at: "/s", to: "/Z")
+
+		try fs.moveNode(from: "/d", to: "/s")
+		try #expect(fs.file(at: "/s/a").stringContents() == "d/a content")
+
+		#expect(fs.nodeType(at: "/s") == .dir)
+		#expect(fs.nodeType(at: "/s/a") == .file)
+		#expect(fs.nodeType(at: "/Z") == nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func moveDirToFileSymlinkReplaces(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let d = try fs.rootDir.createDir(at: "d")
+		try d.createFile(at: "a").replaceContents("d/a content")
+
+		try fs.rootDir.createFile(at: "c").replaceContents("c content")
+		try fs.rootDir.createSymlink(at: "/s", to: "/c")
+
+		try fs.moveNode(from: "/d", to: "/s")
+		try #expect(fs.file(at: "/s/a").stringContents() == "d/a content")
+
+		#expect(fs.nodeType(at: "/c") == .file)
+		#expect(fs.nodeType(at: "/s") == .dir)
+		#expect(fs.nodeType(at: "/s/a") == .file)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func moveDirToDirSymlinkRehomes(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let d1 = try fs.rootDir.createDir(at: "d1")
+		try d1.createFile(at: "a1").replaceContents("a1 content")
+
+		let d2 = try fs.rootDir.createDir(at: "d2")
+		try d2.createFile(at: "a2").replaceContents("a2 content")
+
+		try fs.rootDir.createSymlink(at: "/s", to: "/d2")
+
+		try fs.moveNode(from: "/d1", to: "/s")
+
+		#expect(fs.nodeType(at: "/d2") == .dir)
+		#expect(fs.nodeType(at: "/d2/a2") == .file)
+		try #expect(fs.file(at: "/d2/a2").stringContents() == "a2 content")
+		#expect(fs.nodeType(at: "/d2/d1") == .dir)
+		#expect(fs.nodeType(at: "/d2/d1/a1") == .file)
+		try #expect(fs.file(at: "/d2/d1/a1").stringContents() == "a1 content")
+		#expect(fs.nodeType(at: "/s") == .symlink)
+	}
+
 	@discardableResult
 	private static func prepareForSymlinkTests(_ fs: any FilesystemInterface) throws -> Symlink {
 		try fs.createFile(at: "/a").replaceContents("abc")

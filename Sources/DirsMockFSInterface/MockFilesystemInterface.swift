@@ -284,7 +284,14 @@ public final class MockFilesystemInterface: FilesystemInterface {
 				}
 
 				switch destType {
-					case .symlink: throw UnimplementedError()
+					case .symlink:
+						let (destSymFP, destSymType) = try resolveDestFPSymlink()
+						if destSymType == .dir {
+							let resolvedDestFPRoot = destSymFP.appending(srcFP.lastComponent!)
+							recursivelyMove(destFP: resolvedDestFPRoot)
+						} else {
+							fallthrough
+						}
 
 					case .file:
 						acquisitionLock.resource.removeValue(forKey: destFP)
