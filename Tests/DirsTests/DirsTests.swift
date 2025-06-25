@@ -336,6 +336,21 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
+	func moveFileToBrokenSymlinkReplaces(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createFile(at: "c").replaceContents("c content")
+		try fs.rootDir.createSymlink(at: "/s", to: "/Z")
+
+		try fs.moveNode(from: "/c", to: "/s")
+		try #expect(fs.file(at: "/s").stringContents() == "c content")
+
+		#expect(fs.nodeType(at: "/c") == nil)
+		#expect(fs.nodeType(at: "/s") == .file)
+		#expect(fs.nodeType(at: "/Z") == nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
 	func moveFileToFileSymlinkReplaces(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
@@ -367,26 +382,6 @@ extension DirsTests {
 		#expect(fs.nodeType(at: "/s") == .symlink)
 		#expect(fs.nodeType(at: "/s/c") == .file)
 	}
-
-//	@Test(arguments: FSKind.allCases)
-//	func moveFileToBrokenSymlinkCreates(fsKind: FSKind) throws {
-//		let fs = self.fs(for: fsKind)
-//
-//		try fs.rootDir.createFile(at: "c").replaceContents("c content")
-//		try fs.rootDir.createSymlink(at: "/s", to: "/b")
-//
-//		if let rfs = fs as? RealFSInterface {
-//			print(rfs.chroot?.string)
-//			print()
-//		}
-//
-//		try fs.moveNode(from: "/c", to: "/s")
-//		try #expect(fs.file(at: "/s").stringContents() == "c content")
-//
-//		#expect(fs.nodeType(at: "/b") == .file)
-//		#expect(fs.nodeType(at: "/c") == nil)
-//		#expect(fs.nodeType(at: "/s") == .file)
-//	}
 
 	@Test(arguments: FSKind.allCases)
 	func moveDirToNothingRenames(fsKind: FSKind) throws {

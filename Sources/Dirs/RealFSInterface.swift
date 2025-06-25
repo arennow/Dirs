@@ -132,11 +132,27 @@ public struct RealFSInterface: FilesystemInterface {
 		let fm = FileManager.default
 
 		var isDirectory: ObjCBool = false
-		if fm.fileExists(atPath: destURL.pathNonPercentEncoded(), isDirectory: &isDirectory) {
-			if isDirectory.boolValue {
-				destURL.appendPathComponent(srcURL.lastPathComponent)
-			} else {
+		if fm.fileExists(atPath: destURL.pathNonPercentEncoded(), isDirectory: &isDirectory),
+		   isDirectory.boolValue
+		{
+			destURL.appendPathComponent(srcURL.lastPathComponent)
+		} else {
+			do {
 				try fm.removeItem(at: destURL)
+			} catch {
+				/*
+				 `fileExists` resolves symlinks, meaning it returns `false` for
+				 broken symlinks, but `moveItem` still fails because the symlink
+				 does actually exist. So we just try to delete any non-directory
+				 destination
+				 So if deletion fails because the file doesn't exist, we swallow it
+				 */
+				let nse = error as NSError
+				if nse.domain == NSCocoaErrorDomain, nse.code == CocoaError.fileNoSuchFile.rawValue {
+					// nbd
+				} else {
+					throw error
+				}
 			}
 		}
 
