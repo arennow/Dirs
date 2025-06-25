@@ -37,12 +37,18 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
-		try FileManager.default.contentsOfDirectory(at: self.resolveToRaw(ifp),
-													includingPropertiesForKeys: [.isDirectoryKey])
+		// This ⬇️ handles chroots
+		let rawResolvedIFP: URL = self.resolveToRaw(ifp)
+		// And this ⬇️ handles symlinks
+		let unfurledURL: URL = (try? self.destinationOf(symlink: rawResolvedIFP)).flatMap { URL(string: $0.string) } ?? rawResolvedIFP
+
+		return try FileManager.default.contentsOfDirectory(at: unfurledURL,
+														   includingPropertiesForKeys: [.isDirectoryKey])
 			.map { rawURL in
 				var chrootRelativeFilePath = FilePath(rawURL.path)
 				if let chroot = self.chroot {
-					precondition(chrootRelativeFilePath.removePrefix(chroot))
+					let didRemove = chrootRelativeFilePath.removePrefix(chroot)
+					precondition(didRemove)
 					// removing the prefix also turns this into a relative path so:
 					chrootRelativeFilePath.root = "/"
 				}

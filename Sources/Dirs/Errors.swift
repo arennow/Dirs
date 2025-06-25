@@ -8,7 +8,7 @@ public struct NoSuchNode: Error {
 	}
 }
 
-public struct WrongNodeType: Error {
+public struct WrongNodeType: Error, Equatable {
 	public let path: FilePath
 	public let actualType: NodeType
 

@@ -617,5 +617,24 @@ extension DirsTests {
 		try a.replaceContents("xyz")
 		try #expect(fs.contentsOf(file: "/s") == Data("xyz".utf8))
 		try #expect(fs.file(at: "/s").stringContents() == "xyz")
+
+		#expect(throws: WrongNodeType.self) {
+			try fs.dir(at: "/s")
+		}
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func symlinkRedirectsToDir(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let f = try fs.createFileAndIntermediaryDirs(at: "/a/b/c/f")
+		try f.replaceContents("abc")
+
+		try fs.createSymlink(at: "/s", to: "/a/b")
+
+		try #expect(fs.contentsOf(directory: "/s").compactMap(\.filePath.lastComponent) == ["c"])
+		try #expect(fs.dir(at: "/s").children().directories.compactMap(\.path.lastComponent) == ["c"])
+		#expect(throws: WrongNodeType.self) {
+			try fs.file(at: "/s")
+		}
 	}
 }
