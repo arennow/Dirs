@@ -18,11 +18,13 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		case file(Data)
 		public static func file(_ string: String) -> Self { .file(Data(string.utf8)) }
 		public static var file: Self { .file(Data()) }
+		case symlink(FilePath)
 
 		var nodeType: NodeType {
 			switch self {
 				case .dir: .dir
 				case .file: .file
+				case .symlink: .symlink
 			}
 		}
 	}
@@ -59,29 +61,57 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		switch self.pathsToNodes[fp] {
 			case .file(let data): return data
 			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
+			case .symlink(let destination): return try self.contentsOf(file: destination)
 			case .none: throw NoSuchNode(path: fp)
 		}
 	}
 
 	public func contentsOf(directory ifp: some Dirs.IntoFilePath) throws -> Array<Dirs.FilePathStat> {
+		try self.contentsOf(directory: ifp, using: self.pathsToNodes.acquireIntoHandle())
+	}
+
+	private func contentsOf(directory ifp: some Dirs.IntoFilePath,
+							using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws -> Array<Dirs.FilePathStat>
+	{
 		let fp = ifp.into()
 
-		let childKeys = self.pathsToNodes.read(in: \.keys)
+		switch acquisitionLock.resource[fp] {
+			case .none: throw NoSuchNode(path: fp)
+			case .file: throw WrongNodeType(path: fp, actualType: .file)
+			case .symlink(let destination): return try self.contentsOf(directory: destination, using: acquisitionLock)
+			case .dir: break
+		}
+
+		let childKeys = acquisitionLock.resource.keys
 			.lazy
 			.filter { $0.starts(with: fp) }
 			.filter { $0 != fp } // This may only remove `/`
 			.filter { $0.removingLastComponent() == fp }
 
 		return childKeys.map { childFilePath in
-			switch self.pathsToNodes[childFilePath]! {
-				case .dir: .init(filePath: childFilePath, isDirectory: true)
-				case .file: .init(filePath: childFilePath, isDirectory: false)
+			switch acquisitionLock.resource[childFilePath]! {
+				case .dir: .init(filePath: childFilePath, statType: .isDirectory)
+				case .file: .init(filePath: childFilePath, statType: [])
+				case .symlink(let destination): {
+						var statType = FilePathStat.StatType.isSymlink
+						if acquisitionLock.resource[destination]?.nodeType == .dir {
+							statType.insert(.isDirectory)
+						}
+
+						return .init(filePath: childFilePath, statType: statType)
+					}()
 			}
 		}
 	}
 
-	public func destinationOf(symlink ifp: some Dirs.IntoFilePath) throws -> SystemPackage.FilePath {
-		throw UnimplementedError()
+	public func destinationOf(symlink ifp: some Dirs.IntoFilePath) throws -> FilePath {
+		let fp = ifp.into()
+
+		switch self.pathsToNodes[fp] {
+			case .symlink(let destination): return destination
+			case .none: throw NoSuchNode(path: fp)
+			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
+		}
 	}
 
 	public func filePathOfNonexistentTemporaryFile(extension: String?) -> FilePath {
@@ -125,6 +155,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		switch self.pathsToNodes[fp] {
 			case .dir: throw NodeAlreadyExists(path: fp, type: .dir)
 			case .file: throw NodeAlreadyExists(path: fp, type: .file)
+			case .symlink(let destination): return try self.createFile(at: destination)
 			case .none:
 				self.pathsToNodes[fp] = .file
 				return try File(fs: self, path: fp)
@@ -132,7 +163,9 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	}
 
 	public func createSymlink(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> Symlink {
-		throw UnimplementedError()
+		let linkFP = linkIFP.into()
+		self.pathsToNodes[linkFP] = .symlink(destIFP.into())
+		return try Symlink(fs: self, path: linkFP)
 	}
 
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
@@ -141,6 +174,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 			case .none: throw NoSuchNode(path: fp)
 			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
 			case .file: self.pathsToNodes[fp] = .file(contents.into())
+			case .symlink(let destination): try self.replaceContentsOfFile(at: destination, to: contents)
 		}
 	}
 

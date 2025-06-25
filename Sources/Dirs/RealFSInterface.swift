@@ -43,7 +43,7 @@ public struct RealFSInterface: FilesystemInterface {
 		let unfurledURL: URL = (try? self.destinationOf(symlink: rawResolvedIFP)).flatMap { URL(string: $0.string) } ?? rawResolvedIFP
 
 		return try FileManager.default.contentsOfDirectory(at: unfurledURL,
-														   includingPropertiesForKeys: [.isDirectoryKey])
+														   includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey])
 			.map { rawURL in
 				var chrootRelativeFilePath = FilePath(rawURL.path)
 				if let chroot = self.chroot {
@@ -53,8 +53,15 @@ public struct RealFSInterface: FilesystemInterface {
 					chrootRelativeFilePath.root = "/"
 				}
 
-				return FilePathStat(filePath: chrootRelativeFilePath,
-									isDirectory: try rawURL.getBoolResourceValue(forKey: .isDirectoryKey))
+				var statType: FilePathStat.StatType = []
+				if try rawURL.getBoolResourceValue(forKey: .isDirectoryKey) {
+					statType.insert(.isDirectory)
+				}
+				if try rawURL.getBoolResourceValue(forKey: .isSymbolicLinkKey) {
+					statType.insert(.isSymlink)
+				}
+
+				return FilePathStat(filePath: chrootRelativeFilePath, statType: statType)
 			}
 	}
 

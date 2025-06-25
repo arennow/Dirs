@@ -2,12 +2,26 @@ import Foundation
 import SystemPackage
 
 public struct FilePathStat {
-	public let filePath: FilePath
-	public let isDirectory: Bool
+	public struct StatType: OptionSet, Sendable {
+		public let rawValue: UInt8
+		public init(rawValue: UInt8) { self.rawValue = rawValue }
 
+		public static let isDirectory = Self(rawValue: 0b0000_0001)
+		public static let isSymlink = Self(rawValue: 0b0000_0010)
+	}
+
+	public let filePath: FilePath
+	public let statType: StatType
+	public var isDirectory: Bool { self.statType.contains(.isDirectory) }
+
+	@available(*, deprecated, message: "Use the `StatType` initializer instead.")
 	public init(filePath: FilePath, isDirectory: Bool) {
+		self.init(filePath: filePath, statType: .isDirectory)
+	}
+
+	public init(filePath: FilePath, statType: StatType) {
 		self.filePath = filePath
-		self.isDirectory = isDirectory
+		self.statType = statType
 	}
 }
 

@@ -11,7 +11,7 @@ public struct Symlink: Node {
 	public let fs: any FilesystemInterface
 	public private(set) var path: FilePath
 
-	init(fs: any FilesystemInterface, path: some IntoFilePath) throws {
+	package init(fs: any FilesystemInterface, path: some IntoFilePath) throws {
 		let fp = path.into()
 
 		switch fs.nodeType(at: fp) {
