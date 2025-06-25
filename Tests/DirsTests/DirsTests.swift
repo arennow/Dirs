@@ -378,8 +378,8 @@ extension DirsTests {
 
 	@discardableResult
 	private static func prepareForSymlinkTests(_ fs: any FilesystemInterface) throws -> Symlink {
-		let a = try fs.createFile(at: "/a")
-		try a.replaceContents("abc")
+		try fs.createFile(at: "/a").replaceContents("abc")
+		try fs.createFile(at: "/b").replaceContents("bcd")
 		return try fs.createSymlink(at: "/s", to: "/a")
 	}
 
@@ -394,29 +394,33 @@ extension DirsTests {
 		#expect(fs.nodeType(at: "/s") == nil)
 	}
 
-//	@Test(arguments: FSKind.allCases)
-//	func moveSymlinkToFileReplaces(fsKind: FSKind) throws {
-//		let fs = self.fs(for: fsKind)
-//
-//		try fs.rootDir.createFile(at: "c").replaceContents("c content")
-//		try fs.rootDir.createFile(at: "d")
-//
-//		try fs.moveNode(from: "/c", to: "/d")
-//		try #expect(fs.file(at: "/d").stringContents() == "c content")
-//		#expect(fs.nodeType(at: "/c") == nil)
-//	}
-//
-//	@Test(arguments: FSKind.allCases)
-//	func moveSymlinkToDirRehomes(fsKind: FSKind) throws {
-//		let fs = self.fs(for: fsKind)
-//
-//		try fs.rootDir.createFile(at: "c").replaceContents("c content")
-//		try fs.rootDir.createDir(at: "d")
-//
-//		try fs.moveNode(from: "/c", to: "/d")
-//		try #expect(fs.file(at: "/d/c").stringContents() == "c content")
-//		#expect(fs.nodeType(at: "/c") == nil)
-//	}
+	@Test(arguments: FSKind.allCases)
+	func moveSymlinkToFileReplaces(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForSymlinkTests(fs)
+
+		try fs.moveNode(from: "/s", to: "/b")
+		try #expect(fs.file(at: "/b").stringContents() == "abc")
+
+		#expect(fs.nodeType(at: "/a") == .file)
+		#expect(fs.nodeType(at: "/b") == .symlink)
+		#expect(fs.nodeType(at: "/s") == nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func moveSymlinkToDirRehomes(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForSymlinkTests(fs)
+
+		try fs.rootDir.createDir(at: "d")
+
+		try fs.moveNode(from: "/s", to: "/d")
+		try #expect(fs.file(at: "/d/s").stringContents() == "abc")
+
+		#expect(fs.nodeType(at: "/a") == .file)
+		#expect(fs.nodeType(at: "/d/s") == .symlink)
+		#expect(fs.nodeType(at: "/s") == nil)
+	}
 
 	@Test(arguments: FSKind.allCases)
 	func moveFileUpdatesReceiverPath(fsKind: FSKind) throws {
