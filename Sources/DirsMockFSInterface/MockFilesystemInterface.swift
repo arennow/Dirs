@@ -45,20 +45,56 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		self.pathsToNodes = Locked(["/": .dir])
 	}
 
-	private static func nodeType(at ifp: some IntoFilePath, in ptn: Dictionary<FilePath, MockNode>) -> NodeType? {
-		ptn[ifp.into()]?.nodeType
+	private static func nodeType(at ifp: some IntoFilePath, in ptn: PTN) -> NodeType? {
+		(try? Self.resolveSymlink(at: ifp, in: ptn))?.node.nodeType
+	}
+
+	// See also the nested function `resolveDestFPSymlink`
+	private static func resolveSymlink(at ifp: some IntoFilePath, in ptn: PTN) throws -> (path: FilePath, node: MockNode) {
+		let fp = ifp.into()
+
+		let path = try Self.resolveSymlinkPath(at: fp, in: ptn)
+		guard let node = ptn[path] else { throw NoSuchNode(path: fp) }
+
+		return (path, node)
+	}
+
+	private static func resolveSymlinkPath(at ifp: some IntoFilePath, in ptn: PTN) throws -> FilePath {
+		let fp = ifp.into()
+		if ptn[fp] != nil { return fp }
+
+		var builtRealpathFPCV = FilePath.ComponentView()
+		var builtRealpathFP: FilePath {
+			FilePath(root: fp.root, builtRealpathFPCV)
+		}
+		for comp in fp.components {
+			builtRealpathFPCV.append(comp)
+
+			switch ptn[builtRealpathFP] {
+				case .symlink(let destination):
+					builtRealpathFPCV = .init(destination.components)
+				case nil: throw NoSuchNode(path: builtRealpathFP)
+				default: break
+			}
+		}
+
+		return builtRealpathFP
+	}
+
+	private func node(at ifp: some IntoFilePath) -> MockNode? {
+		self.pathsToNodes.read { ptn in
+			(try? Self.resolveSymlink(at: ifp, in: ptn))?.node
+		}
 	}
 
 	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
-		self.pathsToNodes.read { ptn in
-			Self.nodeType(at: ifp, in: ptn)
-		}
+		self.node(at: ifp)?.nodeType
 	}
 
 	public func contentsOf(file ifp: some IntoFilePath) throws -> Data {
 		let fp = ifp.into()
 
-		switch self.pathsToNodes[fp] {
+		switch self.node(at: fp) {
 			case .file(let data): return data
 			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
 			case .symlink(let destination): return try self.contentsOf(file: destination)
@@ -105,9 +141,13 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	}
 
 	public func destinationOf(symlink ifp: some Dirs.IntoFilePath) throws -> FilePath {
+		try self.destinationOf(symlink: ifp, using: self.pathsToNodes.acquireIntoHandle())
+	}
+
+	private func destinationOf(symlink ifp: some Dirs.IntoFilePath, using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws -> FilePath {
 		let fp = ifp.into()
 
-		switch self.pathsToNodes[fp] {
+		switch acquisitionLock.resource[fp] {
 			case .symlink(let destination): return destination
 			case .none: throw NoSuchNode(path: fp)
 			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
@@ -193,6 +233,14 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		let srcType = Self.nodeType(at: srcFP, in: acquisitionLock.resource)
 		let destType = Self.nodeType(at: destFP, in: acquisitionLock.resource)
 
+		// This is similar to `resolveSymlink`, but that's more of an "outside
+		// perspective", and this is more of a "what's in the dict" perspective
+		func resolveDestFPSymlink() throws -> (fp: FilePath, type: NodeType?) {
+			let destSymlinkDestFP = try self.destinationOf(symlink: destFP, using: acquisitionLock)
+			let destType = Self.nodeType(at: destSymlinkDestFP, in: acquisitionLock.resource)
+			return (destSymlinkDestFP, destType)
+		}
+
 		switch srcType {
 			case .none:
 				throw NoSuchNode(path: srcFP)
@@ -201,7 +249,16 @@ public final class MockFilesystemInterface: FilesystemInterface {
 				let fileToCopy = acquisitionLock.resource[srcFP]
 
 				switch destType {
-					case .symlink: throw UnimplementedError()
+					case .symlink:
+						let (destSymFP, destSymType) = try resolveDestFPSymlink()
+
+						switch destSymType {
+							case .dir:
+								return try self.copyNode(from: source, to: destSymFP, using: acquisitionLock)
+
+							case .file, .symlink, nil:
+								acquisitionLock.resource[destFP] = fileToCopy
+						}
 
 					case .file, .none:
 						acquisitionLock.resource[destFP] = fileToCopy

@@ -160,4 +160,9 @@ public extension Dir {
 	func createFile(at ifpcv: some IntoFilePathComponentView) throws -> File {
 		try self.fs.createFile(at: self.path.appending(ifpcv.into()))
 	}
+
+	@discardableResult
+	func createSymlink(at ifpcv: some IntoFilePathComponentView, to destination: some IntoFilePath) throws -> Symlink {
+		try self.fs.createSymlink(at: self.path.appending(ifpcv.into()), to: destination.into())
+	}
 }
