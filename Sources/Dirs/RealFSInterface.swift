@@ -42,8 +42,10 @@ public struct RealFSInterface: FilesystemInterface {
 		// And this ⬇️ handles symlinks
 		let unfurledURL: URL = (try? self.destinationOf(symlink: rawResolvedIFP)).flatMap { URL(string: $0.string) } ?? rawResolvedIFP
 
-		return try FileManager.default.contentsOfDirectory(at: unfurledURL,
-														   includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+		let fm = FileManager.default
+
+		return try fm.contentsOfDirectory(at: unfurledURL,
+										  includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey])
 			.map { rawURL in
 				var chrootRelativeFilePath = FilePath(rawURL.path)
 				if let chroot = self.chroot {
@@ -53,15 +55,16 @@ public struct RealFSInterface: FilesystemInterface {
 					chrootRelativeFilePath.root = "/"
 				}
 
-				var statType: FilePathStat.StatType = []
-				if try rawURL.getBoolResourceValue(forKey: .isDirectoryKey) {
-					statType.insert(.isDirectory)
-				}
+				let isDir: Bool
 				if try rawURL.getBoolResourceValue(forKey: .isSymbolicLinkKey) {
-					statType.insert(.isSymlink)
+					var isDirObjCBool: ObjCBool = false
+					fm.fileExists(atPath: rawURL.path, isDirectory: &isDirObjCBool)
+					isDir = isDirObjCBool.boolValue
+				} else {
+					isDir = try rawURL.getBoolResourceValue(forKey: .isDirectoryKey)
 				}
 
-				return FilePathStat(filePath: chrootRelativeFilePath, statType: statType)
+				return FilePathStat(filePath: chrootRelativeFilePath, isDirectory: isDir)
 			}
 	}
 

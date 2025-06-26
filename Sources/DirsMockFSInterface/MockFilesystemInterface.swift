@@ -126,16 +126,9 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 		return childKeys.map { childFilePath in
 			switch acquisitionLock.resource[childFilePath]! {
-				case .dir: .init(filePath: childFilePath, statType: .isDirectory)
-				case .file: .init(filePath: childFilePath, statType: [])
-				case .symlink(let destination): {
-						var statType = FilePathStat.StatType.isSymlink
-						if acquisitionLock.resource[destination]?.nodeType == .dir {
-							statType.insert(.isDirectory)
-						}
-
-						return .init(filePath: childFilePath, statType: statType)
-					}()
+				case .dir: .init(filePath: childFilePath, isDirectory: true)
+				case .file: .init(filePath: childFilePath, isDirectory: false)
+				case .symlink(let destination): .init(filePath: childFilePath, isDirectory: acquisitionLock.resource[destination]?.nodeType == .dir)
 			}
 		}
 	}

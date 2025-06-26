@@ -653,6 +653,8 @@ extension DirsTests {
 	}
 }
 
+// MARK: - Random Path
+
 extension DirsTests {
 	@Test(arguments: FSKind.allCases)
 	func randomPathDiffers(fsKind: FSKind) {
@@ -665,6 +667,57 @@ extension DirsTests {
 		let fs = self.fs(for: fsKind)
 		#expect(fs.filePathOfNonexistentTemporaryFile(extension: "abcd").string.hasSuffix("abcd"))
 		#expect(fs.filePathOfNonexistentTemporaryFile(extension: ".abcd.").string.hasSuffix("abcd"))
+	}
+}
+
+// MARK: - Directory Contents
+
+extension DirsTests {
+	@Test(arguments: FSKind.allCases)
+	func dirContentsEmpty(_ fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		#expect(try fs.contentsOf(directory: "/") == [])
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func dirContentsNormal(_ fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try fs.createFile(at: "/a")
+		try fs.createFile(at: "/b")
+		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
+
+		try #expect(Set(fs.contentsOf(directory: "/")) == [
+			.init(filePath: "/a", isDirectory: false),
+			.init(filePath: "/b", isDirectory: false),
+			.init(filePath: "/d", isDirectory: true),
+		])
+
+		try #expect(fs.contentsOf(directory: "/d") == [
+			.init(filePath: "/d/d1", isDirectory: false),
+		])
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func dirContentsSymlink(_ fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
+		try fs.createFileAndIntermediaryDirs(at: "/d/d2")
+		try fs.createSymlink(at: "/s", to: "/d")
+
+		try #expect(Set(fs.contentsOf(directory: "/")) == [
+			.init(filePath: "/d", isDirectory: true),
+			.init(filePath: "/s", isDirectory: true),
+		])
+
+		try #expect(Set(fs.contentsOf(directory: "/d")) == [
+			.init(filePath: "/d/d1", isDirectory: false),
+			.init(filePath: "/d/d2", isDirectory: false),
+		])
+
+		try #expect(Set(fs.contentsOf(directory: "/s")) == [
+			.init(filePath: "/d/d1", isDirectory: false),
+			.init(filePath: "/d/d2", isDirectory: false),
+		])
 	}
 }
 
