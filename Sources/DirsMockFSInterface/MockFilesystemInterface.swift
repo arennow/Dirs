@@ -186,12 +186,10 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		}
 
 		switch self.pathsToNodes[fp] {
-			case .dir: throw NodeAlreadyExists(path: fp, type: .dir)
-			case .file: throw NodeAlreadyExists(path: fp, type: .file)
-			case .symlink(let destination): return try self.createFile(at: destination)
 			case .none:
 				self.pathsToNodes[fp] = .file
 				return try File(fs: self, path: fp)
+			case .some(let x): throw NodeAlreadyExists(path: fp, type: x.nodeType)
 		}
 	}
 

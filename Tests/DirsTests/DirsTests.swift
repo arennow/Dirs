@@ -166,6 +166,8 @@ struct DirsTests: ~Copyable {
 		try #expect(fs.contentsOf(file: "/a") == Data("content".utf8))
 	}
 
+	// MARK: - Create File
+
 	@Test(arguments: FSKind.allCases)
 	func createFile(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
@@ -200,6 +202,34 @@ struct DirsTests: ~Copyable {
 		#expect(throws: (any Error).self) { try root.createFile(at: "a") }
 		#expect(fs.nodeType(at: "/a") == .dir)
 	}
+
+	@Test(arguments: FSKind.allCases)
+	func createFileThroughBrokenSymlinkFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createSymlink(at: "/s", to: "/a")
+		#expect(throws: (any Error).self) { try fs.createFile(at: "/s") }
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func createFileThroughFileSymlinkFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createFile(at: "/a")
+		try fs.createSymlink(at: "/s", to: "/a")
+		#expect(throws: (any Error).self) { try fs.createFile(at: "/s") }
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func createFileThroughDirSymlinkFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/d")
+		try fs.createSymlink(at: "/s", to: "/d")
+		#expect(throws: (any Error).self) { try fs.createFile(at: "/s") }
+	}
+
+	// MARK: - Mutate File
 
 	@Test(arguments: FSKind.allCases)
 	func replaceContentsOfFile(fsKind: FSKind) throws {
