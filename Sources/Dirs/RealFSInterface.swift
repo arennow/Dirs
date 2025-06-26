@@ -99,7 +99,9 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
-		try contents.into().write(to: self.resolveToRaw(ifp), options: .atomic)
+		let fd = try FileDescriptor.open(self.resolveToRaw(ifp), .writeOnly, retryOnInterrupt: true)
+		defer { try? fd.close() }
+		try fd.writeAll(contents.into())
 	}
 
 	public func appendContentsOfFile(at ifp: some IntoFilePath, with addendum: some IntoData) throws {

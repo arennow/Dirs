@@ -243,6 +243,34 @@ struct DirsTests: ~Copyable {
 	}
 
 	@Test(arguments: FSKind.allCases)
+	func replaceContentsOfFileThroughBrokenSymlinkFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createSymlink(at: "/s", to: "/a")
+		#expect(throws: (any Error).self) { try fs.replaceContentsOfFile(at: "/s", to: "abc") }
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func replaceContentsOfFileThroughFileSymlink(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let a = try fs.createFile(at: "/a")
+		try fs.createSymlink(at: "/s", to: "/a")
+
+		try fs.replaceContentsOfFile(at: "/s", to: "abc")
+		try #expect(a.stringContents() == "abc")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func replaceContentsOfFileThroughDirSymlinkFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/d")
+		try fs.createSymlink(at: "/s", to: "/d")
+		#expect(throws: (any Error).self) { try fs.replaceContentsOfFile(at: "/s", to: "abc") }
+	}
+
+	@Test(arguments: FSKind.allCases)
 	func appendContentsOfFile(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
@@ -252,6 +280,8 @@ struct DirsTests: ~Copyable {
 		try file.appendContents(" is king")
 		try #expect(file.stringContents() == "content is king")
 	}
+
+	// MARK: - Delete File
 
 	@Test(arguments: FSKind.allCases)
 	func deleteNode(fsKind: FSKind) throws {
@@ -285,6 +315,8 @@ struct DirsTests: ~Copyable {
 
 		#expect(try fs.file(at: "/a").parent == fs.rootDir)
 	}
+
+	// MARK: - Miscellaneous
 
 	@Test(arguments: FSKind.allCases)
 	func createFileAndIntermediaryDirs(fsKind: FSKind) throws {
