@@ -8,7 +8,7 @@ public struct File: Node {
 	public init(fs: any FilesystemInterface, path: some IntoFilePath) throws {
 		let fp = path.into()
 
-		switch fs.nodeType(at: fp) {
+		switch fs.nodeTypeFollowingSymlinks(at: fp) {
 			case .none: throw NoSuchNode(path: fp)
 			case .file: break
 			case .dir: throw WrongNodeType(path: fp, actualType: .dir)

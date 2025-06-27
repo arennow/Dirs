@@ -17,6 +17,7 @@ public enum NodeType: Sendable {
 
 public protocol FilesystemInterface: Equatable, Sendable {
 	func nodeType(at ifp: some IntoFilePath) -> NodeType?
+	func nodeTypeFollowingSymlinks(at ifp: some IntoFilePath) -> NodeType?
 
 	func contentsOf(file ifp: some IntoFilePath) throws -> Data
 	func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat>

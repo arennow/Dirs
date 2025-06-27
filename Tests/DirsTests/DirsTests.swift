@@ -831,6 +831,7 @@ extension DirsTests {
 	@Test(arguments: FSKind.allCases)
 	func symlinkRedirectsToFile(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
+
 		let a = try fs.createFile(at: "/a")
 		try fs.createSymlink(at: "/s", to: "/a")
 
@@ -850,6 +851,7 @@ extension DirsTests {
 	@Test(arguments: FSKind.allCases)
 	func symlinkRedirectsToDir(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
+
 		let f = try fs.createFileAndIntermediaryDirs(at: "/a/b/c/f")
 		try f.replaceContents("abc")
 
@@ -860,5 +862,35 @@ extension DirsTests {
 		#expect(throws: WrongNodeType.self) {
 			try fs.file(at: "/s")
 		}
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func nodesInsideSymlinkDirResolve(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createFileAndIntermediaryDirs(at: "/a/b/c1")
+		try fs.createFileAndIntermediaryDirs(at: "/a/b/c2")
+		try fs.createFileAndIntermediaryDirs(at: "/a/f")
+		try fs.createSymlink(at: "/s", to: "/a")
+
+		#expect(fs.nodeType(at: "/s") == .symlink)
+		#expect(fs.nodeTypeFollowingSymlinks(at: "/s") == .dir)
+		_ = try fs.dir(at: "/s")
+
+		#expect(fs.nodeType(at: "/s/b") == .dir)
+		#expect(fs.nodeTypeFollowingSymlinks(at: "/s/b") == .dir)
+		_ = try fs.dir(at: "/s/b")
+
+		#expect(fs.nodeType(at: "/s/b/c1") == .file)
+		#expect(fs.nodeTypeFollowingSymlinks(at: "/s/b/c1") == .file)
+		_ = try fs.file(at: "/s/b/c1")
+
+		#expect(fs.nodeType(at: "/s/b/c2") == .file)
+		#expect(fs.nodeTypeFollowingSymlinks(at: "/s/b/c2") == .file)
+		_ = try fs.file(at: "/s/b/c2")
+
+		#expect(fs.nodeType(at: "/s/f") == .file)
+		#expect(fs.nodeTypeFollowingSymlinks(at: "/s/f") == .file)
+		_ = try fs.file(at: "/s/f")
 	}
 }

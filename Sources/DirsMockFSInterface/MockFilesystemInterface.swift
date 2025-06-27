@@ -30,14 +30,22 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	}
 
 	private enum SymlinkResolutionBehavior {
-		case resolve, dontResolve
+		case resolve, resolveExceptFinalComponent, dontResolve
 
 		func properFilePath(for ifp: some IntoFilePath, in ptn: PTN) -> FilePath {
 			let fp = ifp.into()
 
-			return switch self {
-				case .resolve: (try? MockFilesystemInterface.realpath(of: fp, in: ptn)) ?? fp
-				case .dontResolve: fp
+			do {
+				return switch self {
+					case .resolve, .resolveExceptFinalComponent:
+						try MockFilesystemInterface.realpath(of: fp,
+															 exceptFinalComponent: self == .resolveExceptFinalComponent,
+															 in: ptn)
+					case .dontResolve:
+						fp
+				}
+			} catch {
+				return fp
 			}
 		}
 	}
@@ -62,15 +70,24 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		ptn[symRes.properFilePath(for: ifp, in: ptn)]?.nodeType
 	}
 
-	private static func realpath(of ifp: some IntoFilePath, in ptn: PTN) throws -> FilePath {
+	/// Like `realpath(3)`
+	/// - Parameters:
+	///   - ifp: The path to reify
+	///   - exceptFinalComponent: Whether to leave the final component alone. This is useful for
+	///     resolving nodes that are subdirectories of symlinks to directories. If that node is itself a
+	///     symlink, you'll get the real path to the symlink itself
+	///   - ptn: The `PTN` to consult
+	/// - Returns: The reified path
+	///
+	/// - Warning: This function does not yet handle `.`, `..`, `~`, etc.
+	private static func realpath(of ifp: some IntoFilePath, exceptFinalComponent: Bool, in ptn: PTN) throws -> FilePath {
 		let fp = ifp.into()
-		if ptn[fp] != nil { return fp }
 
 		var builtRealpathFPCV = FilePath.ComponentView()
 		var builtRealpathFP: FilePath {
 			FilePath(root: fp.root, builtRealpathFPCV)
 		}
-		for comp in fp.components {
+		for comp in fp.components.dropLast(exceptFinalComponent ? 1 : 0) {
 			builtRealpathFPCV.append(comp)
 
 			switch ptn[builtRealpathFP] {
@@ -79,6 +96,10 @@ public final class MockFilesystemInterface: FilesystemInterface {
 				case nil: throw NoSuchNode(path: fp)
 				default: break
 			}
+		}
+
+		if exceptFinalComponent, let last = fp.lastComponent {
+			builtRealpathFPCV.append(last)
 		}
 
 		return builtRealpathFP
@@ -91,6 +112,17 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	}
 
 	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
+		let node: MockNode?
+		if let exact = self.node(at: ifp, symRes: .dontResolve) {
+			node = exact
+		} else {
+			node = self.node(at: ifp, symRes: .resolveExceptFinalComponent)
+		}
+
+		return node?.nodeType
+	}
+
+	public func nodeTypeFollowingSymlinks(at ifp: some IntoFilePath) -> NodeType? {
 		self.node(at: ifp, symRes: .resolve)?.nodeType
 	}
 

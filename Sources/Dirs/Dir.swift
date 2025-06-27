@@ -8,7 +8,7 @@ public struct Dir: Node {
 	public init(fs: any FilesystemInterface, path: some IntoFilePath, createIfNeeded: Bool = false) throws {
 		let fp = path.into()
 
-		switch fs.nodeType(at: fp) {
+		switch fs.nodeTypeFollowingSymlinks(at: fp) {
 			case .none:
 				if createIfNeeded {
 					self = try fs.createDir(at: fp)

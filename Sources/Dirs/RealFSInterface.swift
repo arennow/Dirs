@@ -32,6 +32,17 @@ public struct RealFSInterface: FilesystemInterface {
 		}
 	}
 
+	public func nodeTypeFollowingSymlinks(at ifp: some IntoFilePath) -> NodeType? {
+		let fp = self.resolveToRaw(ifp)
+
+		do {
+			let followedPath = try FileManager.default.destinationOfSymbolicLink(atPath: fp.string)
+			return self.nodeType(at: followedPath)
+		} catch {
+			return self.nodeType(at: fp)
+		}
+	}
+
 	public func contentsOf(file ifp: some IntoFilePath) throws -> Data {
 		try Data(contentsOf: self.resolveToRaw(ifp))
 	}
