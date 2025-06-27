@@ -930,4 +930,19 @@ extension DirsTests {
 		try #expect(symlinks.dir.realpath() == "/d")
 		try #expect(fs.dir(at: "/d").realpath() == "/d")
 	}
+
+	@Test(arguments: FSKind.allCases)
+	func nodePointsToSameNodeAsOther(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let symlinks = try Self.prepareForSymlinkTests(fs)
+
+		let file = try fs.file(at: "/a")
+		#expect(try file.pointsToSameNode(as: symlinks.file))
+		#expect(try !file.pointsToSameNode(as: symlinks.dir))
+
+		let dir = try fs.dir(at: "/d")
+		#expect(try dir.pointsToSameNode(as: symlinks.dir))
+		#expect(try !dir.pointsToSameNode(as: symlinks.file))
+	}
 }

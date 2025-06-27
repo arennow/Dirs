@@ -31,4 +31,8 @@ public extension Node {
 	func realpath() throws -> FilePath {
 		(try? self.fs.destinationOf(symlink: self.path)) ?? self.path
 	}
+
+	func pointsToSameNode(as other: some Node) throws -> Bool {
+		try self.realpath() == other.realpath()
+	}
 }
