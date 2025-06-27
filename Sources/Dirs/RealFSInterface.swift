@@ -48,10 +48,9 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
-		// This ⬇️ handles chroots
-		let rawResolvedIFP: URL = self.resolveToRaw(ifp)
-		// And this ⬇️ handles symlinks
-		let unfurledURL: URL = (try? self.destinationOf(symlink: rawResolvedIFP)).flatMap { URL(string: $0.string) } ?? rawResolvedIFP
+		let fp = ifp.into()
+		let unfurledFP = (try? self.destinationOf(symlink: fp)) ?? fp
+		let unfurledURL = URL(fileURLWithPath: self.resolveToRaw(unfurledFP).string)
 
 		let fm = FileManager.default
 
@@ -80,7 +79,9 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func destinationOf(symlink ifp: some IntoFilePath) throws -> FilePath {
-		try FileManager.default.destinationOfSymbolicLink(atPath: self.resolveToRaw(ifp).string).into()
+		let rawPathString = try FileManager.default.destinationOfSymbolicLink(atPath: self.resolveToRaw(ifp).string)
+		let projected = self.resolveToProjected(rawPathString)
+		return projected
 	}
 
 	public func filePathOfNonexistentTemporaryFile(extension: String?) -> SystemPackage.FilePath {
