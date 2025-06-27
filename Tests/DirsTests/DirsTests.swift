@@ -919,4 +919,15 @@ extension DirsTests {
 		try #expect(symlinks.dirSym.resolve() is Symlink)
 		#expect(throws: NoSuchNode.self, performing: { try symlinks.broken.resolve() })
 	}
+
+	@Test(arguments: FSKind.allCases)
+	func realpathsIdentifyConcretes(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let symlinks = try Self.prepareForSymlinkTests(fs)
+		try #expect(symlinks.file.realpath() == "/a")
+		try #expect(fs.file(at: "/a").realpath() == "/a")
+		try #expect(symlinks.dir.realpath() == "/d")
+		try #expect(fs.dir(at: "/d").realpath() == "/d")
+	}
 }

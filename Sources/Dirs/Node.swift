@@ -27,4 +27,8 @@ public extension Node {
 	func delete() throws {
 		try self.fs.deleteNode(at: self)
 	}
+
+	func realpath() throws -> FilePath {
+		(try? self.fs.destinationOf(symlink: self.path)) ?? self.path
+	}
 }
