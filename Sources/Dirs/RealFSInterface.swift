@@ -69,7 +69,7 @@ public struct RealFSInterface: FilesystemInterface {
 				let isDir: Bool
 				if try rawURL.getBoolResourceValue(forKey: .isSymbolicLinkKey) {
 					var isDirObjCBool: ObjCBool = false
-					fm.fileExists(atPath: rawURL.path, isDirectory: &isDirObjCBool)
+					_ = fm.fileExists(atPath: rawURL.path, isDirectory: &isDirObjCBool)
 					isDir = isDirObjCBool.boolValue
 				} else {
 					isDir = try rawURL.getBoolResourceValue(forKey: .isDirectoryKey)
