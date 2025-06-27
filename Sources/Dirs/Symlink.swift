@@ -33,4 +33,13 @@ public struct Symlink: Node {
 		try self.fs.moveNode(from: self, to: destFP)
 		self.path = destFP
 	}
+
+	public func resolve() throws -> any Node {
+		switch self.fs.nodeTypeFollowingSymlinks(at: self.path) {
+			case .dir: try Dir(fs: self.fs, path: self.path)
+			case .file: try File(fs: self.fs, path: self.path)
+			case .symlink: try Symlink(fs: self.fs, path: self.path)
+			case .none: throw NoSuchNode(path: try self.fs.destinationOf(symlink: self.path))
+		}
+	}
 }

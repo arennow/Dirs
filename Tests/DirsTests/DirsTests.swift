@@ -544,10 +544,24 @@ extension DirsTests {
 	}
 
 	@discardableResult
-	private static func prepareForSymlinkTests(_ fs: any FilesystemInterface) throws -> Symlink {
+	private static func prepareForSymlinkTests(_ fs: any FilesystemInterface) throws ->
+		(file: Symlink,
+		 dir: Symlink,
+		 fileSym: Symlink,
+		 dirSym: Symlink,
+		 broken: Symlink)
+	{
 		try fs.createFile(at: "/a").replaceContents("abc")
 		try fs.createFile(at: "/b").replaceContents("bcd")
-		return try fs.createSymlink(at: "/s", to: "/a")
+		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
+
+		let fileSym = try fs.createSymlink(at: "/s", to: "/a")
+		let dirSym = try fs.createSymlink(at: "/sd", to: "/d")
+		let fileSymSym = try fs.createSymlink(at: "/ss", to: "/s")
+		let dirSymSym = try fs.createSymlink(at: "/ssd", to: "/sd")
+		let brokenSym = try fs.createSymlink(at: "/sb", to: "/x")
+
+		return (fileSym, dirSym, fileSymSym, dirSymSym, brokenSym)
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -616,7 +630,7 @@ extension DirsTests {
 	@Test(arguments: FSKind.allCases)
 	func moveSymlinkUpdatesReceiverPath(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
-		var sym = try Self.prepareForSymlinkTests(fs)
+		var (sym, _, _, _, _) = try Self.prepareForSymlinkTests(fs)
 
 		try sym.move(to: "/s2")
 		#expect(sym.path == "/s2")
@@ -892,5 +906,17 @@ extension DirsTests {
 		#expect(fs.nodeType(at: "/s/f") == .file)
 		#expect(fs.nodeTypeFollowingSymlinks(at: "/s/f") == .file)
 		_ = try fs.file(at: "/s/f")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func symlinkTypeResolvesToReferent(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let symlinks = try Self.prepareForSymlinkTests(fs)
+		try #expect(symlinks.file.resolve() is File)
+		try #expect(symlinks.dir.resolve() is Dir)
+		try #expect(symlinks.fileSym.resolve() is Symlink)
+		try #expect(symlinks.dirSym.resolve() is Symlink)
+		#expect(throws: NoSuchNode.self, performing: { try symlinks.broken.resolve() })
 	}
 }
