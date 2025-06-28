@@ -182,6 +182,12 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		}
 	}
 
+	public func realpathOf(node ifp: some IntoFilePath) throws -> FilePath {
+		try self.pathsToNodes.read { ptn in
+			try Self.realpath(of: ifp, exceptFinalComponent: false, in: ptn)
+		}
+	}
+
 	public func filePathOfNonexistentTemporaryFile(extension: String?) -> FilePath {
 		var filename = UUID().uuidString
 		if let `extension` {

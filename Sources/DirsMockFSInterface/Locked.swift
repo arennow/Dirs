@@ -8,9 +8,9 @@ final class Locked<T>: @unchecked Sendable {
 		self.inner = inner
 	}
 
-	func read<R>(in f: (borrowing T) -> R) -> R {
-		self.lock.withLock {
-			f(self.inner)
+	func read<R>(in f: (borrowing T) throws -> R) rethrows -> R {
+		try self.lock.withLock {
+			try f(self.inner)
 		}
 	}
 

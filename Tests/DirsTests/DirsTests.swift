@@ -929,6 +929,7 @@ extension DirsTests {
 		try #expect(fs.file(at: "/a").realpath() == "/a")
 		try #expect(symlinks.dir.realpath() == "/d")
 		try #expect(fs.dir(at: "/d").realpath() == "/d")
+		try #expect(fs.file(at: "/sd/d1").realpath() == "/d/d1")
 	}
 
 	@Test(arguments: FSKind.allCases)

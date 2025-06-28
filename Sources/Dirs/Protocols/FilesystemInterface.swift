@@ -22,6 +22,7 @@ public protocol FilesystemInterface: Equatable, Sendable {
 	func contentsOf(file ifp: some IntoFilePath) throws -> Data
 	func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat>
 	func destinationOf(symlink ifp: some IntoFilePath) throws -> FilePath
+	func realpathOf(node ifp: some IntoFilePath) throws -> FilePath
 
 	func filePathOfNonexistentTemporaryFile(extension: String?) -> FilePath
 

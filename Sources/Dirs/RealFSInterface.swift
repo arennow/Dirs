@@ -12,11 +12,7 @@ public struct RealFSInterface: FilesystemInterface {
 		let rawPathString = chroot.path.string
 		try FileManager.default.createDirectory(atPath: rawPathString,
 												withIntermediateDirectories: true)
-		guard let resolvedCPathString = realpath(rawPathString, nil) else {
-			throw InvalidPathForCall.couldNotCanonicalize(rawPathString)
-		}
-		defer { free(resolvedCPathString) }
-		let resolvedPathString = String(cString: resolvedCPathString)
+		let resolvedPathString = try realpath(rawPathString)
 
 		self.chroot = FilePath(resolvedPathString)
 	}
@@ -82,6 +78,11 @@ public struct RealFSInterface: FilesystemInterface {
 		let rawPathString = try FileManager.default.destinationOfSymbolicLink(atPath: self.resolveToRaw(ifp).string)
 		let projected = self.resolveToProjected(rawPathString)
 		return projected
+	}
+
+	public func realpathOf(node ifp: some IntoFilePath) throws -> FilePath {
+		let out = try realpath(self.resolveToRaw(ifp).string)
+		return self.resolveToProjected(out)
 	}
 
 	public func filePathOfNonexistentTemporaryFile(extension: String?) -> SystemPackage.FilePath {
@@ -217,4 +218,14 @@ private extension RealFSInterface {
 	func resolveToRaw(_ ifp: some IntoFilePath) -> URL {
 		(self.resolveToRaw(ifp) as FilePath).url
 	}
+}
+
+private func realpath(_ path: String) throws -> String {
+	guard let resolvedCPathString = realpath(path, nil) else {
+		throw InvalidPathForCall.couldNotCanonicalize(path)
+	}
+	defer { free(resolvedCPathString) }
+	let resolvedPathString = String(cString: resolvedCPathString)
+
+	return resolvedPathString
 }
