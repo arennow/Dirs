@@ -36,3 +36,12 @@ public extension Node {
 		try self.realpath() == other.realpath()
 	}
 }
+
+extension Node {
+	// This indirection is so we can avoid exposing `isAncestor` on `File`
+	func impl_isAncestor(of other: some Node) throws -> Bool {
+		if other.path.starts(with: self.path) { return true }
+
+		return try other.realpath().starts(with: self.realpath())
+	}
+}

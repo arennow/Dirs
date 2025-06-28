@@ -43,3 +43,9 @@ public struct Symlink: Node {
 		}
 	}
 }
+
+public extension Symlink {
+	func isAncestor(of other: some Node) throws -> Bool {
+		try self.impl_isAncestor(of: other)
+	}
+}

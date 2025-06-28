@@ -348,6 +348,22 @@ struct DirsTests: ~Copyable {
 			try Dir(fs: fs, path: "/a")
 		}
 	}
+
+	@Test(arguments: FSKind.allCases)
+	func dirIsAncestorOfNode(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let symlinks = try Self.prepareForSymlinkTests(fs)
+
+		let d = try fs.dir(at: "/d")
+		let descFile = try fs.file(at: "/d/d1")
+		let descDir = try fs.dir(at: "/d/e")
+
+		#expect(try d.isAncestor(of: descFile))
+		#expect(try d.isAncestor(of: descDir))
+		#expect(try symlinks.dir.isAncestor(of: descFile))
+		#expect(try symlinks.dir.isAncestor(of: descDir))
+	}
 }
 
 // MARK: - Moves
@@ -554,6 +570,7 @@ extension DirsTests {
 		try fs.createFile(at: "/a").replaceContents("abc")
 		try fs.createFile(at: "/b").replaceContents("bcd")
 		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
+		try fs.createFileAndIntermediaryDirs(at: "/d/e/e1")
 
 		let fileSym = try fs.createSymlink(at: "/s", to: "/a")
 		let dirSym = try fs.createSymlink(at: "/sd", to: "/d")

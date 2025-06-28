@@ -109,6 +109,10 @@ public extension Dir {
 	func descendentDir(at relativePath: FilePath) -> Dir? {
 		self.descendentNode(at: relativePath, extractor: Dir.childDir)
 	}
+
+	func isAncestor(of other: some Node) throws -> Bool {
+		try self.impl_isAncestor(of: other)
+	}
 }
 
 public extension Dir {
