@@ -2,16 +2,6 @@ import Dirs
 import Foundation
 import SystemPackage
 
-struct UnimplementedError: Error {
-	let file: String
-	let line: Int
-
-	init(file: String = #file, line: Int = #line) {
-		self.file = file
-		self.line = line
-	}
-}
-
 public final class MockFilesystemInterface: FilesystemInterface {
 	private enum MockNode: Equatable {
 		case dir

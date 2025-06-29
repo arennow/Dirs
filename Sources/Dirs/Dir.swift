@@ -84,7 +84,7 @@ public extension Dir {
 		self.childNode(named: component, in: \.directories)
 	}
 
-	private func descendentNode<T: Node>(at relativePath: FilePath, extractor: (Dir) -> (FilePath.Component) -> T?) -> T? {
+	private func descendantNode<T: Node>(at relativePath: FilePath, extractor: (Dir) -> (FilePath.Component) -> T?) -> T? {
 		var currentDir = self
 
 		for posNextComp in relativePath.positionalComponents {
@@ -102,12 +102,12 @@ public extension Dir {
 		return nil
 	}
 
-	func descendentFile(at relativePath: FilePath) -> File? {
-		self.descendentNode(at: relativePath, extractor: Dir.childFile)
+	func descendantFile(at relativePath: FilePath) -> File? {
+		self.descendantNode(at: relativePath, extractor: Dir.childFile)
 	}
 
-	func descendentDir(at relativePath: FilePath) -> Dir? {
-		self.descendentNode(at: relativePath, extractor: Dir.childDir)
+	func descendantDir(at relativePath: FilePath) -> Dir? {
+		self.descendantNode(at: relativePath, extractor: Dir.childDir)
 	}
 
 	func isAncestor(of other: some Node) throws -> Bool {

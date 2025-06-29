@@ -100,18 +100,18 @@ struct DirsTests: ~Copyable {
 		#expect(d.childDir(named: "a3") != nil)
 		#expect(d.childDir(named: "a4") != nil)
 
-		#expect(d.descendentFile(at: "a1") != nil)
-		#expect(d.descendentFile(at: "a2") == nil)
-		#expect(d.descendentFile(at: "a3") == nil)
-		#expect(d.descendentFile(at: "a4") == nil)
-		#expect(d.descendentFile(at: "a4/a4b1/a4b1c1") != nil)
+		#expect(d.descendantFile(at: "a1") != nil)
+		#expect(d.descendantFile(at: "a2") == nil)
+		#expect(d.descendantFile(at: "a3") == nil)
+		#expect(d.descendantFile(at: "a4") == nil)
+		#expect(d.descendantFile(at: "a4/a4b1/a4b1c1") != nil)
 
-		#expect(d.descendentDir(at: "a1") == nil)
-		#expect(d.descendentDir(at: "a2") != nil)
-		#expect(d.descendentDir(at: "a3") != nil)
-		#expect(d.descendentDir(at: "a4") != nil)
-		#expect(d.descendentDir(at: "a4/a4b1") != nil)
-		#expect(d.descendentDir(at: "a4/a4b1/a4b1c1") == nil)
+		#expect(d.descendantDir(at: "a1") == nil)
+		#expect(d.descendantDir(at: "a2") != nil)
+		#expect(d.descendantDir(at: "a3") != nil)
+		#expect(d.descendantDir(at: "a4") != nil)
+		#expect(d.descendantDir(at: "a4/a4b1") != nil)
+		#expect(d.descendantDir(at: "a4/a4b1/a4b1c1") == nil)
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -964,5 +964,21 @@ extension DirsTests {
 		let dir = try fs.dir(at: "/d")
 		#expect(try dir.pointsToSameNode(as: symlinks.dir))
 		#expect(try !dir.pointsToSameNode(as: symlinks.file))
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func nodePathRelativeToDir(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let symlinks = try Self.prepareForSymlinkTests(fs)
+
+		let d = try fs.dir(at: "/d")
+		let descFile = try fs.file(at: "/d/e/e1")
+		let a = try fs.file(at: "/a")
+
+		try #expect(descFile.descendantPath(from: d) == "e/e1")
+		try #expect(descFile.descendantPath(from: symlinks.dir) == "e/e1")
+		try #expect(descFile.descendantPath(from: symlinks.dirSym) == "e/e1")
+
+		#expect(throws: NodeNotDescendantError.self, performing: { try a.descendantPath(from: d) })
 	}
 }
