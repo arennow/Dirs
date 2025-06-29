@@ -32,7 +32,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	private enum SymlinkResolutionBehavior {
 		case resolve, dontResolve
 
-		func properFilePath(for ifp: some IntoFilePath, in ptn: PTN) -> FilePath {
+		func properFilePath(for ifp: some IntoFilePath, in ptn: PTN) -> FilePath? {
 			let fp = ifp.into()
 
 			do {
@@ -43,7 +43,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 						fp
 				}
 			} catch {
-				return fp
+				return nil
 			}
 		}
 	}
@@ -64,8 +64,16 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		self.pathsToNodes = Locked(["/": .dir])
 	}
 
+	private static func node(at ifp: some IntoFilePath, in ptn: PTN, symRes: SymlinkResolutionBehavior) -> MockNode? {
+		if let properFP = symRes.properFilePath(for: ifp, in: ptn) {
+			ptn[properFP]
+		} else {
+			nil
+		}
+	}
+
 	private static func nodeType(at ifp: some IntoFilePath, in ptn: PTN, symRes: SymlinkResolutionBehavior) -> NodeType? {
-		ptn[symRes.properFilePath(for: ifp, in: ptn)]?.nodeType
+		Self.node(at: ifp, in: ptn, symRes: symRes)?.nodeType
 	}
 
 	/// Like `realpath(3)`
@@ -96,12 +104,17 @@ public final class MockFilesystemInterface: FilesystemInterface {
 			}
 		}
 
-		return builtRealpathFP
+		let outThis = builtRealpathFP
+		if outThis != fp {
+			return try Self.realpath(of: outThis, in: ptn)
+		} else {
+			return outThis
+		}
 	}
 
 	private func node(at ifp: some IntoFilePath, symRes: SymlinkResolutionBehavior) -> MockNode? {
 		self.pathsToNodes.read { ptn in
-			ptn[symRes.properFilePath(for: ifp, in: ptn)]
+			Self.node(at: ifp, in: ptn, symRes: symRes)
 		}
 	}
 
