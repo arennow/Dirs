@@ -30,17 +30,15 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	}
 
 	private enum SymlinkResolutionBehavior {
-		case resolve, resolveExceptFinalComponent, dontResolve
+		case resolve, dontResolve
 
 		func properFilePath(for ifp: some IntoFilePath, in ptn: PTN) -> FilePath {
 			let fp = ifp.into()
 
 			do {
 				return switch self {
-					case .resolve, .resolveExceptFinalComponent:
-						try MockFilesystemInterface.realpath(of: fp,
-															 exceptFinalComponent: self == .resolveExceptFinalComponent,
-															 in: ptn)
+					case .resolve:
+						try MockFilesystemInterface.realpath(of: fp, in: ptn)
 					case .dontResolve:
 						fp
 				}
@@ -80,14 +78,14 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	/// - Returns: The reified path
 	///
 	/// - Warning: This function does not yet handle `.`, `..`, `~`, etc.
-	private static func realpath(of ifp: some IntoFilePath, exceptFinalComponent: Bool, in ptn: PTN) throws -> FilePath {
+	private static func realpath(of ifp: some IntoFilePath, in ptn: PTN) throws -> FilePath {
 		let fp = ifp.into()
 
 		var builtRealpathFPCV = FilePath.ComponentView()
 		var builtRealpathFP: FilePath {
 			FilePath(root: fp.root, builtRealpathFPCV)
 		}
-		for comp in fp.components.dropLast(exceptFinalComponent ? 1 : 0) {
+		for comp in fp.components {
 			builtRealpathFPCV.append(comp)
 
 			switch ptn[builtRealpathFP] {
@@ -96,10 +94,6 @@ public final class MockFilesystemInterface: FilesystemInterface {
 				case nil: throw NoSuchNode(path: fp)
 				default: break
 			}
-		}
-
-		if exceptFinalComponent, let last = fp.lastComponent {
-			builtRealpathFPCV.append(last)
 		}
 
 		return builtRealpathFP
@@ -116,7 +110,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		if let exact = self.node(at: ifp, symRes: .dontResolve) {
 			node = exact
 		} else {
-			node = self.node(at: ifp, symRes: .resolveExceptFinalComponent)
+			node = self.node(at: ifp, symRes: .resolve)
 		}
 
 		return node?.nodeType
@@ -184,7 +178,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 	public func realpathOf(node ifp: some IntoFilePath) throws -> FilePath {
 		try self.pathsToNodes.read { ptn in
-			try Self.realpath(of: ifp, exceptFinalComponent: false, in: ptn)
+			try Self.realpath(of: ifp, in: ptn)
 		}
 	}
 
