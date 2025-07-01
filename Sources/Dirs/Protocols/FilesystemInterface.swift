@@ -38,7 +38,8 @@ public protocol FilesystemInterface: Equatable, Sendable {
 
 	func copyNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws
 	func deleteNode(at ifp: some IntoFilePath) throws
-	func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws
+	@discardableResult
+	func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws -> FilePath
 }
 
 public extension FilesystemInterface {

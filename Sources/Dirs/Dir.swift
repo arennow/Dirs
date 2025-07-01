@@ -33,9 +33,7 @@ public struct Dir: Node {
 	}
 
 	public mutating func move(to destination: some IntoFilePath) throws {
-		let destFP = destination.into()
-		try self.fs.moveNode(from: self, to: destFP)
-		self.path = destFP
+		self.path = try self.fs.moveNode(from: self, to: destination)
 	}
 }
 

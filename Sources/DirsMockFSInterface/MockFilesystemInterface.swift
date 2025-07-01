@@ -249,15 +249,19 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 	public func copyNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws {
 		let acquisitionLock = self.pathsToNodes.acquireIntoHandle()
-		try self.copyNode(from: source, to: destination, using: acquisitionLock)
+		_ = try self.copyNode(from: source, to: destination, using: acquisitionLock)
 	}
 
 	private func copyNode(from source: some IntoFilePath,
 						  to destination: some IntoFilePath,
-						  using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws
+						  using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws -> FilePath
 	{
 		let srcFP: FilePath = source.into()
 		let destFP: FilePath = destination.into()
+
+		// This is usually just `destFP`, but if `destFP` is a dir, then we
+		// rehome into it, and this will be `destFP`+`srcFP.final`
+		var finalDestFP = destFP
 
 		let srcType = Self.nodeType(at: srcFP, in: acquisitionLock.resource, symRes: .dontResolve)
 		let destType = Self.nodeType(at: destFP, in: acquisitionLock.resource, symRes: .dontResolve)
@@ -291,6 +295,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 					case .dir:
 						let resolvedDestFP = destFP.appending(srcFP.lastComponent!)
+						finalDestFP = resolvedDestFP
 						acquisitionLock.resource[resolvedDestFP] = fileToCopy
 				}
 
@@ -314,6 +319,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 						let (destSymFP, destSymType) = try resolveDestFPSymlink()
 						if destSymType == .dir {
 							let resolvedDestFPRoot = destSymFP.appending(srcFP.lastComponent!)
+							finalDestFP = resolvedDestFPRoot
 							recursivelyMove(destFP: resolvedDestFPRoot)
 						} else {
 							fallthrough
@@ -325,12 +331,15 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 					case .dir:
 						let resolvedDestFPRoot = destFP.appending(srcFP.lastComponent!)
+						finalDestFP = resolvedDestFPRoot
 						recursivelyMove(destFP: resolvedDestFPRoot)
 
 					case .none:
 						recursivelyMove(destFP: destFP)
 				}
 		}
+
+		return finalDestFP
 	}
 
 	public func deleteNode(at ifp: some IntoFilePath) throws {
@@ -355,13 +364,15 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		}
 	}
 
-	public func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws {
+	@discardableResult
+	public func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws -> FilePath {
 		let acquisitionLock = self.pathsToNodes.acquireIntoHandle()
 		let before = acquisitionLock.resource
 
 		do {
-			try self.copyNode(from: source, to: destination, using: acquisitionLock)
+			let finalDestFP = try self.copyNode(from: source, to: destination, using: acquisitionLock)
 			try self.deleteNode(at: source, using: acquisitionLock)
+			return finalDestFP
 		} catch {
 			acquisitionLock.resource = before
 			throw error

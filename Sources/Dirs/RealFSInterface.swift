@@ -144,7 +144,8 @@ public struct RealFSInterface: FilesystemInterface {
 		try FileManager.default.removeItem(at: self.resolveToRaw(ifp))
 	}
 
-	public func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws {
+	@discardableResult
+	public func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws -> FilePath {
 		var destURL: URL = self.resolveToRaw(destination)
 		let srcURL: URL = self.resolveToRaw(source)
 		let fm = FileManager.default
@@ -175,6 +176,7 @@ public struct RealFSInterface: FilesystemInterface {
 		}
 
 		try fm.moveItem(at: srcURL, to: destURL)
+		return self.resolveToProjected(destURL)
 	}
 }
 

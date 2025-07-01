@@ -634,6 +634,10 @@ extension DirsTests {
 		#expect(file.path == "/f2")
 		try #expect(file.stringContents() == "content")
 		try #expect(File(fs: fs, path: "/f2").stringContents() == "content")
+
+		let d = try fs.createDir(at: "/d")
+		try file.move(to: d)
+		#expect(file.path == "/d/f2")
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -642,8 +646,11 @@ extension DirsTests {
 
 		var dir = try fs.createDir(at: "/d1")
 		try dir.move(to: "/d2")
-
 		#expect(dir.path == "/d2")
+
+		let d = try fs.createDir(at: "/d")
+		try dir.move(to: d)
+		#expect(dir.path == "/d/d2")
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -653,6 +660,10 @@ extension DirsTests {
 
 		try sym.move(to: "/s2")
 		#expect(sym.path == "/s2")
+
+		let d = try fs.createDir(at: "/d")
+		try sym.move(to: d)
+		#expect(sym.path == "/d/s2")
 	}
 }
 
