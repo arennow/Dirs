@@ -311,9 +311,10 @@ struct DirsTests: ~Copyable {
 	func fileParent(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.createFile(at: "/a")
+		let a = try fs.createFile(at: "/a")
 
-		#expect(try fs.file(at: "/a").parent == fs.rootDir)
+		#expect(try a.parent == fs.rootDir)
+		#expect(try a.parent.parent == fs.rootDir)
 	}
 
 	// MARK: - Miscellaneous

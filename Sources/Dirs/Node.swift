@@ -20,8 +20,10 @@ public extension Node {
 		self.path.lastComponent?.string ?? ""
 	}
 
-	var parent: Dir? {
-		try? Dir(fs: self.fs, path: self.path.removingLastComponent())
+	var parent: Dir {
+		get throws {
+			try Dir(fs: self.fs, path: self.path.removingLastComponent())
+		}
 	}
 
 	func delete() throws {
