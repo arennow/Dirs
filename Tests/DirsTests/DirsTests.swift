@@ -366,6 +366,22 @@ struct DirsTests: ~Copyable {
 		#expect(try symlinks.dirSym.isAncestor(of: descFile))
 		#expect(try symlinks.dirSym.isAncestor(of: descDir))
 	}
+
+	@Test(arguments: FSKind.allCases)
+	func ensureInDir(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		var a = try fs.createFile(at: "/a")
+		let d = try fs.createDir(at: "/d")
+
+		try a.ensure(in: d)
+		#expect(a.path == "/d/a")
+		#expect(d.allDescendantFiles().map(\.name) == ["a"])
+
+		try a.ensure(in: d)
+		#expect(a.path == "/d/a")
+		#expect(d.allDescendantFiles().map(\.name) == ["a"])
+	}
 }
 
 // MARK: - Moves

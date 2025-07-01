@@ -56,6 +56,11 @@ public extension Node {
 		}
 		return selfRP
 	}
+
+	mutating func ensure(in dir: Dir) throws {
+		guard try !self.parent.pointsToSameNode(as: dir) else { return }
+		try self.move(to: dir)
+	}
 }
 
 extension Node {
