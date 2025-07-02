@@ -88,13 +88,23 @@ public struct RealFSInterface: FilesystemInterface {
 	/// - Warning: When there's a `chroot`, this will create an alternate universe version of a
 	///            system-provided path
 	public func lookUpDir(_ dlk: DirLookupKind) throws -> Dir {
-		let fmSearchPath: FileManager.SearchPathDirectory = switch dlk {
-			case .documents: .documentDirectory
-			case .cache: .cachesDirectory
-		}
+		let url: URL
 
-		guard let url = FileManager.default.urls(for: fmSearchPath, in: .userDomainMask).first else {
-			throw DirLookupFailed(kind: dlk)
+		if dlk == .uniqueTemporary {
+			var temp = NSTemporaryDirectory()
+			temp.append("/temporary_\(UUID().uuidString)")
+			url = temp.into()
+		} else {
+			let fmSearchPath: FileManager.SearchPathDirectory = switch dlk {
+				case .documents: .documentDirectory
+				case .cache: .cachesDirectory
+				case .uniqueTemporary: preconditionFailure("Shouldn't be reachable")
+			}
+
+			guard let innerURL = FileManager.default.urls(for: fmSearchPath, in: .userDomainMask).first else {
+				throw DirLookupFailed(kind: dlk)
+			}
+			url = innerURL
 		}
 
 		return try Dir(fs: self, path: self.resolveToProjected(url), createIfNeeded: true)

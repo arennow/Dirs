@@ -186,7 +186,10 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	}
 
 	public func lookUpDir(_ dlk: DirLookupKind) throws -> Dir {
-		let path = "/_system_\(dlk.rawValue)"
+		let path = switch dlk {
+			case .uniqueTemporary: "/_temporary_\(UUID().uuidString)"
+			default: "/_system_\(dlk.rawValue)"
+		}
 		return try Dir(fs: self, path: path, createIfNeeded: true)
 	}
 
