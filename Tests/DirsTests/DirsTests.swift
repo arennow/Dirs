@@ -775,20 +775,18 @@ extension DirsTests {
 	}
 }
 
-// MARK: - Random Path
+// MARK: - Dir Lookup
 
 extension DirsTests {
-	@Test(arguments: FSKind.allCases)
-	func randomPathDiffers(fsKind: FSKind) {
+	@Test(arguments: FSKind.allCases, [DirLookupKind.documents, .cache])
+	func dirLookupNonTemporary(_ fsKind: FSKind, dlk: DirLookupKind) throws {
 		let fs = self.fs(for: fsKind)
-		#expect(fs.filePathOfNonexistentTemporaryFile() != fs.filePathOfNonexistentTemporaryFile())
-	}
 
-	@Test(arguments: FSKind.allCases)
-	func randomPathHasExtension(fsKind: FSKind) {
-		let fs = self.fs(for: fsKind)
-		#expect(fs.filePathOfNonexistentTemporaryFile(extension: "abcd").string.hasSuffix("abcd"))
-		#expect(fs.filePathOfNonexistentTemporaryFile(extension: ".abcd.").string.hasSuffix("abcd"))
+		let one = try fs.lookUpDir(dlk)
+		let two = try fs.lookUpDir(dlk)
+
+		#expect(one.path.string.localizedCaseInsensitiveContains(dlk.rawValue))
+		#expect(one == two)
 	}
 }
 

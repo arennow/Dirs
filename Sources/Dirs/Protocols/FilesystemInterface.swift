@@ -15,6 +15,10 @@ public enum NodeType: Sendable {
 	case dir, file, symlink
 }
 
+public enum DirLookupKind: String, Sendable {
+	case documents, cache
+}
+
 public protocol FilesystemInterface: Equatable, Sendable {
 	func nodeType(at ifp: some IntoFilePath) -> NodeType?
 	func nodeTypeFollowingSymlinks(at ifp: some IntoFilePath) -> NodeType?
@@ -24,7 +28,7 @@ public protocol FilesystemInterface: Equatable, Sendable {
 	func destinationOf(symlink ifp: some IntoFilePath) throws -> FilePath
 	func realpathOf(node ifp: some IntoFilePath) throws -> FilePath
 
-	func filePathOfNonexistentTemporaryFile(extension: String?) -> FilePath
+	func lookUpDir(_ dlk: DirLookupKind) throws -> Dir
 
 	@discardableResult
 	func createFile(at ifp: some IntoFilePath) throws -> File
@@ -43,10 +47,6 @@ public protocol FilesystemInterface: Equatable, Sendable {
 }
 
 public extension FilesystemInterface {
-	func filePathOfNonexistentTemporaryFile() -> FilePath {
-		self.filePathOfNonexistentTemporaryFile(extension: nil)
-	}
-
 	func dir(at ifp: some IntoFilePath) throws -> Dir {
 		try Dir(fs: self, path: ifp.into())
 	}

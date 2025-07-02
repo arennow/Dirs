@@ -38,6 +38,14 @@ public struct NodeAlreadyExists: Error {
 	}
 }
 
+public struct DirLookupFailed: Error {
+	public let dirLookupKind: DirLookupKind
+
+	init(kind: DirLookupKind) {
+		self.dirLookupKind = kind
+	}
+}
+
 public enum InvalidPathForCall: Error {
 	case needAbsoluteWithComponent
 	case couldNotCanonicalize(String)

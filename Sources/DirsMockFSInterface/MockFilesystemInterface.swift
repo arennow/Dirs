@@ -185,13 +185,9 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		}
 	}
 
-	public func filePathOfNonexistentTemporaryFile(extension: String?) -> FilePath {
-		var filename = UUID().uuidString
-		if let `extension` {
-			filename += ".\(`extension`.trimmingCharacters(in: ["."]))"
-		}
-
-		return "/\(filename)".into()
+	public func lookUpDir(_ dlk: DirLookupKind) throws -> Dir {
+		let path = "/_system_\(dlk.rawValue)"
+		return try Dir(fs: self, path: path, createIfNeeded: true)
 	}
 
 	@discardableResult

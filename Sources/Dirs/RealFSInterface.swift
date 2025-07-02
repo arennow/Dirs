@@ -85,13 +85,19 @@ public struct RealFSInterface: FilesystemInterface {
 		return self.resolveToProjected(out)
 	}
 
-	public func filePathOfNonexistentTemporaryFile(extension: String?) -> SystemPackage.FilePath {
-		var filename = UUID().uuidString
-		if let `extension` {
-			filename += ".\(`extension`.trimmingCharacters(in: ["."]))"
+	/// - Warning: When there's a `chroot`, this will create an alternate universe version of a
+	///            system-provided path
+	public func lookUpDir(_ dlk: DirLookupKind) throws -> Dir {
+		let fmSearchPath: FileManager.SearchPathDirectory = switch dlk {
+			case .documents: .documentDirectory
+			case .cache: .cachesDirectory
 		}
 
-		return FileManager.default.temporaryDirectory.appendingPathComponent(filename).into()
+		guard let url = FileManager.default.urls(for: fmSearchPath, in: .userDomainMask).first else {
+			throw DirLookupFailed(kind: dlk)
+		}
+
+		return try Dir(fs: self, path: self.resolveToProjected(url), createIfNeeded: true)
 	}
 
 	public func createFile(at ifp: some IntoFilePath) throws -> File {
