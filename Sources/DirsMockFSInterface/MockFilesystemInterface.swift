@@ -1,5 +1,6 @@
 import Dirs
 import Foundation
+import Locked
 import SystemPackage
 
 public final class MockFilesystemInterface: FilesystemInterface {
