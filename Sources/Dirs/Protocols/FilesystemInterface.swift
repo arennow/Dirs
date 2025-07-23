@@ -48,6 +48,22 @@ public protocol FilesystemInterface: Equatable, Sendable {
 }
 
 public extension FilesystemInterface {
+	@discardableResult
+	func renameNode(at source: some IntoFilePath, to newName: String) throws -> FilePath {
+		if newName.contains("/") {
+			throw InvalidPathForCall.needSingleComponent
+		}
+
+		let sourceFP = source.into()
+		let destPath = sourceFP.removingLastComponent().appending(newName)
+		if let existingNT = self.nodeType(at: destPath) {
+			throw NodeAlreadyExists(path: destPath, type: existingNT)
+		}
+		return try self.moveNode(from: sourceFP, to: destPath)
+	}
+}
+
+public extension FilesystemInterface {
 	func dir(at ifp: some IntoFilePath) throws -> Dir {
 		try Dir(fs: self, path: ifp.into())
 	}

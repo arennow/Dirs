@@ -46,7 +46,8 @@ public struct DirLookupFailed: Error {
 	}
 }
 
-public enum InvalidPathForCall: Error {
+public enum InvalidPathForCall: Error, Equatable {
 	case needAbsoluteWithComponent
+	case needSingleComponent
 	case couldNotCanonicalize(String)
 }

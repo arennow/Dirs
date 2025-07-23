@@ -775,6 +775,135 @@ extension DirsTests {
 	}
 }
 
+// MARK: - Renames
+
+extension DirsTests {
+	@Test(arguments: FSKind.allCases)
+	func renameNonexistentSourceFails(fsKind: FSKind) {
+		let fs = self.fs(for: fsKind)
+		#expect(throws: (any Error).self) {
+			try fs.renameNode(at: "/nope", to: "/dest")
+		}
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func renameFileToAbsoluteFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createFile(at: "a")
+		#expect(throws: InvalidPathForCall.needSingleComponent) {
+			try fs.renameNode(at: "/a", to: "b/c")
+		}
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func renameFileWithMultipleComponents(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createFile(at: "a")
+		#expect(throws: InvalidPathForCall.needSingleComponent) {
+			try fs.renameNode(at: "/a", to: "/b")
+		}
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func renameFileToNewPathSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createFile(at: "a").replaceContents("hello")
+		try fs.renameNode(at: "/a", to: "b")
+
+		try #expect(fs.file(at: "/b").stringContents() == "hello")
+		#expect(fs.nodeType(at: "/a") == nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func renameDirToNewPathSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createDir(at: "dir1").createFile(at: "file").replaceContents("world")
+		try fs.renameNode(at: "/dir1", to: "dir2")
+
+		try #expect(fs.file(at: "/dir2/file").stringContents() == "world")
+		#expect(fs.nodeType(at: "/dir1") == nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func renameSymlinkFileToNewPathSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createFile(at: "target").replaceContents("data")
+		try fs.rootDir.createSymlink(at: "link", to: "/target")
+
+		try fs.renameNode(at: "/link", to: "linkRenamed")
+
+		try #expect(fs.destinationOf(symlink: "/linkRenamed") == "/target")
+		#expect(fs.nodeType(at: "/link") == nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func renameSymlinkDirToNewPathSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createDir(at: "dirTarget").createFile(at: "f").replaceContents("x")
+		try fs.rootDir.createSymlink(at: "dirLink", to: "/dirTarget")
+
+		try fs.renameNode(at: "/dirLink", to: "renamedLink")
+
+		try #expect(fs.destinationOf(symlink: "/renamedLink") == "/dirTarget")
+		#expect(fs.nodeType(at: "/dirLink") == nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func renameFailsWhenDestinationExists(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		// file→file conflict
+		try fs.rootDir.createFile(at: "src").replaceContents("x")
+		try fs.rootDir.createFile(at: "dest")
+		#expect(throws: NodeAlreadyExists.self) {
+			try fs.renameNode(at: "/src", to: "dest")
+		}
+
+		// dir→dir conflict
+		try fs.rootDir.createDir(at: "d1")
+		try fs.rootDir.createDir(at: "d2")
+		#expect(throws: NodeAlreadyExists.self) {
+			try fs.renameNode(at: "/d1", to: "d2")
+		}
+
+		// file→dir conflict
+		try fs.rootDir.createFile(at: "f")
+		try fs.rootDir.createDir(at: "d3")
+		#expect(throws: NodeAlreadyExists.self) {
+			try fs.renameNode(at: "/f", to: "d3")
+		}
+
+		// dir→file conflict
+		try fs.rootDir.createDir(at: "d4")
+		try fs.rootDir.createFile(at: "f2")
+		#expect(throws: NodeAlreadyExists.self) {
+			try fs.renameNode(at: "/d4", to: "f2")
+		}
+
+		// file→symlink conflict
+		try fs.rootDir.createFile(at: "file1").replaceContents("a")
+		try fs.rootDir.createFile(at: "targetFile")
+		try fs.rootDir.createSymlink(at: "linkToFile", to: "/targetFile")
+		#expect(throws: NodeAlreadyExists.self) {
+			try fs.renameNode(at: "/file1", to: "linkToFile")
+		}
+
+		// dir→symlink conflict
+		try fs.rootDir.createDir(at: "d")
+		try fs.rootDir.createDir(at: "targetDir")
+		try fs.rootDir.createSymlink(at: "linkToDir", to: "/targetDir")
+		#expect(throws: NodeAlreadyExists.self) {
+			try fs.renameNode(at: "/d", to: "linkToDir")
+		}
+	}
+}
+
 // MARK: - Dir Lookup
 
 extension DirsTests {
