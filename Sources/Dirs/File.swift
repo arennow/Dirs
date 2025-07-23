@@ -29,6 +29,10 @@ public struct File: Node {
 	public mutating func move(to destination: some IntoFilePath) throws {
 		self.path = try self.fs.moveNode(from: self, to: destination)
 	}
+
+	public mutating func rename(to newName: String) throws {
+		self.path = try self.fs.renameNode(at: self, to: newName)
+	}
 }
 
 public extension File {

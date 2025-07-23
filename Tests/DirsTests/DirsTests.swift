@@ -902,6 +902,16 @@ extension DirsTests {
 			try fs.renameNode(at: "/d", to: "linkToDir")
 		}
 	}
+
+	@Test(arguments: FSKind.allCases)
+	func renameUpdatesReceiver(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		var file = try fs.createFile(at: "/f1")
+		try file.rename(to: "f2")
+
+		#expect(file.path == "/f2")
+	}
 }
 
 // MARK: - Dir Lookup

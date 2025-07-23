@@ -32,6 +32,10 @@ public struct Symlink: Node {
 		self.path = try self.fs.moveNode(from: self, to: destination)
 	}
 
+	public mutating func rename(to newName: String) throws {
+		self.path = try self.fs.renameNode(at: self, to: newName)
+	}
+
 	public func resolve() throws -> any Node {
 		let destPath = try self.fs.destinationOf(symlink: self.path)
 		return switch self.fs.nodeType(at: destPath) {

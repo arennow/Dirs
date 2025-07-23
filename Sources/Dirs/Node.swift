@@ -5,6 +5,7 @@ public protocol Node: IntoFilePath, Hashable, Sendable {
 	var path: FilePath { get }
 
 	mutating func move(to destination: some IntoFilePath) throws
+	mutating func rename(to newName: String) throws
 }
 
 public extension Node {
