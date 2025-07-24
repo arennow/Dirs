@@ -16,7 +16,7 @@ public enum NodeType: Sendable {
 }
 
 public enum DirLookupKind: String, Sendable {
-	case documents, cache
+	case documents, cache, temporary
 	case uniqueTemporary
 }
 
