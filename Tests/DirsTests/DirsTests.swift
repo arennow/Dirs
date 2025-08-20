@@ -1000,6 +1000,19 @@ extension DirsTests {
 			.init(filePath: "/d/d2", isDirectory: false),
 		])
 	}
+
+	@Test(arguments: FSKind.allCases)
+	func childNodes(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createFile(at: "/a").replaceContents("abc")
+		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
+
+		let rootDir = try fs.rootDir
+
+		try #expect(rootDir.childFile(named: "a")?.stringContents() == "abc")
+		#expect(rootDir.childDir(named: "d")?.childFile(named: "d1") != nil)
+	}
 }
 
 // MARK: - Descendant Nodes
