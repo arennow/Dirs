@@ -235,11 +235,17 @@ struct DirsTests: ~Copyable {
 	func replaceContentsOfFile(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.rootDir.createFile(at: "a").replaceContents("content")
+		let file = try fs.rootDir.createFile(at: "a")
+		try #expect(file.stringContents() == "")
 
-		let file = try fs.file(at: "/a")
+		try file.replaceContents("content")
+		try #expect(file.stringContents() == "content")
+
 		try file.replaceContents("new content")
 		try #expect(file.stringContents() == "new content")
+
+		try file.replaceContents("smol")
+		try #expect(file.stringContents() == "smol")
 	}
 
 	@Test(arguments: FSKind.allCases)
