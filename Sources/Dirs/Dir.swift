@@ -86,6 +86,14 @@ public extension Dir {
 		self.childNode(named: component, in: \.directories)
 	}
 
+	func newOrExistingChildFile(named name: String) throws -> File {
+		try self.childFile(named: name) ?? self.createFile(at: name)
+	}
+
+	func newOrExistingChildDir(named name: String) throws -> Dir {
+		try self.childDir(named: name) ?? self.createDir(at: name)
+	}
+
 	private func descendantNode<T: Node>(at relativePath: FilePath, extractor: (Dir) -> (FilePath.Component) -> T?) -> T? {
 		var currentDir = self
 
