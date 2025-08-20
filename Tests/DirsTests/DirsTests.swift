@@ -1000,6 +1000,43 @@ extension DirsTests {
 			.init(filePath: "/d/d2", isDirectory: false),
 		])
 	}
+
+	@Test(arguments: FSKind.allCases)
+	func childNodes(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createFile(at: "/a").replaceContents("abc")
+		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
+
+		let rootDir = try fs.rootDir
+
+		try #expect(rootDir.childFile(named: "a")?.stringContents() == "abc")
+		#expect(rootDir.childDir(named: "d")?.childFile(named: "d1") != nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func newOrExistingChildFile(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createFile(at: "/a").replaceContents("abc")
+
+		let rootDir = try fs.rootDir
+
+		try #expect(rootDir.newOrExistingChildFile(named: "a").stringContents() == "abc")
+		try #expect(rootDir.newOrExistingChildFile(named: "b").stringContents() == "")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func newOrExistingChildDir(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
+
+		let rootDir = try fs.rootDir
+
+		try #expect(rootDir.newOrExistingChildDir(named: "d").children().all.map(\.name) == ["d1"])
+		try #expect(rootDir.newOrExistingChildDir(named: "e").children().all.map(\.name) == [])
+	}
 }
 
 // MARK: - Descendant Nodes
