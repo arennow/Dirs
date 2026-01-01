@@ -222,11 +222,12 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	public func createFile(at ifp: some IntoFilePath) throws -> File {
 		let fp = ifp.into()
 		let containingDirFP = fp.removingLastComponent()
-		guard self.nodeType(at: containingDirFP) == .dir else {
-			throw NoSuchNode(path: containingDirFP)
-		}
 
 		try self.pathsToNodes.mutate { ptn in
+			guard Self.nodeType(at: containingDirFP, in: ptn, symRes: .dontResolve) == .dir else {
+				throw NoSuchNode(path: containingDirFP)
+			}
+
 			switch ptn[fp] {
 				case .none:
 					ptn[fp] = .file
