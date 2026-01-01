@@ -20,7 +20,7 @@ let package = Package(name: "Dirs",
 					  	.package(url: "https://github.com/apple/swift-algorithms.git", .upToNextMajor(from: "1.2.0")),
 					  	.package(url: "https://github.com/apple/swift-system", from: "1.4.2"),
 					  	.package(url: "https://github.com/arennow/SortAndFilter.git", .upToNextMajor(from: "1.0.0")),
-					  	.package(url: "https://github.com/arennow/Locked.git", .upToNextMajor(from: "1.1.0")),
+					  	.package(url: "https://github.com/arennow/Locked.git", .upToNextMajor(from: "2.0.0")),
 					  ],
 					  targets: [
 					  	.target(name: "Dirs",
