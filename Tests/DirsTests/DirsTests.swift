@@ -6,7 +6,7 @@ import SystemPackage
 import Testing
 
 struct DirsTests: ~Copyable {
-	let mockFS: any FilesystemInterface = MockFilesystemInterface.empty()
+	let mockFS: any FilesystemInterface = MockFSInterface.empty()
 	let realFS: any FilesystemInterface
 	let pathToDelete: FilePath?
 

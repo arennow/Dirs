@@ -3,7 +3,7 @@ import Foundation
 import Locked
 import SystemPackage
 
-public final class MockFilesystemInterface: FilesystemInterface {
+public final class MockFSInterface: FilesystemInterface {
 	private enum MockNode: Equatable {
 		case dir
 		case file(Data)
@@ -29,9 +29,9 @@ public final class MockFilesystemInterface: FilesystemInterface {
 			do {
 				return switch self {
 					case .resolve:
-						try MockFilesystemInterface.realpath(of: fp, in: ptn)
+						try MockFSInterface.realpath(of: fp, in: ptn)
 					case .resolveExceptFinal:
-						try MockFilesystemInterface.realpath(of: fp, in: ptn, exceptFinalComponent: true)
+						try MockFSInterface.realpath(of: fp, in: ptn, exceptFinalComponent: true)
 					case .dontResolve:
 						fp
 				}
@@ -43,7 +43,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 	private typealias PTN = Dictionary<FilePath, MockNode>
 
-	public static func == (lhs: MockFilesystemInterface, rhs: MockFilesystemInterface) -> Bool {
+	public static func == (lhs: MockFSInterface, rhs: MockFSInterface) -> Bool {
 		lhs.id == rhs.id
 	}
 
@@ -436,3 +436,6 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		}
 	}
 }
+
+@available(*, deprecated, renamed: "MockFSInterface")
+public typealias MockFilesystemInterface = MockFSInterface
