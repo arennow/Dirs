@@ -21,7 +21,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	}
 
 	private enum SymlinkResolutionBehavior {
-		case resolve, dontResolve
+		case resolve, dontResolve, resolveExceptFinal
 
 		func properFilePath(for ifp: some IntoFilePath, in ptn: PTN) -> FilePath? {
 			let fp = ifp.into()
@@ -30,6 +30,8 @@ public final class MockFilesystemInterface: FilesystemInterface {
 				return switch self {
 					case .resolve:
 						try MockFilesystemInterface.realpath(of: fp, in: ptn)
+					case .resolveExceptFinal:
+						try MockFilesystemInterface.realpath(of: fp, in: ptn, exceptFinalComponent: true)
 					case .dontResolve:
 						fp
 				}
@@ -77,15 +79,21 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	/// - Returns: The reified path
 	///
 	/// - Warning: This function does not yet handle `.`, `..`, `~`, etc.
-	private static func realpath(of ifp: some IntoFilePath, in ptn: PTN) throws -> FilePath {
+	private static func realpath(of ifp: some IntoFilePath, in ptn: PTN, exceptFinalComponent: Bool = false) throws -> FilePath {
 		let fp = ifp.into()
 
 		var builtRealpathFPCV = FilePath.ComponentView()
 		var builtRealpathFP: FilePath {
 			FilePath(root: fp.root, builtRealpathFPCV)
 		}
-		for comp in fp.components {
+		let components = Array(fp.components)
+		for (index, comp) in components.enumerated() {
 			builtRealpathFPCV.append(comp)
+
+			let isLastComponent = index == components.count - 1
+			if exceptFinalComponent, isLastComponent {
+				break
+			}
 
 			switch ptn[builtRealpathFP] {
 				case .symlink(let destination):
@@ -97,10 +105,24 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 		let outThis = builtRealpathFP
 		if outThis != fp {
-			return try Self.realpath(of: outThis, in: ptn)
+			return try Self.realpath(of: outThis, in: ptn, exceptFinalComponent: exceptFinalComponent)
 		} else {
 			return outThis
 		}
+	}
+
+	/// Resolves symlinks in the parent directory path and returns the path with the resolved
+	/// parent and the original final component. This is used for operations that need to be
+	/// able to work on nodes inside symlinked directories.
+	private static func resolveParentSymlinks(of ifp: some IntoFilePath, in ptn: PTN) throws -> FilePath {
+		let fp = ifp.into()
+		guard let lastComponent = fp.lastComponent else {
+			// Root path has no parent to resolve
+			return fp
+		}
+		let parentFP = fp.removingLastComponent()
+		let resolvedParentFP = try Self.realpath(of: parentFP, in: ptn)
+		return resolvedParentFP.appending(lastComponent)
 	}
 
 	private func node(at ifp: some IntoFilePath, symRes: SymlinkResolutionBehavior) -> MockNode? {
@@ -114,7 +136,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		if let exact = self.node(at: ifp, symRes: .dontResolve) {
 			node = exact
 		} else {
-			node = self.node(at: ifp, symRes: .resolve)
+			node = self.node(at: ifp, symRes: .resolveExceptFinal)
 		}
 
 		return node?.nodeType
@@ -142,7 +164,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	private func contentsOf(directory ifp: some Dirs.IntoFilePath,
 							using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws -> Array<Dirs.FilePathStat>
 	{
-		let fp = ifp.into()
+		let fp = try Self.resolveParentSymlinks(of: ifp, in: acquisitionLock.resource)
 
 		switch acquisitionLock.resource[fp] {
 			case .none: throw NoSuchNode(path: fp)
@@ -171,7 +193,7 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	}
 
 	private func destinationOf(symlink ifp: some Dirs.IntoFilePath, using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws -> FilePath {
-		let fp = ifp.into()
+		let fp = try Self.resolveParentSymlinks(of: ifp, in: acquisitionLock.resource)
 
 		switch acquisitionLock.resource[fp] {
 			case .symlink(let destination): return destination
@@ -202,15 +224,25 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		let eachIndex = sequence(first: comps.startIndex) { ind in
 			comps.index(ind, offsetBy: 1, limitedBy: comps.endIndex)
 		}
-		let allDirectories = eachIndex.map { endIndex in
-			FilePath(root: "/", fp.components[comps.startIndex..<endIndex])
-		}
+		let cumulativeFilePaths = eachIndex
+			.dropFirst() // Skip root directory (always exists)
+			.map { endIndex in FilePath(root: "/", fp.components[comps.startIndex..<endIndex]) }
+
 		try self.pathsToNodes.mutate { ptn in
-			for dirComponent in allDirectories {
-				if case .file = ptn[dirComponent] {
-					throw NodeAlreadyExists(path: dirComponent, type: .file)
-				} else {
-					ptn[dirComponent] = .dir
+			for cumulativeFP in cumulativeFilePaths {
+				guard cumulativeFP.lastComponent != nil else {
+					preconditionFailure("Path has no last component after dropFirst()")
+				}
+
+				let resolvedDirFP = try Self.resolveParentSymlinks(of: cumulativeFP, in: ptn)
+
+				switch ptn[resolvedDirFP] {
+					case .file:
+						throw NodeAlreadyExists(path: cumulativeFP, type: .file)
+					case .dir, .symlink:
+						break // Already exists
+					case .none:
+						ptn[resolvedDirFP] = .dir
 				}
 			}
 		}
@@ -221,16 +253,18 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	@discardableResult
 	public func createFile(at ifp: some IntoFilePath) throws -> File {
 		let fp = ifp.into()
-		let containingDirFP = fp.removingLastComponent()
+		let parentFP = fp.removingLastComponent()
 
 		try self.pathsToNodes.mutate { ptn in
-			guard Self.nodeType(at: containingDirFP, in: ptn, symRes: .dontResolve) == .dir else {
-				throw NoSuchNode(path: containingDirFP)
+			guard Self.nodeType(at: parentFP, in: ptn, symRes: .resolve) == .dir else {
+				throw NoSuchNode(path: parentFP)
 			}
 
-			switch ptn[fp] {
+			let resolvedFP = try Self.resolveParentSymlinks(of: fp, in: ptn)
+
+			switch ptn[resolvedFP] {
 				case .none:
-					ptn[fp] = .file
+					ptn[resolvedFP] = .file
 				case .some(let x): throw NodeAlreadyExists(path: fp, type: x.nodeType)
 			}
 		}
@@ -239,8 +273,15 @@ public final class MockFilesystemInterface: FilesystemInterface {
 
 	public func createSymlink(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> Symlink {
 		let linkFP = linkIFP.into()
-		self.pathsToNodes.mutate { ptn in
-			ptn[linkFP] = .symlink(destIFP.into())
+		try self.pathsToNodes.mutate { ptn in
+			let parentFP = linkFP.removingLastComponent()
+			guard Self.nodeType(at: parentFP, in: ptn, symRes: .resolve) == .dir else {
+				throw NoSuchNode(path: parentFP)
+			}
+
+			let resolvedFP = try Self.resolveParentSymlinks(of: linkFP, in: ptn)
+
+			ptn[resolvedFP] = .symlink(destIFP.into())
 		}
 		return try Symlink(fs: self, path: linkFP)
 	}
@@ -252,10 +293,12 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	private func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData, using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws {
 		let fp = ifp.into()
 		let contentsData = contents.into()
-		switch acquisitionLock.resource[fp] {
+		let resolvedFP = try Self.resolveParentSymlinks(of: fp, in: acquisitionLock.resource)
+
+		switch acquisitionLock.resource[resolvedFP] {
 			case .none: throw NoSuchNode(path: fp)
 			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
-			case .file: acquisitionLock.resource[fp] = .file(contentsData)
+			case .file: acquisitionLock.resource[resolvedFP] = .file(contentsData)
 			case .symlink(let destination): try self.replaceContentsOfFile(at: destination, to: contentsData, using: acquisitionLock)
 		}
 	}
@@ -269,8 +312,8 @@ public final class MockFilesystemInterface: FilesystemInterface {
 						  to destination: some IntoFilePath,
 						  using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws -> FilePath
 	{
-		let srcFP: FilePath = source.into()
-		let destFP: FilePath = destination.into()
+		let srcFP = try Self.resolveParentSymlinks(of: source, in: acquisitionLock.resource)
+		let destFP = try Self.resolveParentSymlinks(of: destination, in: acquisitionLock.resource)
 
 		// This is usually just `destFP`, but if `destFP` is a dir, then we
 		// rehome into it, and this will be `destFP`+`srcFP.final`
@@ -364,9 +407,10 @@ public final class MockFilesystemInterface: FilesystemInterface {
 							using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws
 	{
 		let fp = ifp.into()
+		let resolvedFP = try Self.resolveParentSymlinks(of: fp, in: acquisitionLock.resource)
 
 		let keysToDelete = acquisitionLock.resource.keys
-			.filter { $0.starts(with: fp) }
+			.filter { $0.starts(with: resolvedFP) }
 
 		guard !keysToDelete.isEmpty else {
 			throw NoSuchNode(path: fp)

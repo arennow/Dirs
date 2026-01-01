@@ -148,6 +148,13 @@ struct DirsTests: ~Copyable {
 	}
 
 	@Test(arguments: FSKind.allCases)
+	func createRootDir(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		#expect(throws: Never.self) { try fs.createDir(at: "/") }
+	}
+
+	@Test(arguments: FSKind.allCases)
 	func dirOverExistingFileFails(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
@@ -1127,7 +1134,7 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func nodesInsideSymlinkDirResolve(fsKind: FSKind) throws {
+	func nodesInsideSymlinkDirResolveTypes(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
 		try fs.createFileAndIntermediaryDirs(at: "/a/b/c1")
@@ -1210,5 +1217,103 @@ extension DirsTests {
 		try #expect(descFile.descendantPath(from: symlinks.dirSym) == "e/e1")
 
 		#expect(throws: NodeNotDescendantError.self, performing: { try a.descendantPath(from: d) })
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func createFileThroughSymlinkedParentDirSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForSymlinkTests(fs)
+
+		#expect(throws: Never.self) { try fs.createFile(at: "/sd/newFile") }
+		#expect(fs.nodeType(at: "/d/newFile") == .file)
+		#expect(fs.nodeType(at: "/sd/newFile") == .file)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func createDirThroughSymlinkedParentDirSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForSymlinkTests(fs)
+
+		#expect(throws: Never.self) { try fs.createDir(at: "/sd/newDir") }
+		#expect(fs.nodeType(at: "/d/newDir") == .dir)
+		#expect(fs.nodeType(at: "/sd/newDir") == .dir)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func createSymlinkThroughSymlinkedParentDirSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForSymlinkTests(fs)
+
+		#expect(throws: Never.self) { try fs.createSymlink(at: "/sd/link", to: "/target") }
+		#expect(fs.nodeType(at: "/d/link") == .symlink)
+		#expect(fs.nodeType(at: "/sd/link") == .symlink)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func replaceContentsThroughSymlinkedParentDirSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForSymlinkTests(fs)
+
+		#expect(throws: Never.self) { try fs.replaceContentsOfFile(at: "/sd/d1", to: "abc") }
+		try #expect(fs.contentsOf(file: "/d/d1") == Data("abc".utf8))
+		try #expect(fs.contentsOf(file: "/sd/d1") == Data("abc".utf8))
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func appendContentsOfFileThroughSymlinkedParentDirSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForSymlinkTests(fs)
+
+		try fs.replaceContentsOfFile(at: "/d/d1", to: "initial")
+		#expect(throws: Never.self) { try fs.appendContentsOfFile(at: "/sd/d1", with: " appended") }
+		try #expect(fs.contentsOf(file: "/d/d1") == Data("initial appended".utf8))
+		try #expect(fs.contentsOf(file: "/sd/d1") == Data("initial appended".utf8))
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func deleteNodeThroughSymlinkedParentDirSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForSymlinkTests(fs)
+
+		#expect(fs.nodeType(at: "/d/d1") == .file)
+		#expect(throws: Never.self) { try fs.deleteNode(at: "/sd/d1") }
+		#expect(fs.nodeType(at: "/d/d1") == nil)
+		#expect(fs.nodeType(at: "/sd/d1") == nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func copyNodeThroughSymlinkedParentDirSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForSymlinkTests(fs)
+
+		try fs.replaceContentsOfFile(at: "/d/d1", to: "content")
+		#expect(throws: Never.self) { try fs.copyNode(from: "/sd/d1", to: "/sd/d1_copy") }
+		#expect(fs.nodeType(at: "/d/d1_copy") == .file)
+		#expect(fs.nodeType(at: "/sd/d1_copy") == .file)
+		try #expect(fs.contentsOf(file: "/d/d1_copy") == Data("content".utf8))
+		try #expect(fs.contentsOf(file: "/sd/d1_copy") == Data("content".utf8))
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func contentsOfDirectoryThroughSymlinkedParentDirSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForSymlinkTests(fs)
+
+		let contentsViaReal = try fs.contentsOf(directory: "/d/e")
+		let contentsViaSymlink = try fs.contentsOf(directory: "/sd/e")
+		#expect(Set(contentsViaReal.map(\.filePath.lastComponent)) == ["e1"])
+		#expect(Set(contentsViaSymlink.map(\.filePath.lastComponent)) == ["e1"])
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func destinationOfSymlinkThroughSymlinkedParentDirSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		try Self.prepareForSymlinkTests(fs)
+
+		try fs.createSymlink(at: "/d/link", to: "/target")
+		let destViaReal = try fs.destinationOf(symlink: "/d/link")
+		let destViaSymlink = try fs.destinationOf(symlink: "/sd/link")
+		#expect(destViaReal == "/target")
+		#expect(destViaSymlink == "/target")
 	}
 }

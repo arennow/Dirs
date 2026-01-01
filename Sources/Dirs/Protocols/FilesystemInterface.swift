@@ -21,7 +21,12 @@ public enum DirLookupKind: String, Sendable {
 }
 
 public protocol FilesystemInterface: Equatable, Sendable {
+	/// Returns the type of node at the given path, resolving symlinks in parent directories
+	/// but not the final component. This allows finding nodes inside symlinked directories
+	/// while still identifying symlinks themselves (rather than what they point to).
 	func nodeType(at ifp: some IntoFilePath) -> NodeType?
+
+	/// Returns the type of node after following all symlinks to their final destination.
 	func nodeTypeFollowingSymlinks(at ifp: some IntoFilePath) -> NodeType?
 
 	func contentsOf(file ifp: some IntoFilePath) throws -> Data
