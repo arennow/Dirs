@@ -1,13 +1,13 @@
 {
-  "originHash" : "f21c1a0c8c9acd6a69eed29ea97f22ff1ddbab727c157ecd8ae6a2b1a6b6e40c",
+  "originHash" : "46e69c56dbd315caf59002763919c46a313dc837c14bfd3da5ebc117e93e5d7b",
   "pins" : [
     {
       "identity" : "locked",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/arennow/Locked.git",
       "state" : {
-        "revision" : "73d1200dc77ac95cc9815314a93e82cf176d9740",
-        "version" : "1.0.1"
+        "revision" : "0193503fed7d94927b1a49064ed06d1333a151dd",
+        "version" : "1.1.0"
       }
     },
     {

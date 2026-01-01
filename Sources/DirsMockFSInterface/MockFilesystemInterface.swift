@@ -7,8 +7,8 @@ public final class MockFilesystemInterface: FilesystemInterface {
 	private enum MockNode: Equatable {
 		case dir
 		case file(Data)
-		public static func file(_ string: String) -> Self { .file(Data(string.utf8)) }
-		public static var file: Self { .file(Data()) }
+		static func file(_ string: String) -> Self { .file(Data(string.utf8)) }
+		static var file: Self { .file(Data()) }
 		case symlink(FilePath)
 
 		var nodeType: NodeType {
@@ -205,11 +205,13 @@ public final class MockFilesystemInterface: FilesystemInterface {
 		let allDirectories = eachIndex.map { endIndex in
 			FilePath(root: "/", fp.components[comps.startIndex..<endIndex])
 		}
-		for dirComponent in allDirectories {
-			if case .file = self.pathsToNodes[dirComponent] {
-				throw NodeAlreadyExists(path: dirComponent, type: .file)
-			} else {
-				self.pathsToNodes[dirComponent] = .dir
+		try self.pathsToNodes.mutate { ptn in
+			for dirComponent in allDirectories {
+				if case .file = ptn[dirComponent] {
+					throw NodeAlreadyExists(path: dirComponent, type: .file)
+				} else {
+					ptn[dirComponent] = .dir
+				}
 			}
 		}
 
@@ -224,27 +226,36 @@ public final class MockFilesystemInterface: FilesystemInterface {
 			throw NoSuchNode(path: containingDirFP)
 		}
 
-		switch self.pathsToNodes[fp] {
-			case .none:
-				self.pathsToNodes[fp] = .file
-				return try File(fs: self, path: fp)
-			case .some(let x): throw NodeAlreadyExists(path: fp, type: x.nodeType)
+		try self.pathsToNodes.mutate { ptn in
+			switch ptn[fp] {
+				case .none:
+					ptn[fp] = .file
+				case .some(let x): throw NodeAlreadyExists(path: fp, type: x.nodeType)
+			}
 		}
+		return try File(fs: self, path: fp)
 	}
 
 	public func createSymlink(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> Symlink {
 		let linkFP = linkIFP.into()
-		self.pathsToNodes[linkFP] = .symlink(destIFP.into())
+		self.pathsToNodes.mutate { ptn in
+			ptn[linkFP] = .symlink(destIFP.into())
+		}
 		return try Symlink(fs: self, path: linkFP)
 	}
 
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
+		try self.replaceContentsOfFile(at: ifp, to: contents, using: self.pathsToNodes.acquireIntoHandle())
+	}
+
+	private func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData, using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws {
 		let fp = ifp.into()
-		switch self.pathsToNodes[fp] {
+		let contentsData = contents.into()
+		switch acquisitionLock.resource[fp] {
 			case .none: throw NoSuchNode(path: fp)
 			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
-			case .file: self.pathsToNodes[fp] = .file(contents.into())
-			case .symlink(let destination): try self.replaceContentsOfFile(at: destination, to: contents)
+			case .file: acquisitionLock.resource[fp] = .file(contentsData)
+			case .symlink(let destination): try self.replaceContentsOfFile(at: destination, to: contentsData, using: acquisitionLock)
 		}
 	}
 
