@@ -1,6 +1,10 @@
 import Foundation
 import SystemPackage
 
+#if canImport(Darwin)
+	import Darwin
+#endif
+
 public struct RealFSInterface: FilesystemInterface {
 	public let chroot: FilePath?
 
@@ -198,6 +202,107 @@ public struct RealFSInterface: FilesystemInterface {
 		try fm.moveItem(at: srcURL, to: destURL)
 		return self.resolveToProjected(destURL)
 	}
+
+	public func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String> {
+		#if canImport(Darwin)
+			let fp = ifp.into()
+			let path = self.resolveToRaw(fp).string
+
+			let bufferSize = try xattrCall(attributeName: nil, path: fp) {
+				listxattr(path, nil, 0, XATTR_NOFOLLOW)
+			}
+
+			guard bufferSize > 0 else {
+				return []
+			}
+
+			return try withUnsafeTemporaryAllocation(of: CChar.self, capacity: bufferSize) { buffer in
+				let actualSize = try xattrCall(attributeName: nil, path: fp) {
+					listxattr(path, buffer.baseAddress, bufferSize, XATTR_NOFOLLOW)
+				}
+
+				// Parse null-terminated strings from buffer
+				var names = Set<String>()
+				var currentStart = 0
+				for i in 0..<actualSize {
+					if buffer[i] == 0 {
+						if currentStart < i {
+							if let name = String(validatingCString: buffer.baseAddress! + currentStart) {
+								names.insert(name)
+							}
+						}
+						currentStart = i + 1
+					}
+				}
+
+				return names
+			}
+		#else
+			throw XAttrNotSupported(path: ifp.into())
+		#endif
+	}
+
+	public func extendedAttribute(named name: String, at ifp: some IntoFilePath) throws -> Data? {
+		#if canImport(Darwin)
+			let fp = ifp.into()
+			let path = self.resolveToRaw(fp).string
+
+			do {
+				let bufferSize = try xattrCall(attributeName: name, path: fp) {
+					getxattr(path, name, nil, 0, 0, XATTR_NOFOLLOW)
+				}
+
+				guard bufferSize > 0 else {
+					return Data()
+				}
+
+				return try withUnsafeTemporaryAllocation(of: UInt8.self, capacity: bufferSize) { buffer in
+					let actualSize = try xattrCall(attributeName: name, path: fp) {
+						getxattr(path, name, buffer.baseAddress, bufferSize, 0, XATTR_NOFOLLOW)
+					}
+
+					return Data(bytes: buffer.baseAddress!, count: actualSize)
+				}
+			} catch is XAttrNotFound {
+				return nil
+			}
+		#else
+			throw XAttrNotSupported(path: ifp.into())
+		#endif
+	}
+
+	public func setExtendedAttribute(named name: String, to value: Data, at ifp: some IntoFilePath) throws {
+		#if canImport(Darwin)
+			let fp = ifp.into()
+			let path = self.resolveToRaw(fp).string
+
+			try value.withUnsafeBytes { bufferPointer in
+				_ = try xattrCall(attributeName: name, path: fp) {
+					setxattr(path, name, bufferPointer.baseAddress, value.count, 0, XATTR_NOFOLLOW)
+				}
+			}
+		#else
+			throw XAttrNotSupported(path: ifp.into())
+		#endif
+	}
+
+	public func removeExtendedAttribute(named name: String, at ifp: some IntoFilePath) throws {
+		#if canImport(Darwin)
+			let fp = ifp.into()
+			let path = self.resolveToRaw(fp).string
+
+			do {
+				_ = try xattrCall(attributeName: name, path: fp) {
+					removexattr(path, name, XATTR_NOFOLLOW)
+				}
+			} catch is XAttrNotFound {
+				// Silently succeed if attribute doesn't exist
+				return
+			}
+		#else
+			throw XAttrNotSupported(path: ifp.into())
+		#endif
+	}
 }
 
 public extension RealFSInterface {
@@ -251,3 +356,44 @@ private func realpath(_ path: String) throws -> String {
 
 	return resolvedPathString
 }
+
+#if canImport(Darwin)
+	@discardableResult
+	private func xattrCall<T: BinaryInteger>(attributeName: String?,
+											 path: FilePath,
+											 _ call: () -> T) throws -> T
+	{
+		let result = call()
+		guard result != -1 else {
+			throw makeXattrError(errno: errno, attributeName: attributeName, path: path)
+		}
+		return result
+	}
+
+	private func makeXattrError(errno: Int32, attributeName: String?, path: FilePath) -> any Error {
+		if errno == ENOATTR {
+			return XAttrNotFound()
+		}
+
+		// These errno values can only occur during operations on a specific attribute
+		var requiredAttributeName: String {
+			assert(attributeName != nil, "attributeName required for this errno")
+			return attributeName ?? ":unspecified:"
+		}
+
+		switch errno {
+			case ENOTSUP:
+				return XAttrNotSupported(path: path)
+			case ENAMETOOLONG:
+				return XAttrNameTooLong(attributeName: requiredAttributeName, path: path)
+			case E2BIG:
+				return XAttrValueTooLarge(attributeName: requiredAttributeName, path: path)
+			case ERANGE:
+				return XAttrBufferTooSmall(attributeName: requiredAttributeName, path: path)
+			case ENOSPC:
+				return XAttrNoSpace(attributeName: requiredAttributeName, path: path)
+			default:
+				return NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+		}
+	}
+#endif

@@ -1,3 +1,4 @@
+import Foundation
 import SystemPackage
 
 public protocol Node: IntoFilePath, Hashable, Sendable {
@@ -61,6 +62,22 @@ public extension Node {
 	mutating func ensure(in dir: Dir) throws {
 		guard try !self.parent.pointsToSameNode(as: dir) else { return }
 		try self.move(to: dir)
+	}
+
+	func extendedAttributeNames() throws -> Set<String> {
+		try self.fs.extendedAttributeNames(at: self)
+	}
+
+	func extendedAttribute(named name: String) throws -> Data? {
+		try self.fs.extendedAttribute(named: name, at: self)
+	}
+
+	func setExtendedAttribute(named name: String, to value: Data) throws {
+		try self.fs.setExtendedAttribute(named: name, to: value, at: self)
+	}
+
+	func removeExtendedAttribute(named name: String) throws {
+		try self.fs.removeExtendedAttribute(named: name, at: self)
 	}
 }
 

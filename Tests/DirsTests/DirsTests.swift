@@ -6,7 +6,7 @@ import SystemPackage
 import Testing
 
 struct DirsTests: ~Copyable {
-	let mockFS: any FilesystemInterface = MockFSInterface.empty()
+	let mockFS: any FilesystemInterface = MockFSInterface()
 	let realFS: any FilesystemInterface
 	let pathToDelete: FilePath?
 
@@ -1315,5 +1315,160 @@ extension DirsTests {
 		let destViaSymlink = try fs.destinationOf(symlink: "/sd/link")
 		#expect(destViaReal == "/target")
 		#expect(destViaSymlink == "/target")
+	}
+}
+
+// MARK: - Extended Attributes
+
+extension DirsTests {
+	@Test(arguments: FSKind.allCases)
+	func setAndGetExtendedAttribute(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let file = try fs.createFile(at: "/test")
+
+		try file.setExtendedAttribute(named: "user.comment", to: Data("test comment".utf8))
+		let retrieved = try file.extendedAttribute(named: "user.comment")
+		#expect(retrieved == Data("test comment".utf8))
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func getNonExistentExtendedAttributeReturnsNil(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let file = try fs.createFile(at: "/test")
+
+		let retrieved = try file.extendedAttribute(named: "user.nonexistent")
+		#expect(retrieved == nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func listExtendedAttributes(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let file = try fs.createFile(at: "/test")
+
+		#expect(try file.extendedAttributeNames().isEmpty)
+
+		try file.setExtendedAttribute(named: "user.attr1", to: Data("value1".utf8))
+		try file.setExtendedAttribute(named: "user.attr2", to: Data("value2".utf8))
+		try file.setExtendedAttribute(named: "user.attr3", to: Data("value3".utf8))
+
+		let names = try file.extendedAttributeNames()
+		#expect(names == ["user.attr1", "user.attr2", "user.attr3"])
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func removeExtendedAttribute(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let file = try fs.createFile(at: "/test")
+
+		try file.setExtendedAttribute(named: "user.temp", to: Data("temporary".utf8))
+		#expect(try file.extendedAttribute(named: "user.temp") != nil)
+
+		try file.removeExtendedAttribute(named: "user.temp")
+
+		#expect(try file.extendedAttribute(named: "user.temp") == nil)
+		#expect(try file.extendedAttributeNames().isEmpty)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func removeNonExistentExtendedAttributeSucceeds(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let file = try fs.createFile(at: "/test")
+
+		try file.removeExtendedAttribute(named: "user.doesnotexist")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func updateExistingExtendedAttribute(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let file = try fs.createFile(at: "/test")
+
+		try file.setExtendedAttribute(named: "user.counter", to: Data("1".utf8))
+		try file.setExtendedAttribute(named: "user.counter", to: Data("2".utf8))
+		#expect(try file.extendedAttribute(named: "user.counter") == Data("2".utf8))
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func extendedAttributeWithEmptyValue(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let file = try fs.createFile(at: "/test")
+
+		try file.setExtendedAttribute(named: "user.empty", to: Data())
+
+		let retrieved = try file.extendedAttribute(named: "user.empty")
+		#expect(retrieved == Data())
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func extendedAttributeWithBinaryData(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let file = try fs.createFile(at: "/test")
+
+		let binaryData = Data([0x00, 0xFF, 0x42, 0xAB, 0xCD, 0xEF])
+		try file.setExtendedAttribute(named: "user.binary", to: binaryData)
+
+		let retrieved = try file.extendedAttribute(named: "user.binary")
+		#expect(retrieved == binaryData)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func extendedAttributeNameTooLongThrows(fsKind: FSKind) throws {
+		// Mock: use small custom limit to test configurability.
+		// Real: use very large limit that exceeds any platform.
+		let (fs, limit): (any FilesystemInterface, Int) = switch fsKind {
+			case .mock:
+				(MockFSInterface(maxExtendedAttributeNameLength: 10), 10)
+			case .real:
+				(self.realFS, 10_000)
+		}
+
+		let file = try fs.createFile(at: "/test")
+		let longName = String(repeating: "a", count: limit + 1)
+
+		#expect(throws: XAttrNameTooLong.self) {
+			try file.setExtendedAttribute(named: longName, to: Data("value".utf8))
+		}
+
+		if case .mock = fsKind {
+			let atLimitName = String(repeating: "b", count: limit)
+			#expect(throws: Never.self) {
+				try file.setExtendedAttribute(named: atLimitName, to: Data("ok".utf8))
+			}
+		}
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func extendedAttributesOnDirectory(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let dir = try fs.createDir(at: "/testdir")
+
+		try dir.setExtendedAttribute(named: "user.dirattr", to: Data("dir value".utf8))
+
+		let retrieved = try dir.extendedAttribute(named: "user.dirattr")
+		#expect(retrieved == Data("dir value".utf8))
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func extendedAttributesOnSymlink(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let target = try fs.createFile(at: "/target")
+		let symlink = try fs.createSymlink(at: "/link", to: "/target")
+
+		#expect(try symlink.extendedAttributeNames().isEmpty)
+		#expect(try target.extendedAttributeNames().isEmpty)
+
+		try symlink.setExtendedAttribute(named: "user.linkattr", to: Data("v1".utf8))
+		#expect(try symlink.extendedAttributeNames() == ["user.linkattr"])
+		#expect(try target.extendedAttributeNames().isEmpty)
+
+		#expect(try symlink.extendedAttribute(named: "user.linkattr") == Data("v1".utf8))
+		#expect(try target.extendedAttribute(named: "user.linkattr") == nil)
+
+		try symlink.setExtendedAttribute(named: "user.linkattr", to: Data("v2".utf8))
+		#expect(try symlink.extendedAttribute(named: "user.linkattr") == Data("v2".utf8))
+		#expect(try target.extendedAttribute(named: "user.linkattr") == nil)
+
+		try symlink.removeExtendedAttribute(named: "user.linkattr")
+		#expect(try symlink.extendedAttributeNames().isEmpty)
+		#expect(try target.extendedAttributeNames().isEmpty)
 	}
 }

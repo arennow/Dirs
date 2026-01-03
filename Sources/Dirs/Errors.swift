@@ -51,3 +51,53 @@ public enum InvalidPathForCall: Error, Equatable {
 	case needSingleComponent
 	case couldNotCanonicalize(String)
 }
+
+public struct XAttrNotSupported: Error {
+	public let path: FilePath
+
+	package init(path: FilePath) {
+		self.path = path
+	}
+}
+
+public struct XAttrNameTooLong: Error {
+	public let attributeName: String
+	public let path: FilePath
+
+	package init(attributeName: String, path: FilePath) {
+		self.attributeName = attributeName
+		self.path = path
+	}
+}
+
+public struct XAttrValueTooLarge: Error {
+	public let attributeName: String
+	public let path: FilePath
+
+	package init(attributeName: String, path: FilePath) {
+		self.attributeName = attributeName
+		self.path = path
+	}
+}
+
+public struct XAttrBufferTooSmall: Error {
+	public let attributeName: String
+	public let path: FilePath
+
+	package init(attributeName: String, path: FilePath) {
+		self.attributeName = attributeName
+		self.path = path
+	}
+}
+
+public struct XAttrNoSpace: Error {
+	public let attributeName: String
+	public let path: FilePath
+
+	package init(attributeName: String, path: FilePath) {
+		self.attributeName = attributeName
+		self.path = path
+	}
+}
+
+struct XAttrNotFound: Error {}

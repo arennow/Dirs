@@ -5,17 +5,36 @@ import SystemPackage
 
 public final class MockFSInterface: FilesystemInterface {
 	private enum MockNode: Equatable {
-		case dir
-		case file(Data)
-		static func file(_ string: String) -> Self { .file(Data(string.utf8)) }
-		static var file: Self { .file(Data()) }
-		case symlink(FilePath)
+		case dir(xattrs: Dictionary<String, Data> = [:])
+		case file(data: Data = Data(), xattrs: Dictionary<String, Data> = [:])
+		case symlink(destination: FilePath, xattrs: Dictionary<String, Data> = [:])
 
 		var nodeType: NodeType {
 			switch self {
 				case .dir: .dir
 				case .file: .file
 				case .symlink: .symlink
+			}
+		}
+
+		var xattrs: Dictionary<String, Data> {
+			get {
+				switch self {
+					case .dir(let xattrs),
+						 .file(_, let xattrs),
+						 .symlink(_, let xattrs):
+						return xattrs
+				}
+			}
+			set {
+				switch self {
+					case .dir:
+						self = .dir(xattrs: newValue)
+					case .file(let data, _):
+						self = .file(data: data, xattrs: newValue)
+					case .symlink(let destination, _):
+						self = .symlink(destination: destination, xattrs: newValue)
+				}
 			}
 		}
 	}
@@ -43,18 +62,29 @@ public final class MockFSInterface: FilesystemInterface {
 
 	private typealias PTN = Dictionary<FilePath, MockNode>
 
+	/// Default maximum extended attribute name length (127 bytes). This matches Darwin's
+	/// limit, which is small compared to other platforms.
+	public static let defaultMaxExtendedAttributeNameLength = 127
+
 	public static func == (lhs: MockFSInterface, rhs: MockFSInterface) -> Bool {
 		lhs.id == rhs.id
 	}
 
+	@available(*, deprecated, message: "Use init() instead")
 	public static func empty() -> Self { Self() }
 
 	// To allow us to avoid traversing our fake FS for deep equality
 	private let id = UUID()
 	private let pathsToNodes: Locked<PTN>
 
-	private init() {
-		self.pathsToNodes = Locked(["/": .dir])
+	/// Maximum length for extended attribute names enforced by this mock filesystem.
+	/// Different platforms have different limits (e.g., macOS uses 127, Linux uses 255), and the
+	/// real filesystem implementation will defer to the platform's native validation.
+	public let maxExtendedAttributeNameLength: Int
+
+	public init(maxExtendedAttributeNameLength: Int = MockFSInterface.defaultMaxExtendedAttributeNameLength) {
+		self.maxExtendedAttributeNameLength = maxExtendedAttributeNameLength
+		self.pathsToNodes = Locked(["/": .dir()])
 	}
 
 	private static func node(at ifp: some IntoFilePath, in ptn: PTN, symRes: SymlinkResolutionBehavior) -> MockNode? {
@@ -63,6 +93,15 @@ public final class MockFSInterface: FilesystemInterface {
 		} else {
 			nil
 		}
+	}
+
+	private static func existingParentResolvedNode(at ifp: some IntoFilePath, in ptn: PTN) throws -> (node: MockNode, resolvedPath: FilePath) {
+		let fp = ifp.into()
+		let resolvedFP = try Self.resolveParentSymlinks(of: fp, in: ptn)
+		guard let node = ptn[resolvedFP] else {
+			throw NoSuchNode(path: fp)
+		}
+		return (node, resolvedFP)
 	}
 
 	private static func nodeType(at ifp: some IntoFilePath, in ptn: PTN, symRes: SymlinkResolutionBehavior) -> NodeType? {
@@ -96,7 +135,7 @@ public final class MockFSInterface: FilesystemInterface {
 			}
 
 			switch ptn[builtRealpathFP] {
-				case .symlink(let destination):
+				case .symlink(let destination, _):
 					builtRealpathFPCV = .init(destination.components)
 				case nil: throw NoSuchNode(path: fp)
 				default: break
@@ -150,9 +189,9 @@ public final class MockFSInterface: FilesystemInterface {
 		let fp = ifp.into()
 
 		switch self.node(at: fp, symRes: .resolve) {
-			case .file(let data): return data
+			case .file(let data, _): return data
 			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
-			case .symlink(let destination): return try self.contentsOf(file: destination)
+			case .symlink(let destination, _): return try self.contentsOf(file: destination)
 			case .none: throw NoSuchNode(path: fp)
 		}
 	}
@@ -169,7 +208,7 @@ public final class MockFSInterface: FilesystemInterface {
 		switch acquisitionLock.resource[fp] {
 			case .none: throw NoSuchNode(path: fp)
 			case .file: throw WrongNodeType(path: fp, actualType: .file)
-			case .symlink(let destination): return try self.contentsOf(directory: destination, using: acquisitionLock)
+			case .symlink(let destination, _): return try self.contentsOf(directory: destination, using: acquisitionLock)
 			case .dir: break
 		}
 
@@ -183,7 +222,7 @@ public final class MockFSInterface: FilesystemInterface {
 			switch acquisitionLock.resource[childFilePath]! {
 				case .dir: .init(filePath: childFilePath, isDirectory: true)
 				case .file: .init(filePath: childFilePath, isDirectory: false)
-				case .symlink(let destination): .init(filePath: childFilePath, isDirectory: acquisitionLock.resource[destination]?.nodeType == .dir)
+				case .symlink(let destination, _): .init(filePath: childFilePath, isDirectory: acquisitionLock.resource[destination]?.nodeType == .dir)
 			}
 		}
 	}
@@ -196,7 +235,7 @@ public final class MockFSInterface: FilesystemInterface {
 		let fp = try Self.resolveParentSymlinks(of: ifp, in: acquisitionLock.resource)
 
 		switch acquisitionLock.resource[fp] {
-			case .symlink(let destination): return destination
+			case .symlink(let destination, _): return destination
 			case .none: throw NoSuchNode(path: fp)
 			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
 		}
@@ -242,7 +281,7 @@ public final class MockFSInterface: FilesystemInterface {
 					case .dir, .symlink:
 						break // Already exists
 					case .none:
-						ptn[resolvedDirFP] = .dir
+						ptn[resolvedDirFP] = .dir()
 				}
 			}
 		}
@@ -264,7 +303,7 @@ public final class MockFSInterface: FilesystemInterface {
 
 			switch ptn[resolvedFP] {
 				case .none:
-					ptn[resolvedFP] = .file
+					ptn[resolvedFP] = .file()
 				case .some(let x): throw NodeAlreadyExists(path: fp, type: x.nodeType)
 			}
 		}
@@ -281,7 +320,7 @@ public final class MockFSInterface: FilesystemInterface {
 
 			let resolvedFP = try Self.resolveParentSymlinks(of: linkFP, in: ptn)
 
-			ptn[resolvedFP] = .symlink(destIFP.into())
+			ptn[resolvedFP] = .symlink(destination: destIFP.into())
 		}
 		return try Symlink(fs: self, path: linkFP)
 	}
@@ -298,8 +337,8 @@ public final class MockFSInterface: FilesystemInterface {
 		switch acquisitionLock.resource[resolvedFP] {
 			case .none: throw NoSuchNode(path: fp)
 			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
-			case .file: acquisitionLock.resource[resolvedFP] = .file(contentsData)
-			case .symlink(let destination): try self.replaceContentsOfFile(at: destination, to: contentsData, using: acquisitionLock)
+			case .file(_, let xattrs): acquisitionLock.resource[resolvedFP] = .file(data: contentsData, xattrs: xattrs)
+			case .symlink(let destination, _): try self.replaceContentsOfFile(at: destination, to: contentsData, using: acquisitionLock)
 		}
 	}
 
@@ -433,6 +472,43 @@ public final class MockFSInterface: FilesystemInterface {
 		} catch {
 			acquisitionLock.resource = before
 			throw error
+		}
+	}
+
+	public func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String> {
+		try self.pathsToNodes.read { ptn in
+			let (node, _) = try Self.existingParentResolvedNode(at: ifp, in: ptn)
+			return Set(node.xattrs.keys)
+		}
+	}
+
+	public func extendedAttribute(named name: String, at ifp: some IntoFilePath) throws -> Data? {
+		try self.pathsToNodes.read { ptn in
+			let (node, _) = try Self.existingParentResolvedNode(at: ifp, in: ptn)
+			return node.xattrs[name]
+		}
+	}
+
+	public func setExtendedAttribute(named name: String, to value: Data, at ifp: some IntoFilePath) throws {
+		let fp = ifp.into()
+
+		if name.utf8.count > self.maxExtendedAttributeNameLength {
+			throw XAttrNameTooLong(attributeName: name, path: fp)
+		}
+
+		try self.pathsToNodes.mutate { ptn in
+			var (node, resolvedFP) = try Self.existingParentResolvedNode(at: fp, in: ptn)
+			node.xattrs[name] = value
+			ptn[resolvedFP] = node
+		}
+	}
+
+	public func removeExtendedAttribute(named name: String, at ifp: some IntoFilePath) throws {
+		let fp = ifp.into()
+		try self.pathsToNodes.mutate { ptn in
+			var (node, resolvedFP) = try Self.existingParentResolvedNode(at: fp, in: ptn)
+			node.xattrs.removeValue(forKey: name)
+			ptn[resolvedFP] = node
 		}
 	}
 }
