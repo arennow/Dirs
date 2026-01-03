@@ -1,3 +1,4 @@
+import Foundation
 import SystemPackage
 
 public struct NoSuchNode: Error {
@@ -97,6 +98,18 @@ public struct XAttrNoSpace: Error {
 	package init(attributeName: String, path: FilePath) {
 		self.attributeName = attributeName
 		self.path = path
+	}
+}
+
+public struct XAttrInvalidUTF8: Error {
+	public let attributeName: String
+	public let path: FilePath
+	public let data: Data
+
+	package init(attributeName: String, path: FilePath, data: Data) {
+		self.attributeName = attributeName
+		self.path = path
+		self.data = data
 	}
 }
 

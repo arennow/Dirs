@@ -1453,22 +1453,60 @@ extension DirsTests {
 		let target = try fs.createFile(at: "/target")
 		let symlink = try fs.createSymlink(at: "/link", to: "/target")
 
+		let attrName = "user.linkattr"
+		let value1 = Data("v1".utf8)
+		let value2 = Data("v2".utf8)
+
 		#expect(try symlink.extendedAttributeNames().isEmpty)
 		#expect(try target.extendedAttributeNames().isEmpty)
 
-		try symlink.setExtendedAttribute(named: "user.linkattr", to: Data("v1".utf8))
-		#expect(try symlink.extendedAttributeNames() == ["user.linkattr"])
+		try symlink.setExtendedAttribute(named: attrName, to: value1)
+		#expect(try symlink.extendedAttributeNames() == [attrName])
 		#expect(try target.extendedAttributeNames().isEmpty)
 
-		#expect(try symlink.extendedAttribute(named: "user.linkattr") == Data("v1".utf8))
-		#expect(try target.extendedAttribute(named: "user.linkattr") == nil)
+		#expect(try symlink.extendedAttribute(named: attrName) == value1)
+		#expect(try target.extendedAttribute(named: attrName) == nil)
 
-		try symlink.setExtendedAttribute(named: "user.linkattr", to: Data("v2".utf8))
-		#expect(try symlink.extendedAttribute(named: "user.linkattr") == Data("v2".utf8))
-		#expect(try target.extendedAttribute(named: "user.linkattr") == nil)
+		try symlink.setExtendedAttribute(named: attrName, to: value2)
+		#expect(try symlink.extendedAttribute(named: attrName) == value2)
+		#expect(try target.extendedAttribute(named: attrName) == nil)
 
-		try symlink.removeExtendedAttribute(named: "user.linkattr")
+		try symlink.removeExtendedAttribute(named: attrName)
 		#expect(try symlink.extendedAttributeNames().isEmpty)
 		#expect(try target.extendedAttributeNames().isEmpty)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func extendedAttributeStringConvenience(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let file = try fs.createFile(at: "/test")
+
+		let attrName = "user.message"
+		let attrValue = "hello world"
+
+		try file.setExtendedAttribute(named: attrName, to: attrValue)
+		#expect(try file.extendedAttributeString(named: attrName) == attrValue)
+
+		let data = try #require(try file.extendedAttribute(named: attrName))
+		#expect(data == Data(attrValue.utf8))
+		#expect(String(data: data, encoding: .utf8) == attrValue)
+
+		#expect(try file.extendedAttributeString(named: "user.nonexistent") == nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func extendedAttributeStringInvalidUTF8Throws(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let file = try fs.createFile(at: "/test")
+
+		let invalidUTF8 = Data([0xFF, 0xFE, 0xFD])
+		try file.setExtendedAttribute(named: "user.invalid", to: invalidUTF8)
+
+		#expect {
+			try file.extendedAttributeString(named: "user.invalid")
+		} throws: { error in
+			guard let xattrError = error as? XAttrInvalidUTF8 else { return false }
+			return xattrError.data == invalidUTF8
+		}
 	}
 }

@@ -79,6 +79,20 @@ public extension Node {
 	func removeExtendedAttribute(named name: String) throws {
 		try self.fs.removeExtendedAttribute(named: name, at: self)
 	}
+
+	func extendedAttributeString(named name: String) throws -> String? {
+		guard let data = try self.extendedAttribute(named: name) else {
+			return nil
+		}
+		guard let string = String(data: data, encoding: .utf8) else {
+			throw XAttrInvalidUTF8(attributeName: name, path: self.path, data: data)
+		}
+		return string
+	}
+
+	func setExtendedAttribute(named name: String, to value: String) throws {
+		try self.setExtendedAttribute(named: name, to: Data(value.utf8))
+	}
 }
 
 extension Node {
