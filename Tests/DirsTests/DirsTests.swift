@@ -1449,6 +1449,17 @@ extension DirsTests {
 
 	@Test(arguments: FSKind.allCases)
 	func extendedAttributesOnSymlink(fsKind: FSKind) throws {
+		#if os(Linux)
+			// Despite the existence of lsetxattr/lgetxattr/etc., the Linux kernel VFS
+			// prohibits user-namespaced xattrs on symlinks (security/system namespaced
+			// xattrs can exist in special cases, but not the normal user.* variety).
+			// From xattr(7): "User extended attributes may be assigned to files and
+			// directories for storing arbitrary additional information..."
+			// Symlinks are conspicuously absent. This is a Linux VFS policy due to
+			// mandatory xattr namespacing. Operations return EOPNOTSUPP.
+			guard fsKind == .mock else { return }
+		#endif
+
 		let fs = self.fs(for: fsKind)
 		let target = try fs.createFile(at: "/target")
 		let symlink = try fs.createSymlink(at: "/link", to: "/target")

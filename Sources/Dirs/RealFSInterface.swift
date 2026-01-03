@@ -3,6 +3,10 @@ import SystemPackage
 
 #if canImport(Darwin)
 	import Darwin
+#elseif os(Linux)
+	import Glibc
+
+	// Additional Linux C imports in LinuxCImports.swift
 #endif
 
 public struct RealFSInterface: FilesystemInterface {
@@ -203,13 +207,17 @@ public struct RealFSInterface: FilesystemInterface {
 		return self.resolveToProjected(destURL)
 	}
 
-	public func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String> {
-		#if canImport(Darwin)
+	#if canImport(Darwin) || os(Linux)
+		public func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String> {
 			let fp = ifp.into()
 			let path = self.resolveToRaw(fp).string
 
 			let bufferSize = try xattrCall(attributeName: nil, path: fp) {
-				listxattr(path, nil, 0, XATTR_NOFOLLOW)
+				#if canImport(Darwin)
+					listxattr(path, nil, 0, XATTR_NOFOLLOW)
+				#elseif os(Linux)
+					llistxattr(path, nil, 0)
+				#endif
 			}
 
 			guard bufferSize > 0 else {
@@ -218,7 +226,11 @@ public struct RealFSInterface: FilesystemInterface {
 
 			return try withUnsafeTemporaryAllocation(of: CChar.self, capacity: bufferSize) { buffer in
 				let actualSize = try xattrCall(attributeName: nil, path: fp) {
-					listxattr(path, buffer.baseAddress, bufferSize, XATTR_NOFOLLOW)
+					#if canImport(Darwin)
+						listxattr(path, buffer.baseAddress, bufferSize, XATTR_NOFOLLOW)
+					#elseif os(Linux)
+						llistxattr(path, buffer.baseAddress, bufferSize)
+					#endif
 				}
 
 				// Parse null-terminated strings from buffer
@@ -237,19 +249,19 @@ public struct RealFSInterface: FilesystemInterface {
 
 				return names
 			}
-		#else
-			throw XAttrNotSupported(path: ifp.into())
-		#endif
-	}
+		}
 
-	public func extendedAttribute(named name: String, at ifp: some IntoFilePath) throws -> Data? {
-		#if canImport(Darwin)
+		public func extendedAttribute(named name: String, at ifp: some IntoFilePath) throws -> Data? {
 			let fp = ifp.into()
 			let path = self.resolveToRaw(fp).string
 
 			do {
 				let bufferSize = try xattrCall(attributeName: name, path: fp) {
-					getxattr(path, name, nil, 0, 0, XATTR_NOFOLLOW)
+					#if canImport(Darwin)
+						getxattr(path, name, nil, 0, 0, XATTR_NOFOLLOW)
+					#elseif os(Linux)
+						lgetxattr(path, name, nil, 0)
+					#endif
 				}
 
 				guard bufferSize > 0 else {
@@ -258,7 +270,11 @@ public struct RealFSInterface: FilesystemInterface {
 
 				return try withUnsafeTemporaryAllocation(of: UInt8.self, capacity: bufferSize) { buffer in
 					let actualSize = try xattrCall(attributeName: name, path: fp) {
-						getxattr(path, name, buffer.baseAddress, bufferSize, 0, XATTR_NOFOLLOW)
+						#if canImport(Darwin)
+							getxattr(path, name, buffer.baseAddress, bufferSize, 0, XATTR_NOFOLLOW)
+						#elseif os(Linux)
+							lgetxattr(path, name, buffer.baseAddress, bufferSize)
+						#endif
 					}
 
 					return Data(bytes: buffer.baseAddress!, count: actualSize)
@@ -266,43 +282,41 @@ public struct RealFSInterface: FilesystemInterface {
 			} catch is XAttrNotFound {
 				return nil
 			}
-		#else
-			throw XAttrNotSupported(path: ifp.into())
-		#endif
-	}
+		}
 
-	public func setExtendedAttribute(named name: String, to value: Data, at ifp: some IntoFilePath) throws {
-		#if canImport(Darwin)
+		public func setExtendedAttribute(named name: String, to value: Data, at ifp: some IntoFilePath) throws {
 			let fp = ifp.into()
 			let path = self.resolveToRaw(fp).string
 
 			try value.withUnsafeBytes { bufferPointer in
 				_ = try xattrCall(attributeName: name, path: fp) {
-					setxattr(path, name, bufferPointer.baseAddress, value.count, 0, XATTR_NOFOLLOW)
+					#if canImport(Darwin)
+						setxattr(path, name, bufferPointer.baseAddress, value.count, 0, XATTR_NOFOLLOW)
+					#elseif os(Linux)
+						lsetxattr(path, name, bufferPointer.baseAddress, value.count, 0)
+					#endif
 				}
 			}
-		#else
-			throw XAttrNotSupported(path: ifp.into())
-		#endif
-	}
+		}
 
-	public func removeExtendedAttribute(named name: String, at ifp: some IntoFilePath) throws {
-		#if canImport(Darwin)
+		public func removeExtendedAttribute(named name: String, at ifp: some IntoFilePath) throws {
 			let fp = ifp.into()
 			let path = self.resolveToRaw(fp).string
 
 			do {
 				_ = try xattrCall(attributeName: name, path: fp) {
-					removexattr(path, name, XATTR_NOFOLLOW)
+					#if canImport(Darwin)
+						removexattr(path, name, XATTR_NOFOLLOW)
+					#elseif os(Linux)
+						lremovexattr(path, name)
+					#endif
 				}
 			} catch is XAttrNotFound {
 				// Silently succeed if attribute doesn't exist
 				return
 			}
-		#else
-			throw XAttrNotSupported(path: ifp.into())
-		#endif
-	}
+		}
+	#endif
 }
 
 public extension RealFSInterface {
@@ -357,7 +371,12 @@ private func realpath(_ path: String) throws -> String {
 	return resolvedPathString
 }
 
-#if canImport(Darwin)
+#if canImport(Darwin) || os(Linux)
+	#if os(Linux)
+		// Linux VFS limit for extended attribute names (see xattr(7) man page)
+		private let XATTR_MAXNAMELEN = 255
+	#endif
+
 	@discardableResult
 	private func xattrCall<T: BinaryInteger>(attributeName: String?,
 											 path: FilePath,
@@ -371,7 +390,15 @@ private func realpath(_ path: String) throws -> String {
 	}
 
 	private func makeXattrError(errno: Int32, attributeName: String?, path: FilePath) -> any Error {
-		if errno == ENOATTR {
+		#if canImport(Darwin)
+			let notFoundErrno = ENOATTR
+			let notSupportedErrno = ENOTSUP
+		#elseif os(Linux)
+			let notFoundErrno = ENODATA
+			let notSupportedErrno = EOPNOTSUPP
+		#endif
+
+		if errno == notFoundErrno {
 			return XAttrNotFound()
 		}
 
@@ -382,13 +409,22 @@ private func realpath(_ path: String) throws -> String {
 		}
 
 		switch errno {
-			case ENOTSUP:
+			case notSupportedErrno:
 				return XAttrNotSupported(path: path)
 			case ENAMETOOLONG:
 				return XAttrNameTooLong(attributeName: requiredAttributeName, path: path)
 			case E2BIG:
 				return XAttrValueTooLarge(attributeName: requiredAttributeName, path: path)
 			case ERANGE:
+				#if os(Linux)
+					// On Linux, ERANGE can mean either:
+					// 1. Attribute name too long (>255 bytes)
+					// 2. Buffer provided for reading is too small for the attribute value
+					// Check name length to determine which case applies
+					if let name = attributeName, name.utf8.count > XATTR_MAXNAMELEN {
+						return XAttrNameTooLong(attributeName: requiredAttributeName, path: path)
+					}
+				#endif
 				return XAttrBufferTooSmall(attributeName: requiredAttributeName, path: path)
 			case ENOSPC:
 				return XAttrNoSpace(attributeName: requiredAttributeName, path: path)

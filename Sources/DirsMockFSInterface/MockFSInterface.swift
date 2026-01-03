@@ -475,42 +475,44 @@ public final class MockFSInterface: FilesystemInterface {
 		}
 	}
 
-	public func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String> {
-		try self.pathsToNodes.read { ptn in
-			let (node, _) = try Self.existingParentResolvedNode(at: ifp, in: ptn)
-			return Set(node.xattrs.keys)
-		}
-	}
-
-	public func extendedAttribute(named name: String, at ifp: some IntoFilePath) throws -> Data? {
-		try self.pathsToNodes.read { ptn in
-			let (node, _) = try Self.existingParentResolvedNode(at: ifp, in: ptn)
-			return node.xattrs[name]
-		}
-	}
-
-	public func setExtendedAttribute(named name: String, to value: Data, at ifp: some IntoFilePath) throws {
-		let fp = ifp.into()
-
-		if name.utf8.count > self.maxExtendedAttributeNameLength {
-			throw XAttrNameTooLong(attributeName: name, path: fp)
+	#if canImport(Darwin) || os(Linux)
+		public func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String> {
+			try self.pathsToNodes.read { ptn in
+				let (node, _) = try Self.existingParentResolvedNode(at: ifp, in: ptn)
+				return Set(node.xattrs.keys)
+			}
 		}
 
-		try self.pathsToNodes.mutate { ptn in
-			var (node, resolvedFP) = try Self.existingParentResolvedNode(at: fp, in: ptn)
-			node.xattrs[name] = value
-			ptn[resolvedFP] = node
+		public func extendedAttribute(named name: String, at ifp: some IntoFilePath) throws -> Data? {
+			try self.pathsToNodes.read { ptn in
+				let (node, _) = try Self.existingParentResolvedNode(at: ifp, in: ptn)
+				return node.xattrs[name]
+			}
 		}
-	}
 
-	public func removeExtendedAttribute(named name: String, at ifp: some IntoFilePath) throws {
-		let fp = ifp.into()
-		try self.pathsToNodes.mutate { ptn in
-			var (node, resolvedFP) = try Self.existingParentResolvedNode(at: fp, in: ptn)
-			node.xattrs.removeValue(forKey: name)
-			ptn[resolvedFP] = node
+		public func setExtendedAttribute(named name: String, to value: Data, at ifp: some IntoFilePath) throws {
+			let fp = ifp.into()
+
+			if name.utf8.count > self.maxExtendedAttributeNameLength {
+				throw XAttrNameTooLong(attributeName: name, path: fp)
+			}
+
+			try self.pathsToNodes.mutate { ptn in
+				var (node, resolvedFP) = try Self.existingParentResolvedNode(at: fp, in: ptn)
+				node.xattrs[name] = value
+				ptn[resolvedFP] = node
+			}
 		}
-	}
+
+		public func removeExtendedAttribute(named name: String, at ifp: some IntoFilePath) throws {
+			let fp = ifp.into()
+			try self.pathsToNodes.mutate { ptn in
+				var (node, resolvedFP) = try Self.existingParentResolvedNode(at: fp, in: ptn)
+				node.xattrs.removeValue(forKey: name)
+				ptn[resolvedFP] = node
+			}
+		}
+	#endif
 }
 
 @available(*, deprecated, renamed: "MockFSInterface")

@@ -51,10 +51,12 @@ public protocol FilesystemInterface: Equatable, Sendable {
 	@discardableResult
 	func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws -> FilePath
 
-	func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String>
-	func extendedAttribute(named name: String, at ifp: some IntoFilePath) throws -> Data?
-	func setExtendedAttribute(named name: String, to value: Data, at ifp: some IntoFilePath) throws
-	func removeExtendedAttribute(named name: String, at ifp: some IntoFilePath) throws
+	#if canImport(Darwin) || os(Linux)
+		func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String>
+		func extendedAttribute(named name: String, at ifp: some IntoFilePath) throws -> Data?
+		func setExtendedAttribute(named name: String, to value: Data, at ifp: some IntoFilePath) throws
+		func removeExtendedAttribute(named name: String, at ifp: some IntoFilePath) throws
+	#endif
 }
 
 public extension FilesystemInterface {
