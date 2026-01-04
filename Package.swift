@@ -27,6 +27,9 @@ let package = Package(name: "Dirs",
 								  dependencies: [
 								  	.product(name: "Algorithms", package: "swift-algorithms"),
 								  	.product(name: "SystemPackage", package: "swift-system"),
+								  ],
+								  swiftSettings: [
+								  	.enableUpcomingFeature("ExistentialAny"),
 								  ]),
 					  	.target(name: "DirsMockFSInterface",
 								  dependencies: ["Dirs", "Locked"]),
