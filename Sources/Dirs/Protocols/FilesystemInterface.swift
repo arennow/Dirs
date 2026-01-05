@@ -84,6 +84,20 @@ public extension FilesystemInterface {
 		try File(fs: self, path: ifp.into())
 	}
 
+	func symlink(at ifp: some IntoFilePath) throws -> Symlink {
+		try Symlink(fs: self, path: ifp.into())
+	}
+
+	func node(at ifp: some IntoFilePath) throws -> any Node {
+		let fp = ifp.into()
+		return switch self.nodeType(at: fp) {
+			case .dir: try Dir(fs: self, path: fp)
+			case .file: try File(fs: self, path: fp)
+			case .symlink: try Symlink(fs: self, path: fp)
+			case .none: throw NoSuchNode(path: fp)
+		}
+	}
+
 	@discardableResult
 	func createFileAndIntermediaryDirs(at ifp: some IntoFilePath) throws -> File {
 		guard let (path, leaf) = ifp.into().pathAndLeaf else {
