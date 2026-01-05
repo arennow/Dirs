@@ -137,6 +137,22 @@ public struct RealFSInterface: FilesystemInterface {
 		return try Symlink(fs: self, path: self.resolveToProjected(linkIFP))
 	}
 
+	#if canImport(Darwin)
+		public func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> File {
+			let linkURL: URL = self.resolveToRaw(linkIFP)
+			let destURL: URL = self.resolveToRaw(destIFP)
+			let bookmarkData = try destURL.bookmarkData(options: .suitableForBookmarkFile)
+			try URL.writeBookmarkData(bookmarkData, to: linkURL)
+			return try File(fs: self, path: self.resolveToProjected(linkIFP))
+		}
+
+		public func destinationOfFinderAlias(at ifp: some IntoFilePath) throws -> FilePath {
+			let linkURL: URL = self.resolveToRaw(ifp)
+			let resolvedURL = try URL(resolvingAliasFileAt: linkURL, options: [.withoutUI])
+			return self.resolveToProjected(resolvedURL)
+		}
+	#endif
+
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
 		let fd = try FileDescriptor.open(self.resolveToRaw(ifp), .writeOnly, retryOnInterrupt: true)
 		defer { try? fd.close() }

@@ -51,6 +51,14 @@ public protocol FilesystemInterface: Equatable, Sendable {
 	@discardableResult
 	func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws -> FilePath
 
+	// Finder aliases are a macOS/Darwin-only system feature;
+	// expose these APIs only when Darwin/Foundation is available
+	#if canImport(Darwin)
+		@discardableResult
+		func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> File
+		func destinationOfFinderAlias(at ifp: some IntoFilePath) throws -> FilePath
+	#endif
+
 	#if canImport(Darwin) || os(Linux)
 		func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String>
 		func extendedAttribute(named name: String, at ifp: some IntoFilePath) throws -> Data?

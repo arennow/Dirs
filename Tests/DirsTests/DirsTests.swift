@@ -1372,6 +1372,21 @@ extension DirsTests {
 	}
 }
 
+// MARK: - Finder Aliases
+
+#if canImport(Darwin)
+	extension DirsTests {
+		@Test(arguments: FSKind.allCases)
+		func finderAliasRoundTrip(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/target")
+			try fs.createFinderAlias(at: "/alias", to: "/target")
+			let dest = try fs.destinationOfFinderAlias(at: "/alias")
+			#expect(dest == "/target")
+		}
+	}
+#endif
+
 // MARK: - Extended Attributes
 
 extension DirsTests {
