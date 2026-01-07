@@ -7,7 +7,7 @@
 
 @preconcurrency import SystemPackage
 
-public struct Symlink: Node {
+public struct Symlink: ResolvableNode {
 	public let fs: any FilesystemInterface
 	public private(set) var path: FilePath
 

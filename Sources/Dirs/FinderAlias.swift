@@ -8,7 +8,7 @@
 #if canImport(Darwin)
 	import SystemPackage
 
-	public struct FinderAlias: Node {
+	public struct FinderAlias: ResolvableNode {
 		public let fs: any FilesystemInterface
 		public private(set) var path: FilePath
 
