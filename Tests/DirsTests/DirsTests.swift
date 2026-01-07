@@ -1382,6 +1382,50 @@ extension DirsTests {
 		#expect(destViaReal == "/target")
 		#expect(destViaSymlink == "/target")
 	}
+
+	// Reading and writing symlinks through the FS interface is an unusual thing to do,
+	// but the expected semantics are that it operates on the target of the symlink.
+	// This is in contrast to FinderAlias, which is mostly a regular file, and thus
+	// reading/writing operates on the alias data itself
+
+	@Test(arguments: FSKind.allCases)
+	func contentsOfSymlink(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let file = try fs.createFile(at: "/target")
+		try file.replaceContents("target content")
+		try fs.createSymlink(at: "/symlink", to: "/target")
+
+		let symlinkContents = try fs.contentsOf(file: "/symlink")
+
+		// Reading through a symlink should transparently return the target's contents
+		let asText = String(data: symlinkContents, encoding: .utf8)
+		#expect(asText == "target content", "Symlink read should return target content")
+
+		// Verify the symlink itself is still intact
+		#expect(fs.nodeType(at: "/symlink") == .symlink)
+		let destination = try fs.destinationOf(symlink: "/symlink")
+		#expect(destination == "/target")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func writeSymlink(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let file = try fs.createFile(at: "/target")
+		try file.replaceContents("initial content")
+		try fs.createSymlink(at: "/symlink", to: "/target")
+
+		// Writing to symlink path should write through to the target
+		try fs.replaceContentsOfFile(at: "/symlink", to: "modified content")
+
+		// The target file should have the new content
+		let targetContents = try fs.contentsOf(file: "/target")
+		#expect(String(data: targetContents, encoding: .utf8) == "modified content")
+
+		// The symlink should still be a symlink pointing to the same target
+		#expect(fs.nodeType(at: "/symlink") == .symlink)
+		let destination = try fs.destinationOf(symlink: "/symlink")
+		#expect(destination == "/target")
+	}
 }
 
 // MARK: - Finder Aliases
@@ -1587,6 +1631,10 @@ extension DirsTests {
 			// Both mock and real FS follow alias chains to the final destination. This is weird, but less weird than what's happening in `resolveFinderAliasToSymlink`
 			#expect(resolved.path == "/target")
 		}
+
+		// Reading and writing Finder Aliases through the FS interface is an unusual thing to do,
+		// but the expected semantics are that it operates on the alias file itself.
+		// This is in contrast to symlinks, which transparently redirect to their target
 
 		@Test(arguments: FSKind.allCases)
 		func contentsOfFinderAlias(fsKind: FSKind) throws {
