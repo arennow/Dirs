@@ -712,8 +712,9 @@ extension DirsTests {
 	func copyFileToNothingDuplicates(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.rootDir.createFile(at: "a").replaceContents("a content")
-		try fs.copyNode(from: "/a", to: "/b")
+		let file = try fs.rootDir.createFile(at: "a")
+		try file.replaceContents("a content")
+		try file.copy(to: "/b")
 		try #expect(fs.file(at: "/b").stringContents() == "a content")
 	}
 
@@ -721,10 +722,11 @@ extension DirsTests {
 	func copyFileToFileReplaces(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.rootDir.createFile(at: "c").replaceContents("c content")
+		let fileC = try fs.rootDir.createFile(at: "c")
+		try fileC.replaceContents("c content")
 		try fs.rootDir.createFile(at: "d")
 
-		try fs.copyNode(from: "/c", to: "/d")
+		try fileC.copy(to: "/d")
 
 		try #expect(fs.file(at: "/c").stringContents() == "c content")
 		try #expect(fs.file(at: "/d").stringContents() == "c content")
@@ -734,10 +736,11 @@ extension DirsTests {
 	func copyFileToDirRehomes(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.rootDir.createFile(at: "c").replaceContents("c content")
+		let fileC = try fs.rootDir.createFile(at: "c")
+		try fileC.replaceContents("c content")
 		try fs.rootDir.createDir(at: "d")
 
-		try fs.copyNode(from: "/c", to: "/d")
+		try fileC.copy(to: "/d")
 
 		try #expect(fs.file(at: "/c").stringContents() == "c content")
 		try #expect(fs.file(at: "/d/c").stringContents() == "c content")
@@ -747,9 +750,10 @@ extension DirsTests {
 	func copyDirToNothingDuplicates(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.rootDir.createDir(at: "d").createFile(at: "a").replaceContents("a content")
+		let dir = try fs.rootDir.createDir(at: "d")
+		try dir.createFile(at: "a").replaceContents("a content")
 
-		try fs.copyNode(from: "/d", to: "/e")
+		try dir.copy(to: "/e")
 
 		try #expect(fs.file(at: "/d/a").stringContents() == "a content")
 		try #expect(fs.file(at: "/e/a").stringContents() == "a content")
@@ -760,9 +764,9 @@ extension DirsTests {
 		let fs = self.fs(for: fsKind)
 
 		try fs.rootDir.createFile(at: "a")
-		try fs.rootDir.createDir(at: "d")
+		let dir = try fs.rootDir.createDir(at: "d")
 
-		try fs.copyNode(from: "/d", to: "/a")
+		try dir.copy(to: "/a")
 
 		try #expect(fs.rootDir.childDir(named: "d") != nil)
 		try #expect(fs.rootDir.childDir(named: "a") != nil)
@@ -772,13 +776,13 @@ extension DirsTests {
 	func copyDirToDirRehomes(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.createDir(at: "/d")
+		let dir = try fs.createDir(at: "/d")
 		try fs.createFile(at: "/d/a").replaceContents("a")
 		try fs.createDir(at: "/d/b")
 		try fs.createFile(at: "/d/b/c").replaceContents("c")
 		try fs.createDir(at: "/e")
 
-		try fs.copyNode(from: "/d", to: "/e")
+		try dir.copy(to: "/e")
 
 		try #expect(fs.file(at: "/d/a").stringContents() == "a")
 		try #expect(fs.file(at: "/d/b/c").stringContents() == "c")
@@ -1348,7 +1352,8 @@ extension DirsTests {
 		try Self.prepareForSymlinkTests(fs)
 
 		try fs.replaceContentsOfFile(at: "/d/d1", to: "content")
-		#expect(throws: Never.self) { try fs.copyNode(from: "/sd/d1", to: "/sd/d1_copy") }
+		let file = try fs.file(at: "/sd/d1")
+		#expect(throws: Never.self) { try file.copy(to: "/sd/d1_copy") }
 		#expect(fs.nodeType(at: "/d/d1_copy") == .file)
 		#expect(fs.nodeType(at: "/sd/d1_copy") == .file)
 		try #expect(fs.contentsOf(file: "/d/d1_copy") == Data("content".utf8))
@@ -1407,7 +1412,7 @@ extension DirsTests {
 			let fs = self.fs(for: fsKind)
 			try fs.createFile(at: "/target")
 			let original = try fs.createFinderAlias(at: "/alias", to: "/target")
-			try fs.copyNode(from: "/alias", to: "/copied_alias")
+			try original.copy(to: "/copied_alias")
 			let copiedAlias = try FinderAlias(fs: fs, path: "/copied_alias")
 
 			let resolvedOriginal = try original.resolve()
@@ -1422,9 +1427,9 @@ extension DirsTests {
 			try fs.createFile(at: "/target")
 			try fs.createFile(at: "/existing_file")
 			try fs.replaceContentsOfFile(at: "/existing_file", to: "existing content")
-			try fs.createFinderAlias(at: "/alias", to: "/target")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
 
-			try fs.copyNode(from: "/alias", to: "/existing_file")
+			try alias.copy(to: "/existing_file")
 
 			#expect(fs.nodeType(at: "/existing_file") == .finderAlias)
 			let copiedAlias = try FinderAlias(fs: fs, path: "/existing_file")
@@ -1436,10 +1441,10 @@ extension DirsTests {
 		func copyFinderAliasToDirDuplicates(fsKind: FSKind) throws {
 			let fs = self.fs(for: fsKind)
 			try fs.createFile(at: "/target")
-			try fs.createFinderAlias(at: "/alias", to: "/target")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
 			try fs.createDir(at: "/dest_dir")
 
-			try fs.copyNode(from: "/alias", to: "/dest_dir")
+			try alias.copy(to: "/dest_dir")
 
 			#expect(fs.nodeType(at: "/dest_dir/alias") == .finderAlias)
 			let copiedAlias = try FinderAlias(fs: fs, path: "/dest_dir/alias")
@@ -1453,9 +1458,9 @@ extension DirsTests {
 			try fs.createFile(at: "/alias_target")
 			try fs.createFile(at: "/symlink_target")
 			try fs.createSymlink(at: "/symlink", to: "/symlink_target")
-			try fs.createFinderAlias(at: "/alias", to: "/alias_target")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/alias_target")
 
-			try fs.copyNode(from: "/alias", to: "/symlink")
+			try alias.copy(to: "/symlink")
 
 			#expect(fs.nodeType(at: "/symlink") == .finderAlias)
 			let copiedAlias = try FinderAlias(fs: fs, path: "/symlink")
@@ -1468,10 +1473,10 @@ extension DirsTests {
 			let fs = self.fs(for: fsKind)
 			try fs.createFile(at: "/target1")
 			try fs.createFile(at: "/target2")
-			try fs.createFinderAlias(at: "/alias1", to: "/target1")
+			let alias1 = try fs.createFinderAlias(at: "/alias1", to: "/target1")
 			try fs.createFinderAlias(at: "/alias2", to: "/target2")
 
-			try fs.copyNode(from: "/alias1", to: "/alias2")
+			try alias1.copy(to: "/alias2")
 
 			#expect(fs.nodeType(at: "/alias2") == .finderAlias)
 			let copiedAlias = try FinderAlias(fs: fs, path: "/alias2")
@@ -1485,9 +1490,9 @@ extension DirsTests {
 			try fs.createFile(at: "/target")
 			try fs.createDir(at: "/dest_dir")
 			try fs.createSymlink(at: "/symlink_to_dir", to: "/dest_dir")
-			try fs.createFinderAlias(at: "/alias", to: "/target")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
 
-			try fs.copyNode(from: "/alias", to: "/symlink_to_dir")
+			try alias.copy(to: "/symlink_to_dir")
 
 			#expect(fs.nodeType(at: "/dest_dir/alias") == .finderAlias)
 			let copiedAlias = try FinderAlias(fs: fs, path: "/dest_dir/alias")

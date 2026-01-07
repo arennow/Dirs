@@ -28,6 +28,10 @@ public extension Node {
 		}
 	}
 
+	func copy(to destination: some IntoFilePath) throws {
+		try self.fs.copyNode(from: self, to: destination)
+	}
+
 	func delete() throws {
 		try self.fs.deleteNode(at: self)
 	}
