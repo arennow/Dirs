@@ -25,23 +25,36 @@ public struct RealFSInterface: FilesystemInterface {
 		self.init(chroot: FilePath(resolvedPathString))
 	}
 
-	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
-		let url: URL = self.resolveToRaw(ifp)
-
-		#if canImport(Darwin)
+	#if canImport(Darwin)
+		public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
 			do {
-				let rv = try url.resourceValues(forKeys: [.fileResourceTypeKey, .isAliasFileKey])
-				switch rv.fileResourceType {
-					case .some(.directory): return .dir
-					case .some(.symbolicLink): return .symlink
-					default:
-						if rv.isAliasFile == true { return .finderAlias }
-						return .file
-				}
-			} catch {
+				let fp: FilePath = self.resolveToRaw(ifp)
+				// First, try the fast `getattrlist` method
+				return try Self.classifyPathKind_getattrlist(fp)
+			} catch POSIXError.ENOTDIR, POSIXError.ENOENT {
+				// These mean the path doesn't exist
 				return nil
+			} catch {
+				// For any other kind of error, including `NoFinderInfoAvailable`,
+				// fall back to slower Foundation mechanisms
+				do {
+					let url: URL = self.resolveToRaw(ifp)
+					let rv = try url.resourceValues(forKeys: [.fileResourceTypeKey, .isAliasFileKey])
+					switch rv.fileResourceType {
+						case .some(.directory): return .dir
+						case .some(.symbolicLink): return .symlink
+						default:
+							if rv.isAliasFile == true { return .finderAlias }
+							return .file
+					}
+				} catch {
+					return nil
+				}
 			}
-		#else
+		}
+	#else
+		public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
+			let url: URL = self.resolveToRaw(ifp)
 			let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
 			switch attrs?[.type] as? FileAttributeType {
 				case .typeDirectory: return .dir
@@ -49,8 +62,8 @@ public struct RealFSInterface: FilesystemInterface {
 				case .none: return nil
 				default: return .file
 			}
-		#endif
-	}
+		}
+	#endif
 
 	public func nodeTypeFollowingSymlinks(at ifp: some IntoFilePath) -> NodeType? {
 		let fp = self.resolveToRaw(ifp)
