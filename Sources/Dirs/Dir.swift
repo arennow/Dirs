@@ -17,11 +17,7 @@ public struct Dir: Node {
 					throw NoSuchNode(path: fp)
 				}
 			case .dir: break
-			case .file: throw WrongNodeType(path: fp, actualType: .file)
-			case .symlink:
-				let destinationPath = try fs.destinationOf(symlink: fp)
-				self = try Dir(fs: fs, path: destinationPath)
-				return
+			case .some(let x): throw WrongNodeType(path: fp, actualType: x)
 		}
 
 		self.fs = fs

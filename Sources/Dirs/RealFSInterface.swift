@@ -22,18 +22,34 @@ public struct RealFSInterface: FilesystemInterface {
 												withIntermediateDirectories: true)
 		let resolvedPathString = try realpath(rawPathString)
 
-		self.chroot = FilePath(resolvedPathString)
+		self.init(chroot: FilePath(resolvedPathString))
 	}
 
 	public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
-		let attrs = try? FileManager.default.attributesOfItem(atPath: self.resolveToRaw(ifp).string)
+		let url: URL = self.resolveToRaw(ifp)
 
-		switch attrs?[.type] as? FileAttributeType {
-			case .typeDirectory: return .dir
-			case .typeSymbolicLink: return .symlink
-			case .none: return nil
-			default: return .file
-		}
+		#if canImport(Darwin)
+			do {
+				let rv = try url.resourceValues(forKeys: [.fileResourceTypeKey, .isAliasFileKey])
+				switch rv.fileResourceType {
+					case .some(.directory): return .dir
+					case .some(.symbolicLink): return .symlink
+					default:
+						if rv.isAliasFile == true { return .finderAlias }
+						return .file
+				}
+			} catch {
+				return nil
+			}
+		#else
+			let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+			switch attrs?[.type] as? FileAttributeType {
+				case .typeDirectory: return .dir
+				case .typeSymbolicLink: return .symlink
+				case .none: return nil
+				default: return .file
+			}
+		#endif
 	}
 
 	public func nodeTypeFollowingSymlinks(at ifp: some IntoFilePath) -> NodeType? {
@@ -138,12 +154,12 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	#if canImport(Darwin)
-		public func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> File {
+		public func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> FinderAlias {
 			let linkURL: URL = self.resolveToRaw(linkIFP)
 			let destURL: URL = self.resolveToRaw(destIFP)
 			let bookmarkData = try destURL.bookmarkData(options: .suitableForBookmarkFile)
 			try URL.writeBookmarkData(bookmarkData, to: linkURL)
-			return try File(fs: self, path: self.resolveToProjected(linkIFP))
+			return try FinderAlias(fs: self, path: self.resolveToProjected(linkIFP))
 		}
 
 		public func destinationOfFinderAlias(at ifp: some IntoFilePath) throws -> FilePath {

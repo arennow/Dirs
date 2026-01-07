@@ -42,6 +42,9 @@ public struct Symlink: Node {
 			case .dir: try Dir(fs: self.fs, path: self.path)
 			case .file: try File(fs: self.fs, path: self.path)
 			case .symlink: try Symlink(fs: self.fs, path: self.path)
+			#if canImport(Darwin)
+				case .finderAlias: try FinderAlias(fs: self.fs, path: destPath)
+			#endif
 			case .none: throw NoSuchNode(path: try self.fs.destinationOf(symlink: self.path))
 		}
 	}

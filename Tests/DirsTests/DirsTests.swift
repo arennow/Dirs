@@ -709,7 +709,7 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func copyFileToFileDuplicates(fsKind: FSKind) throws {
+	func copyFileToNothingDuplicates(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
 		try fs.rootDir.createFile(at: "a").replaceContents("a content")
@@ -744,7 +744,7 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func copyDirToNothingRenames(fsKind: FSKind) throws {
+	func copyDirToNothingDuplicates(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
 		try fs.rootDir.createDir(at: "d").createFile(at: "a").replaceContents("a content")
@@ -1215,6 +1215,13 @@ extension DirsTests {
 		#expect(fs.nodeType(at: "/s/f") == .file)
 		#expect(fs.nodeTypeFollowingSymlinks(at: "/s/f") == .file)
 		_ = try fs.file(at: "/s/f")
+
+		#if canImport(Darwin)
+			try fs.createFile(at: "/a/target")
+			try fs.createFinderAlias(at: "/a/alias", to: "/a/target")
+			#expect(fs.nodeType(at: "/s/alias") == .finderAlias)
+			_ = try FinderAlias(fs: fs, path: "/s/alias")
+		#endif
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -1380,9 +1387,258 @@ extension DirsTests {
 		func finderAliasRoundTrip(fsKind: FSKind) throws {
 			let fs = self.fs(for: fsKind)
 			try fs.createFile(at: "/target")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
+			let resolved = try alias.resolve()
+			let resolvedFile = try fs.file(at: "/target")
+			#expect(resolved.path == resolvedFile.path)
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func finderAliasInitFromNonAliasFileFails(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/file")
+			#expect(throws: WrongNodeType.self) {
+				try FinderAlias(fs: fs, path: "/file")
+			}
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func copyFinderAliasToNothingDuplicates(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/target")
+			let original = try fs.createFinderAlias(at: "/alias", to: "/target")
+			try fs.copyNode(from: "/alias", to: "/copied_alias")
+			let copiedAlias = try FinderAlias(fs: fs, path: "/copied_alias")
+
+			let resolvedOriginal = try original.resolve()
+			let resolvedCopy = try copiedAlias.resolve()
+			#expect(resolvedOriginal.path == "/target")
+			#expect(resolvedCopy.path == "/target")
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func copyFinderAliasToFileReplaces(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/target")
+			try fs.createFile(at: "/existing_file")
+			try fs.replaceContentsOfFile(at: "/existing_file", to: "existing content")
 			try fs.createFinderAlias(at: "/alias", to: "/target")
-			let dest = try fs.destinationOfFinderAlias(at: "/alias")
-			#expect(dest == "/target")
+
+			try fs.copyNode(from: "/alias", to: "/existing_file")
+
+			#expect(fs.nodeType(at: "/existing_file") == .finderAlias)
+			let copiedAlias = try FinderAlias(fs: fs, path: "/existing_file")
+			let resolved = try copiedAlias.resolve()
+			#expect(resolved.path == "/target")
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func copyFinderAliasToDirDuplicates(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/target")
+			try fs.createFinderAlias(at: "/alias", to: "/target")
+			try fs.createDir(at: "/dest_dir")
+
+			try fs.copyNode(from: "/alias", to: "/dest_dir")
+
+			#expect(fs.nodeType(at: "/dest_dir/alias") == .finderAlias)
+			let copiedAlias = try FinderAlias(fs: fs, path: "/dest_dir/alias")
+			let resolved = try copiedAlias.resolve()
+			#expect(resolved.path == "/target")
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func copyFinderAliasToSymlinkReplaces(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/alias_target")
+			try fs.createFile(at: "/symlink_target")
+			try fs.createSymlink(at: "/symlink", to: "/symlink_target")
+			try fs.createFinderAlias(at: "/alias", to: "/alias_target")
+
+			try fs.copyNode(from: "/alias", to: "/symlink")
+
+			#expect(fs.nodeType(at: "/symlink") == .finderAlias)
+			let copiedAlias = try FinderAlias(fs: fs, path: "/symlink")
+			let resolved = try copiedAlias.resolve()
+			#expect(resolved.path == "/alias_target")
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func copyFinderAliasToAliasReplaces(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/target1")
+			try fs.createFile(at: "/target2")
+			try fs.createFinderAlias(at: "/alias1", to: "/target1")
+			try fs.createFinderAlias(at: "/alias2", to: "/target2")
+
+			try fs.copyNode(from: "/alias1", to: "/alias2")
+
+			#expect(fs.nodeType(at: "/alias2") == .finderAlias)
+			let copiedAlias = try FinderAlias(fs: fs, path: "/alias2")
+			let resolved = try copiedAlias.resolve()
+			#expect(resolved.path == "/target1")
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func copyFinderAliasToSymlinkToDirDuplicates(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/target")
+			try fs.createDir(at: "/dest_dir")
+			try fs.createSymlink(at: "/symlink_to_dir", to: "/dest_dir")
+			try fs.createFinderAlias(at: "/alias", to: "/target")
+
+			try fs.copyNode(from: "/alias", to: "/symlink_to_dir")
+
+			#expect(fs.nodeType(at: "/dest_dir/alias") == .finderAlias)
+			let copiedAlias = try FinderAlias(fs: fs, path: "/dest_dir/alias")
+			let resolved = try copiedAlias.resolve()
+			#expect(resolved.path == "/target")
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func moveFinderAliasRenames(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/target")
+			var alias = try fs.createFinderAlias(at: "/alias", to: "/target")
+			try alias.move(to: "/moved_alias")
+			#expect(alias.path == "/moved_alias")
+			let resolved = try alias.resolve()
+			#expect(resolved.path == "/target")
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func moveFinderAliasToDirRehomes(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/target")
+			var alias = try fs.createFinderAlias(at: "/alias", to: "/target")
+			let dir = try fs.createDir(at: "/dir")
+			try alias.move(to: dir)
+			#expect(alias.path == "/dir/alias")
+			let resolved = try alias.resolve()
+			#expect(resolved.path == "/target")
+			#expect(fs.nodeType(at: "/alias") == nil)
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func renameFinderAlias(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/target")
+			var alias = try fs.createFinderAlias(at: "/alias", to: "/target")
+			try alias.rename(to: "renamed_alias")
+			#expect(alias.path == "/renamed_alias")
+			let resolved = try alias.resolve()
+			#expect(resolved.path == "/target")
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func extendedAttributesOnFinderAlias(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			let target = try fs.createFile(at: "/target")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
+			try alias.setExtendedAttribute(named: "user.test", to: "value")
+			let retrievedValue = try alias.extendedAttributeString(named: "user.test")
+			#expect(retrievedValue == "value")
+			try #expect(target.extendedAttributeNames().isEmpty)
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func deleteFinderAlias(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/target")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
+			try alias.delete()
+			#expect(fs.nodeType(at: "/alias") == nil)
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func resolveFinderAliasToDir(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createDir(at: "/target_dir")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/target_dir")
+			let resolved = try alias.resolve()
+			let targetDir = try fs.dir(at: "/target_dir")
+			#expect(resolved.path == targetDir.path)
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func resolveFinderAliasToSymlink(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/real_file")
+			try fs.createSymlink(at: "/symlink", to: "/real_file")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/symlink")
+			let resolved = try alias.resolve()
+
+			// Both mock and real FS follow aliases through symlinks to the final destination. This seems super weird to me, but it's what the official Darwin API does
+			#expect(resolved.path == "/real_file")
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func resolveFinderAliasToAnotherFinderAlias(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/target")
+			try fs.createFinderAlias(at: "/alias1", to: "/target")
+			let alias2 = try fs.createFinderAlias(at: "/alias2", to: "/alias1")
+			let resolved = try alias2.resolve()
+			// Both mock and real FS follow alias chains to the final destination. This is weird, but less weird than what's happening in `resolveFinderAliasToSymlink`
+			#expect(resolved.path == "/target")
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func contentsOfFinderAlias(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			let file = try fs.createFile(at: "/target")
+			try file.replaceContents("target content")
+			try fs.createFinderAlias(at: "/alias", to: "/target")
+
+			let aliasContents = try fs.contentsOf(file: "/alias")
+
+			// The contents should be binary bookmark data, not the target's text
+			let asText = String(data: aliasContents, encoding: .utf8)
+			#expect(asText != "target content", "Alias contents should be bookmark data, not target content")
+
+			// Proving that the alias isn't broken; you just have to use it correctly
+			let alias = try FinderAlias(fs: fs, path: "/alias")
+			let resolved = try alias.resolve()
+			#expect(resolved as? File == file)
+			let targetContents = try file.stringContents()
+			#expect(targetContents == "target content")
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func writeFinderAlias(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/target")
+			try fs.replaceContentsOfFile(at: "/target", to: "initial content")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
+
+			// Writing to alias path overwrites the alias file itself (breaks the alias)
+			try fs.replaceContentsOfFile(at: "/alias", to: "this breaks the alias")
+
+			// From the persepctive of this library, the contents of a broken alias are undefined
+			// So we can't assert on the contents, but it also doesn't matter
+
+			// The target file is unchanged
+			let targetContents = try fs.contentsOf(file: "/target")
+			#expect(String(data: targetContents, encoding: .utf8) == "initial content")
+
+			// Still "typed" as a Finder Alias
+			#expect(fs.nodeType(at: "/alias") == .finderAlias)
+			#expect(throws: Error.self) {
+				try alias.resolve()
+			}
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func finderAliasPointingToNonexistentTargetResolutionFails(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createFile(at: "/target")
+			try fs.createFinderAlias(at: "/alias", to: "/target")
+			try fs.deleteNode(at: "/target")
+
+			let alias = try FinderAlias(fs: fs, path: "/alias")
+			#expect(throws: Error.self) {
+				try alias.resolve()
+			}
 		}
 	}
 #endif

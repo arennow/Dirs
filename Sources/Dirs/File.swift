@@ -11,11 +11,7 @@ public struct File: Node {
 		switch fs.nodeTypeFollowingSymlinks(at: fp) {
 			case .none: throw NoSuchNode(path: fp)
 			case .file: break
-			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
-			case .symlink:
-				let destinationPath = try fs.destinationOf(symlink: fp)
-				self = try File(fs: fs, path: destinationPath)
-				return
+			case .some(let x): throw WrongNodeType(path: fp, actualType: x)
 		}
 
 		self.fs = fs

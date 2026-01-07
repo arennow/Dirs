@@ -13,6 +13,9 @@ public struct FilePathStat: Hashable, Equatable {
 
 public enum NodeType: Sendable {
 	case dir, file, symlink
+	#if canImport(Darwin)
+		case finderAlias
+	#endif
 }
 
 public enum DirLookupKind: String, Sendable {
@@ -51,11 +54,14 @@ public protocol FilesystemInterface: Equatable, Sendable {
 	@discardableResult
 	func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws -> FilePath
 
-	// Finder aliases are a macOS/Darwin-only system feature;
+	// Finder Aliases are a macOS/Darwin-only system feature;
 	// expose these APIs only when Darwin/Foundation is available
 	#if canImport(Darwin)
 		@discardableResult
-		func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> File
+		func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> FinderAlias
+		// By observation, the macOS implementation of this ⬇️ resolves the alias fully,
+		// following chain of aliases and symlinks to the final target.
+		// So that's how `MockFSInterface` implements it as well.
 		func destinationOfFinderAlias(at ifp: some IntoFilePath) throws -> FilePath
 	#endif
 
@@ -102,6 +108,9 @@ public extension FilesystemInterface {
 			case .dir: try Dir(fs: self, path: fp)
 			case .file: try File(fs: self, path: fp)
 			case .symlink: try Symlink(fs: self, path: fp)
+			#if canImport(Darwin)
+				case .finderAlias: try FinderAlias(fs: self, path: fp)
+			#endif
 			case .none: throw NoSuchNode(path: fp)
 		}
 	}

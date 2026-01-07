@@ -16,7 +16,7 @@ public final class MockFSInterface: FilesystemInterface {
 			switch self {
 				case .dir: .dir
 				#if canImport(Darwin)
-					case .finderAlias: fallthrough
+					case .finderAlias: .finderAlias
 				#endif
 				case .file: .file
 				case .symlink: .symlink
@@ -206,8 +206,10 @@ public final class MockFSInterface: FilesystemInterface {
 			case .file(let data, _): return data
 			#if canImport(Darwin)
 				case .finderAlias:
-					assertionFailure("Attempted to read contents of Finder Alias — unsupported")
-					return Data()
+					// Real Finder Alias files contain opaque bookmark data (not readable
+					// file contents). We simulate that here by returning a placeholder
+					// value which is intentionally unmeaningful
+					return Data("<bookmark data>".utf8)
 			#endif
 			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
 			case .symlink(let destination, _): return try self.contentsOf(file: destination)
@@ -226,13 +228,9 @@ public final class MockFSInterface: FilesystemInterface {
 
 		switch acquisitionLock.resource[fp] {
 			case .none: throw NoSuchNode(path: fp)
-			#if canImport(Darwin)
-				case .finderAlias: fallthrough
-			#endif
-			case .file:
-				throw WrongNodeType(path: fp, actualType: .file)
 			case .symlink(let destination, _): return try self.contentsOf(directory: destination, using: acquisitionLock)
 			case .dir: break
+			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
 		}
 
 		let childKeys = acquisitionLock.resource.keys
@@ -302,15 +300,11 @@ public final class MockFSInterface: FilesystemInterface {
 				let resolvedDirFP = try Self.resolveParentSymlinks(of: cumulativeFP, in: ptn)
 
 				switch ptn[resolvedDirFP] {
-					#if canImport(Darwin)
-						case .finderAlias: fallthrough
-					#endif
-					case .file:
-						throw NodeAlreadyExists(path: cumulativeFP, type: .file)
 					case .dir, .symlink:
 						break // Already exists
 					case .none:
 						ptn[resolvedDirFP] = .dir()
+					case .some(let x): throw NodeAlreadyExists(path: cumulativeFP, type: x.nodeType)
 				}
 			}
 		}
@@ -355,7 +349,7 @@ public final class MockFSInterface: FilesystemInterface {
 	}
 
 	#if canImport(Darwin)
-		public func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> File {
+		public func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> FinderAlias {
 			let linkFP = linkIFP.into()
 			try self.pathsToNodes.mutate { ptn in
 				let parentFP = linkFP.removingLastComponent()
@@ -367,7 +361,7 @@ public final class MockFSInterface: FilesystemInterface {
 
 				ptn[resolvedFP] = .finderAlias(destination: destIFP.into())
 			}
-			return try File(fs: self, path: linkFP)
+			return try FinderAlias(fs: self, path: linkFP)
 		}
 
 		public func destinationOfFinderAlias(at ifp: some Dirs.IntoFilePath) throws -> FilePath {
@@ -378,7 +372,19 @@ public final class MockFSInterface: FilesystemInterface {
 			let fp = try Self.resolveParentSymlinks(of: ifp, in: acquisitionLock.resource)
 
 			switch acquisitionLock.resource[fp] {
-				case .finderAlias(let destination, _): return destination
+				case .finderAlias(var destination, _):
+					// Follow the chain like real macOS bookmark resolution does
+					// If destination is another alias, follow it
+					// If destination is a symlink, follow it
+					while true {
+						switch acquisitionLock.resource[destination] {
+							case .finderAlias(let nextDest, _), .symlink(let nextDest, _):
+								destination = nextDest
+							default:
+								// Final destination is not an alias or symlink
+								return destination
+						}
+					}
 				case .none: throw NoSuchNode(path: fp)
 				case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
 			}
@@ -399,7 +405,10 @@ public final class MockFSInterface: FilesystemInterface {
 			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
 			case .file(_, let xattrs): acquisitionLock.resource[resolvedFP] = .file(data: contentsData, xattrs: xattrs)
 			#if canImport(Darwin)
-				case .finderAlias: assertionFailure("Attempted to write contents of Finder Alias — unsupported")
+				case .finderAlias(_, let xattrs):
+					// Overwrite the alias file (breaks the alias, but it'll still be typed as a Finder Alias)
+					acquisitionLock.resource[resolvedFP] = .finderAlias(destination: "/__MOCK_FS_BROKEN_ALIAS/__MOCK_FS_BROKEN_ALIAS/",
+																		xattrs: xattrs)
 			#endif
 			case .symlink(let destination, _): try self.replaceContentsOfFile(at: destination, to: contentsData, using: acquisitionLock)
 		}
@@ -410,6 +419,9 @@ public final class MockFSInterface: FilesystemInterface {
 		_ = try self.copyNode(from: source, to: destination, using: acquisitionLock)
 	}
 
+	// This function extensively uses `default:` in `switch` statements to avoid
+	// needing lots of `#if canImport(Darwin)` blocks for the `finderAlias` case.
+	// Rest assured, Finder Aliases are just regular files (with special contents + metadata)
 	private func copyNode(from source: some IntoFilePath,
 						  to destination: some IntoFilePath,
 						  using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws -> FilePath
@@ -433,29 +445,6 @@ public final class MockFSInterface: FilesystemInterface {
 		switch srcType {
 			case .none:
 				throw NoSuchNode(path: srcFP)
-
-			case .file, .symlink:
-				let fileToCopy = acquisitionLock.resource[srcFP]
-
-				switch destType {
-					case .symlink:
-						let (destSymFP, destSymType) = try resolveDestFPSymlink()
-						switch destSymType {
-							case .dir:
-								return try self.copyNode(from: source, to: destSymFP, using: acquisitionLock)
-
-							case .file, .symlink, nil:
-								acquisitionLock.resource[destFP] = fileToCopy
-						}
-
-					case .file, .none:
-						acquisitionLock.resource[destFP] = fileToCopy
-
-					case .dir:
-						let resolvedDestFP = destFP.appending(srcFP.lastComponent!)
-						finalDestFP = resolvedDestFP
-						acquisitionLock.resource[resolvedDestFP] = fileToCopy
-				}
 
 			case .dir:
 				let nodePathsToMove = acquisitionLock.resource.keys
@@ -483,6 +472,10 @@ public final class MockFSInterface: FilesystemInterface {
 							fallthrough
 						}
 
+					#if canImport(Darwin)
+						case .finderAlias: fallthrough
+					#endif
+
 					case .file:
 						acquisitionLock.resource.removeValue(forKey: destFP)
 						recursivelyMove(destFP: destFP)
@@ -494,6 +487,29 @@ public final class MockFSInterface: FilesystemInterface {
 
 					case .none:
 						recursivelyMove(destFP: destFP)
+				}
+
+			default:
+				let fileToCopy = acquisitionLock.resource[srcFP]
+
+				switch destType {
+					case .symlink:
+						let (destSymFP, destSymType) = try resolveDestFPSymlink()
+						switch destSymType {
+							case .dir:
+								return try self.copyNode(from: source, to: destSymFP, using: acquisitionLock)
+
+							default:
+								acquisitionLock.resource[destFP] = fileToCopy
+						}
+
+					case .dir:
+						let resolvedDestFP = destFP.appending(srcFP.lastComponent!)
+						finalDestFP = resolvedDestFP
+						acquisitionLock.resource[resolvedDestFP] = fileToCopy
+
+					default:
+						acquisitionLock.resource[destFP] = fileToCopy
 				}
 		}
 
