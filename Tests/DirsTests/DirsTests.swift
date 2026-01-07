@@ -1192,6 +1192,18 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
+	func resolvedSymlinkUsesTargetPathAndName(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		_ = try fs.createFile(at: "/a")
+		let symlink = try fs.createSymlink(at: "/s", to: "/a")
+
+		let resolved = try symlink.resolve()
+		#expect(resolved.path == "/a")
+		#expect(resolved.name == "a")
+	}
+
+	@Test(arguments: FSKind.allCases)
 	func nodesInsideSymlinkDirResolveTypes(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
@@ -1630,6 +1642,18 @@ extension DirsTests {
 			let resolved = try alias2.resolve()
 			// Both mock and real FS follow alias chains to the final destination. This is weird, but less weird than what's happening in `resolveFinderAliasToSymlink`
 			#expect(resolved.path == "/target")
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func resolvedFinderAliasUsesTargetPathAndName(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+
+			try fs.createFile(at: "/target")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
+
+			let resolved = try alias.resolve()
+			#expect(resolved.path == "/target")
+			#expect(resolved.name == "target")
 		}
 
 		// Reading and writing Finder Aliases through the FS interface is an unusual thing to do,

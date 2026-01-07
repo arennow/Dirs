@@ -39,13 +39,13 @@ public struct Symlink: Node {
 	public func resolve() throws -> any Node {
 		let destPath = try self.fs.destinationOf(symlink: self.path)
 		return switch self.fs.nodeType(at: destPath) {
-			case .dir: try Dir(fs: self.fs, path: self.path)
-			case .file: try File(fs: self.fs, path: self.path)
-			case .symlink: try Symlink(fs: self.fs, path: self.path)
+			case .dir: try Dir(fs: self.fs, path: destPath)
+			case .file: try File(fs: self.fs, path: destPath)
+			case .symlink: try Symlink(fs: self.fs, path: destPath)
 			#if canImport(Darwin)
 				case .finderAlias: try FinderAlias(fs: self.fs, path: destPath)
 			#endif
-			case .none: throw NoSuchNode(path: try self.fs.destinationOf(symlink: self.path))
+			case .none: throw NoSuchNode(path: destPath)
 		}
 	}
 }
