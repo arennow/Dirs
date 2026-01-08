@@ -14,6 +14,13 @@ public struct Symlink: ResolvableNode {
 	package init(fs: any FilesystemInterface, path: some IntoFilePath) throws {
 		let fp = path.into()
 
+		// Intentionally check with `nodeType` (which resolves symlinks in
+		// parent directories but does NOT follow the final component). We
+		// want to validate that the path *itself* is a symlink and not the
+		// type of its referent. Other concrete inits (e.g. `File`/`Dir`)
+		// use `nodeTypeFollowingSymlinks` because they care about the
+		// resolved target type; `Symlink` must specifically identify the
+		// symlink node.
 		switch fs.nodeType(at: fp) {
 			case .none: throw NoSuchNode(path: fp)
 			case .symlink: break

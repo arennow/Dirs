@@ -15,6 +15,13 @@
 		public init(fs: any FilesystemInterface, path: some IntoFilePath) throws {
 			let fp = path.into()
 
+			// Finder aliases are effectively regular files carrying extra
+			// metadata (they are not the same kind of filesystem node as a
+			// symlink). For the purpose of validating the node type at the
+			// given path we want the resolved target type (the same rationale
+			// used for `File`/`Dir`), so we use
+			// `nodeTypeFollowingSymlinks(at:)` here rather than the symlink-
+			// preserving `nodeType(at:)`.
 			switch fs.nodeTypeFollowingSymlinks(at: fp) {
 				case .none: throw NoSuchNode(path: fp)
 				case .finderAlias: break
