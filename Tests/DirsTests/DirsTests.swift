@@ -395,6 +395,20 @@ struct DirsTests: ~Copyable {
 		#expect(a.path == "/d/a")
 		#expect(d.allDescendantFiles().map(\.name) == ["a"])
 	}
+
+	@Test(arguments: FSKind.allCases, ResolvableKind.allCases)
+	func resolvableKindCreateAndResolve(fsKind: FSKind, rKind: ResolvableKind) throws {
+		let fs = self.fs(for: fsKind)
+		try fs.createFile(at: "/target")
+
+		let rNode = try rKind.createResolvableNode(at: "/resolvable", to: "/target", in: fs)
+
+		#expect(rNode.path == "/resolvable")
+		#expect(rNode.resolvableKind == rKind)
+
+		let resolved = try rNode.resolve()
+		#expect(resolved.path == "/target")
+	}
 }
 
 // MARK: - Moves

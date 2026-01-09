@@ -9,6 +9,8 @@
 	import SystemPackage
 
 	public struct FinderAlias: ResolvableNode {
+		public static let resolvableKind: ResolvableKind = .finderAlias
+
 		public let fs: any FilesystemInterface
 		public private(set) var path: FilePath
 

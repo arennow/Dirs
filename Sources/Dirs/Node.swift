@@ -9,11 +9,6 @@ public protocol Node: IntoFilePath, Hashable, Sendable {
 	mutating func rename(to newName: String) throws
 }
 
-/// Nodes that can be resolved to another node (for example symlinks and Finder aliases).
-public protocol ResolvableNode: Node {
-	func resolve() throws -> any Node
-}
-
 public extension Node {
 	static func == (lhs: Self, rhs: Self) -> Bool {
 		lhs.fs.isEqual(to: rhs.fs) && lhs.path == rhs.path

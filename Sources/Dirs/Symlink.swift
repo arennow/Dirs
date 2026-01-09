@@ -8,6 +8,8 @@
 @preconcurrency import SystemPackage
 
 public struct Symlink: ResolvableNode {
+	public static let resolvableKind: ResolvableKind = .symlink
+
 	public let fs: any FilesystemInterface
 	public private(set) var path: FilePath
 
