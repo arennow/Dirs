@@ -251,6 +251,21 @@ public final class MockFSInterface: FilesystemInterface {
 		}
 	}
 
+	public func sizeOfFile(at ifp: some IntoFilePath) throws -> UInt64 {
+		let fp = ifp.into()
+
+		switch self.node(at: fp, symRes: .resolve) {
+			case .file(let data, _): return UInt64(data.count)
+			#if canImport(Darwin)
+				case .finderAlias:
+					// Finder Alias files contain opaque bookmark data
+					return UInt64("<bookmark data>".utf8.count)
+			#endif
+			case .none: throw NoSuchNode(path: fp)
+			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
+		}
+	}
+
 	public func destinationOf(symlink ifp: some Dirs.IntoFilePath) throws -> FilePath {
 		try self.destinationOf(symlink: ifp, using: self.pathsToNodes.acquireIntoHandle())
 	}

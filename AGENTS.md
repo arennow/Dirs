@@ -6,6 +6,13 @@ This project is cross-platform, and is explicitly tested on macOS and Ubuntu Lin
 ## Editing guidelines
 - Begin by adding tests that describe the desired new/changed behavior. Iterate on the tests and the `RealFSInterface` implementation until all the tests pass (with the desired behavior). Then iterate on `MockFSInterface` until it matches established and verified behavior. Do not under any circumstances conditionlize behavior based on whether the code is running on a real or mock interface.
 - New tests should structurally match the existing tests – specifically the `fsKind: FSKind` argument. They should be placed near other tests that cover similar topics or behaviors.
+- If you introduce new warnings in the editing process, resolve them or explain to me why you can't
+
+## Style preferences
+- Prefer to use `self.`-style references when possible
+- Prefer non-sugared forms for collection types (`Array<T>` and `Dictionary<K, V>` instead of `[T]` and `[K: V]`, respectively)
+- Prefer a "coalescing" case (e.g., `case .some(let x): throw WrongNodeType(path: fp, actualType: x)`) instead of explicit cases for nearly identical "all the other cases" situations
+	- Unless a simple `default:` will work, then prefer that
 
 ## Testing instructions
 - After each change, make sure all tests pass with `swift test -q`

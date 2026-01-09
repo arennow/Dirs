@@ -80,14 +80,26 @@ public struct RealFSInterface: FilesystemInterface {
 		try Data(contentsOf: self.resolveToRaw(ifp))
 	}
 
-	public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
+	public func sizeOfFile(at ifp: some IntoFilePath) throws -> UInt64 {
 		let fp = ifp.into()
-		let unfurledFP = (try? self.destinationOf(symlink: fp)) ?? fp
-		let unfurledURL = URL(fileURLWithPath: self.resolveToRaw(unfurledFP).string)
+		let (resolvedPath, nodeType) = try self.resolveSymlinksAndGetNodeType(at: fp)
+
+		guard nodeType == .file else {
+			throw WrongNodeType(path: fp, actualType: nodeType)
+		}
+
+		let url = URL(fileURLWithPath: self.resolveToRaw(resolvedPath).string)
+		let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+		return UInt64(size)
+	}
+
+	public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
+		let (resolvedPath, _) = try self.resolveSymlinksAndGetNodeType(at: ifp)
+		let rawURL = URL(fileURLWithPath: self.resolveToRaw(resolvedPath).string)
 
 		let fm = FileManager.default
 
-		return try fm.contentsOfDirectory(at: unfurledURL,
+		return try fm.contentsOfDirectory(at: rawURL,
 										  includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey])
 			.map { rawURL in
 				var chrootRelativeFilePath = FilePath(rawURL.path)
@@ -375,6 +387,17 @@ public extension RealFSInterface {
 }
 
 private extension RealFSInterface {
+	func resolveSymlinksAndGetNodeType(at ifp: some IntoFilePath) throws -> (resolvedPath: FilePath, nodeType: NodeType) {
+		let fp = ifp.into()
+		let resolvedFP = (try? self.destinationOf(symlink: fp)) ?? fp
+
+		guard let nodeType = self.nodeTypeFollowingSymlinks(at: fp) else {
+			throw NoSuchNode(path: fp)
+		}
+
+		return (resolvedFP, nodeType)
+	}
+
 	func resolveToProjected(_ ifp: some IntoFilePath) -> FilePath {
 		var fp = ifp.into()
 		guard let chroot = self.chroot else {

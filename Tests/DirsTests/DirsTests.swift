@@ -294,6 +294,65 @@ struct DirsTests: ~Copyable {
 		try #expect(file.stringContents() == "content is king")
 	}
 
+	// MARK: - File Size
+
+	@Test(arguments: FSKind.allCases)
+	func fileSizeEmpty(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let file = try fs.createFile(at: "/empty")
+		try #expect(file.size() == 0)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func fileSizeAfterReplace(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let file = try fs.createFile(at: "/file")
+		try file.replaceContents("initial")
+		try #expect(file.size() == 7)
+
+		try file.replaceContents("much longer content")
+		try #expect(file.size() == 19)
+
+		try file.replaceContents("sm")
+		try #expect(file.size() == 2)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func fileSizeThroughSymlink(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let file = try fs.createFile(at: "/target")
+		try file.replaceContents("target content")
+		try fs.createSymlink(at: "/link", to: "/target")
+
+		let linkSize = try fs.sizeOfFile(at: "/link")
+		let fileSize = try file.size()
+		#expect(linkSize == fileSize)
+		#expect(linkSize == 14)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func fileSizeOnDirectoryThrows(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/dir")
+
+		#expect(throws: WrongNodeType.self) {
+			try fs.sizeOfFile(at: "/dir")
+		}
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func fileSizeOnNonexistentThrows(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		#expect(throws: NoSuchNode.self) {
+			try fs.sizeOfFile(at: "/nonexistent")
+		}
+	}
+
 	// MARK: - Delete File
 
 	@Test(arguments: FSKind.allCases)

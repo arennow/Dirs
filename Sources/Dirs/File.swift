@@ -40,6 +40,10 @@ public extension File {
 		String(data: try self.contents(), encoding: .utf8)
 	}
 
+	func size() throws -> UInt64 {
+		try self.fs.sizeOfFile(at: self)
+	}
+
 	func replaceContents(_ content: some IntoData) throws {
 		try self.fs.replaceContentsOfFile(at: self, to: content)
 	}

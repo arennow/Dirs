@@ -33,6 +33,7 @@ public protocol FilesystemInterface: Equatable, Sendable {
 	func nodeTypeFollowingSymlinks(at ifp: some IntoFilePath) -> NodeType?
 
 	func contentsOf(file ifp: some IntoFilePath) throws -> Data
+	func sizeOfFile(at ifp: some IntoFilePath) throws -> UInt64
 	func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat>
 	func destinationOf(symlink ifp: some IntoFilePath) throws -> FilePath
 	func realpathOf(node ifp: some IntoFilePath) throws -> FilePath
