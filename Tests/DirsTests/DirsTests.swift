@@ -1284,6 +1284,7 @@ extension DirsTests {
 		try fs.createFileAndIntermediaryDirs(at: "/a/b/c2")
 		try fs.createFileAndIntermediaryDirs(at: "/a/f")
 		try fs.createSymlink(at: "/s", to: "/a")
+		try fs.createSymlink(at: "/s2", to: "/s")
 
 		#expect(fs.nodeType(at: "/s") == .symlink)
 		#expect(fs.nodeTypeFollowingSymlinks(at: "/s") == .dir)
@@ -1304,6 +1305,10 @@ extension DirsTests {
 		#expect(fs.nodeType(at: "/s/f") == .file)
 		#expect(fs.nodeTypeFollowingSymlinks(at: "/s/f") == .file)
 		_ = try fs.file(at: "/s/f")
+
+		#expect(fs.nodeType(at: "/s2") == .symlink)
+		#expect(fs.nodeTypeFollowingSymlinks(at: "/s2") == .dir)
+		_ = try fs.symlink(at: "/s2")
 
 		#if canImport(Darwin)
 			try fs.createFile(at: "/a/target")

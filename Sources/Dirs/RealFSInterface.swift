@@ -66,13 +66,13 @@ public struct RealFSInterface: FilesystemInterface {
 	#endif
 
 	public func nodeTypeFollowingSymlinks(at ifp: some IntoFilePath) -> NodeType? {
-		let fp = self.resolveToRaw(ifp)
+		let fp = ifp.into()
 
 		do {
-			let followedPath = try FileManager.default.destinationOfSymbolicLink(atPath: fp.string)
-			return self.nodeType(at: followedPath)
+			let resolvedPath = try self.realpathOf(node: fp)
+			return self.nodeType(at: resolvedPath)
 		} catch {
-			return self.nodeType(at: fp)
+			return nil
 		}
 	}
 
