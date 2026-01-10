@@ -387,11 +387,13 @@ public extension RealFSInterface {
 }
 
 private extension RealFSInterface {
+	/// Fully resolves all symlinks in the path and returns both the resolved path and node type.
 	func resolveSymlinksAndGetNodeType(at ifp: some IntoFilePath) throws -> (resolvedPath: FilePath, nodeType: NodeType) {
 		let fp = ifp.into()
-		let resolvedFP = (try? self.destinationOf(symlink: fp)) ?? fp
 
-		guard let nodeType = self.nodeTypeFollowingSymlinks(at: fp) else {
+		let resolvedFP = try self.realpathOf(node: fp)
+		guard let nodeType = self.nodeType(at: resolvedFP) else {
+			// This shouldn't happen since we just confirmed it exists, but handle it anyway
 			throw NoSuchNode(path: fp)
 		}
 
@@ -431,7 +433,11 @@ private extension RealFSInterface {
 
 private func realpath(_ path: String) throws -> String {
 	guard let resolvedCPathString = realpath(path, nil) else {
-		throw InvalidPathForCall.couldNotCanonicalize(path)
+		if errno == ENOENT {
+			throw NoSuchNode(path: FilePath(path))
+		} else {
+			throw InvalidPathForCall.couldNotCanonicalize(path)
+		}
 	}
 	defer { free(resolvedCPathString) }
 	let resolvedPathString = String(cString: resolvedCPathString)
