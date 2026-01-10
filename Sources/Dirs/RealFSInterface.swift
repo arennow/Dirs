@@ -77,7 +77,18 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func contentsOf(file ifp: some IntoFilePath) throws -> Data {
-		try Data(contentsOf: self.resolveToRaw(ifp))
+		let fp = ifp.into()
+		let nodeType = self.nodeTypeFollowingSymlinks(at: fp)
+
+		guard nodeType == .file else {
+			if let nt = nodeType {
+				throw WrongNodeType(path: fp, actualType: nt)
+			} else {
+				throw NoSuchNode(path: fp)
+			}
+		}
+
+		return try Data(contentsOf: self.resolveToRaw(ifp))
 	}
 
 	public func sizeOfFile(at ifp: some IntoFilePath) throws -> UInt64 {
@@ -195,6 +206,17 @@ public struct RealFSInterface: FilesystemInterface {
 	#endif
 
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
+		let fp = ifp.into()
+		let nodeType = self.nodeTypeFollowingSymlinks(at: fp)
+
+		guard nodeType == .file else {
+			if let nt = nodeType {
+				throw WrongNodeType(path: fp, actualType: nt)
+			} else {
+				throw NoSuchNode(path: fp)
+			}
+		}
+
 		let fd = try FileDescriptor.open(self.resolveToRaw(ifp), .writeOnly, retryOnInterrupt: true)
 		defer { try? fd.close() }
 		let data = contents.into()
@@ -203,6 +225,17 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func appendContentsOfFile(at ifp: some IntoFilePath, with addendum: some IntoData) throws {
+		let fp = ifp.into()
+		let nodeType = self.nodeTypeFollowingSymlinks(at: fp)
+
+		guard nodeType == .file else {
+			if let nt = nodeType {
+				throw WrongNodeType(path: fp, actualType: nt)
+			} else {
+				throw NoSuchNode(path: fp)
+			}
+		}
+
 		let fd = try FileDescriptor.open(self.resolveToRaw(ifp), .writeOnly, options: .append, retryOnInterrupt: true)
 		defer { try? fd.close() }
 		try fd.writeAll(addendum.into())

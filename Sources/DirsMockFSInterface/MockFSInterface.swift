@@ -204,16 +204,9 @@ public final class MockFSInterface: FilesystemInterface {
 
 		switch self.node(at: fp, symRes: .resolve) {
 			case .file(let data, _): return data
-			#if canImport(Darwin)
-				case .finderAlias:
-					// Real Finder Alias files contain opaque bookmark data (not readable
-					// file contents). We simulate that here by returning a placeholder
-					// value which is intentionally unmeaningful
-					return Data("<bookmark data>".utf8)
-			#endif
-			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
 			case .symlink(let destination, _): return try self.contentsOf(file: destination)
 			case .none: throw NoSuchNode(path: fp)
+			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
 		}
 	}
 
@@ -256,11 +249,6 @@ public final class MockFSInterface: FilesystemInterface {
 
 		switch self.node(at: fp, symRes: .resolve) {
 			case .file(let data, _): return UInt64(data.count)
-			#if canImport(Darwin)
-				case .finderAlias:
-					// Finder Alias files contain opaque bookmark data
-					return UInt64("<bookmark data>".utf8.count)
-			#endif
 			case .none: throw NoSuchNode(path: fp)
 			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
 		}
@@ -417,15 +405,9 @@ public final class MockFSInterface: FilesystemInterface {
 
 		switch acquisitionLock.resource[resolvedFP] {
 			case .none: throw NoSuchNode(path: fp)
-			case .dir: throw WrongNodeType(path: fp, actualType: .dir)
 			case .file(_, let xattrs): acquisitionLock.resource[resolvedFP] = .file(data: contentsData, xattrs: xattrs)
-			#if canImport(Darwin)
-				case .finderAlias(_, let xattrs):
-					// Overwrite the alias file (breaks the alias, but it'll still be typed as a Finder Alias)
-					acquisitionLock.resource[resolvedFP] = .finderAlias(destination: "/__MOCK_FS_BROKEN_ALIAS/__MOCK_FS_BROKEN_ALIAS/",
-																		xattrs: xattrs)
-			#endif
 			case .symlink(let destination, _): try self.replaceContentsOfFile(at: destination, to: contentsData, using: acquisitionLock)
+			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
 		}
 	}
 

@@ -1734,9 +1734,9 @@ extension DirsTests {
 			#expect(resolved.name == "target")
 		}
 
-		// Reading and writing Finder Aliases through the FS interface is an unusual thing to do,
-		// but the expected semantics are that it operates on the alias file itself.
-		// This is in contrast to symlinks, which transparently redirect to their target
+		// Finder Alias files should not be readable through contentsOf(file:) or sizeOfFile(at:)
+		// because they contain opaque bookmark data that has no meaning outside of the
+		// bookmark resolution APIs.
 
 		@Test(arguments: FSKind.allCases)
 		func contentsOfFinderAlias(fsKind: FSKind) throws {
@@ -1745,11 +1745,13 @@ extension DirsTests {
 			try file.replaceContents("target content")
 			try fs.createFinderAlias(at: "/alias", to: "/target")
 
-			let aliasContents = try fs.contentsOf(file: "/alias")
+			#expect(throws: WrongNodeType.self) {
+				try fs.contentsOf(file: "/alias")
+			}
 
-			// The contents should be binary bookmark data, not the target's text
-			let asText = String(data: aliasContents, encoding: .utf8)
-			#expect(asText != "target content", "Alias contents should be bookmark data, not target content")
+			#expect(throws: WrongNodeType.self) {
+				try fs.sizeOfFile(at: "/alias")
+			}
 
 			// Proving that the alias isn't broken; you just have to use it correctly
 			let alias = try FinderAlias(fs: fs, path: "/alias")
@@ -1766,21 +1768,16 @@ extension DirsTests {
 			try fs.replaceContentsOfFile(at: "/target", to: "initial content")
 			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
 
-			// Writing to alias path overwrites the alias file itself (breaks the alias)
-			try fs.replaceContentsOfFile(at: "/alias", to: "this breaks the alias")
-
-			// From the persepctive of this library, the contents of a broken alias are undefined
-			// So we can't assert on the contents, but it also doesn't matter
+			#expect(throws: WrongNodeType.self) {
+				try fs.replaceContentsOfFile(at: "/alias", to: "this should fail")
+			}
 
 			// The target file is unchanged
 			let targetContents = try fs.contentsOf(file: "/target")
 			#expect(String(data: targetContents, encoding: .utf8) == "initial content")
 
-			// Still "typed" as a Finder Alias
-			#expect(fs.nodeType(at: "/alias") == .finderAlias)
-			#expect(throws: Error.self) {
-				try alias.resolve()
-			}
+			let resolved = try alias.resolve()
+			#expect(resolved.path == "/target")
 		}
 
 		@Test(arguments: FSKind.allCases)

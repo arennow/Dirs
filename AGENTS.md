@@ -13,6 +13,7 @@ This project is cross-platform, and is explicitly tested on macOS and Ubuntu Lin
 - Prefer non-sugared forms for collection types (`Array<T>` and `Dictionary<K, V>` instead of `[T]` and `[K: V]`, respectively)
 - Prefer a "coalescing" case (e.g., `case .some(let x): throw WrongNodeType(path: fp, actualType: x)`) instead of explicit cases for nearly identical "all the other cases" situations
 	- Unless a simple `default:` will work, then prefer that
+- Prefer `any P` over plain `P` for protocol existential types
 
 ## Testing instructions
 - After each change, make sure all tests pass with `swift test -q`
