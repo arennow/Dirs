@@ -1,5 +1,4 @@
 import Dirs
-import DirsMockFSInterface
 import Foundation
 import SortAndFilter
 import SystemPackage
@@ -84,7 +83,7 @@ struct DirsTests: ~Copyable {
 		try fs.createDir(at: "/a4/a4b1")
 		try fs.createFile(at: "/a4/a4b1/a4b1c1")
 
-		let d = try Dir(fs: fs, path: "/")
+		let d = try fs.dir(at: "/")
 
 		#expect(d.childFile(named: "a1") != nil)
 		// Make sure we don't just support literals ⬇️
@@ -120,8 +119,8 @@ struct DirsTests: ~Copyable {
 
 		let created = try fs.createDir(at: "/a/b/c/d")
 
-		#expect(throws: Never.self) { try Dir(fs: fs, path: "/a") }
-		try #expect(Dir(fs: fs, path: "/a/b/c/d") == created)
+		#expect(throws: Never.self) { try fs.dir(at: "/a") }
+		try #expect(fs.dir(at: "/a/b/c/d") == created)
 
 		#expect(throws: Never.self) { try fs.createDir(at: "/a/b/c/d") }
 	}
@@ -183,7 +182,7 @@ struct DirsTests: ~Copyable {
 		let createdFile = try subDir.createFile(at: "file")
 
 		#expect(createdFile.path == "/a/file")
-		#expect(throws: Never.self) { try File(fs: fs, path: "/a/file") }
+		#expect(throws: Never.self) { try fs.file(at: "/a/file") }
 		try #expect(createdFile.contents() == Data())
 		try #expect(fs.contentsOf(file: "/a/file") == Data())
 	}
@@ -205,7 +204,7 @@ struct DirsTests: ~Copyable {
 
 		try fs.createDir(at: "/a")
 
-		let root = try Dir(fs: fs, path: "/")
+		let root = try fs.dir(at: "/")
 		#expect(throws: (any Error).self) { try root.createFile(at: "a") }
 		#expect(fs.nodeType(at: "/a") == .dir)
 	}
@@ -402,23 +401,12 @@ struct DirsTests: ~Copyable {
 		try #expect(fs.contentsOf(file: "/file2") == "contents 2".into())
 	}
 
-	@Test(arguments: FSKind.allCases, ["/new", "/existing"])
-	func dirInitWithCreation(fsKind: FSKind, path: FilePath) throws {
-		let fs = self.fs(for: fsKind)
-
-		try fs.createDir(at: "/existing")
-
-		let firstTime = try Dir(fs: fs, path: path, createIfNeeded: true)
-		let secondTime = try fs.dir(at: path)
-		#expect(firstTime == secondTime)
-	}
-
 	@Test(arguments: FSKind.allCases)
 	func dirInitNonExisting(fsKind: FSKind) {
 		let fs = self.fs(for: fsKind)
 
 		#expect(throws: (any Error).self) {
-			try Dir(fs: fs, path: "/a")
+			try fs.dir(at: "/a")
 		}
 	}
 
@@ -735,7 +723,7 @@ extension DirsTests {
 
 		#expect(file.path == "/f2")
 		try #expect(file.stringContents() == "content")
-		try #expect(File(fs: fs, path: "/f2").stringContents() == "content")
+		try #expect(fs.file(at: "/f2").stringContents() == "content")
 
 		let d = try fs.createDir(at: "/d")
 		try file.move(to: d)
@@ -1314,7 +1302,7 @@ extension DirsTests {
 			try fs.createFile(at: "/a/target")
 			try fs.createFinderAlias(at: "/a/alias", to: "/a/target")
 			#expect(fs.nodeType(at: "/s/alias") == .finderAlias)
-			_ = try FinderAlias(fs: fs, path: "/s/alias")
+			_ = try fs.finderAlias(at: "/s/alias")
 		#endif
 	}
 
@@ -1537,7 +1525,7 @@ extension DirsTests {
 			let fs = self.fs(for: fsKind)
 			try fs.createFile(at: "/file")
 			#expect(throws: WrongNodeType.self) {
-				try FinderAlias(fs: fs, path: "/file")
+				try fs.finderAlias(at: "/file")
 			}
 		}
 
@@ -1547,7 +1535,7 @@ extension DirsTests {
 			try fs.createFile(at: "/target")
 			let original = try fs.createFinderAlias(at: "/alias", to: "/target")
 			try original.copy(to: "/copied_alias")
-			let copiedAlias = try FinderAlias(fs: fs, path: "/copied_alias")
+			let copiedAlias = try fs.finderAlias(at: "/copied_alias")
 
 			let resolvedOriginal = try original.resolve()
 			let resolvedCopy = try copiedAlias.resolve()
@@ -1566,7 +1554,7 @@ extension DirsTests {
 			try alias.copy(to: "/existing_file")
 
 			#expect(fs.nodeType(at: "/existing_file") == .finderAlias)
-			let copiedAlias = try FinderAlias(fs: fs, path: "/existing_file")
+			let copiedAlias = try fs.finderAlias(at: "/existing_file")
 			let resolved = try copiedAlias.resolve()
 			#expect(resolved.path == "/target")
 		}
@@ -1581,7 +1569,7 @@ extension DirsTests {
 			try alias.copy(to: "/dest_dir")
 
 			#expect(fs.nodeType(at: "/dest_dir/alias") == .finderAlias)
-			let copiedAlias = try FinderAlias(fs: fs, path: "/dest_dir/alias")
+			let copiedAlias = try fs.finderAlias(at: "/dest_dir/alias")
 			let resolved = try copiedAlias.resolve()
 			#expect(resolved.path == "/target")
 		}
@@ -1597,7 +1585,7 @@ extension DirsTests {
 			try alias.copy(to: "/symlink")
 
 			#expect(fs.nodeType(at: "/symlink") == .finderAlias)
-			let copiedAlias = try FinderAlias(fs: fs, path: "/symlink")
+			let copiedAlias = try fs.finderAlias(at: "/symlink")
 			let resolved = try copiedAlias.resolve()
 			#expect(resolved.path == "/alias_target")
 		}
@@ -1613,7 +1601,7 @@ extension DirsTests {
 			try alias1.copy(to: "/alias2")
 
 			#expect(fs.nodeType(at: "/alias2") == .finderAlias)
-			let copiedAlias = try FinderAlias(fs: fs, path: "/alias2")
+			let copiedAlias = try fs.finderAlias(at: "/alias2")
 			let resolved = try copiedAlias.resolve()
 			#expect(resolved.path == "/target1")
 		}
@@ -1629,7 +1617,7 @@ extension DirsTests {
 			try alias.copy(to: "/symlink_to_dir")
 
 			#expect(fs.nodeType(at: "/dest_dir/alias") == .finderAlias)
-			let copiedAlias = try FinderAlias(fs: fs, path: "/dest_dir/alias")
+			let copiedAlias = try fs.finderAlias(at: "/dest_dir/alias")
 			let resolved = try copiedAlias.resolve()
 			#expect(resolved.path == "/target")
 		}
@@ -1754,7 +1742,7 @@ extension DirsTests {
 			}
 
 			// Proving that the alias isn't broken; you just have to use it correctly
-			let alias = try FinderAlias(fs: fs, path: "/alias")
+			let alias = try fs.finderAlias(at: "/alias")
 			let resolved = try alias.resolve()
 			#expect(resolved as? File == file)
 			let targetContents = try file.stringContents()
@@ -1787,7 +1775,7 @@ extension DirsTests {
 			try fs.createFinderAlias(at: "/alias", to: "/target")
 			try fs.deleteNode(at: "/target")
 
-			let alias = try FinderAlias(fs: fs, path: "/alias")
+			let alias = try fs.finderAlias(at: "/alias")
 			#expect(throws: Error.self) {
 				try alias.resolve()
 			}

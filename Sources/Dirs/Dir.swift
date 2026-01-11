@@ -1,17 +1,18 @@
 import Foundation
-@preconcurrency import SystemPackage
+import SystemPackage
 
 public struct Dir: Node {
-	public let fs: any FilesystemInterface
+	let _fs: FSInterface
+	public var fs: any FilesystemInterface { self._fs.wrapped }
 	public private(set) var path: FilePath
 
-	public init(fs: any FilesystemInterface, path: some IntoFilePath, createIfNeeded: Bool = false) throws {
+	init(_fs: FSInterface, path: some IntoFilePath, createIfNeeded: Bool = false) throws {
 		let fp = path.into()
 
-		switch fs.nodeTypeFollowingSymlinks(at: fp) {
+		switch _fs.wrapped.nodeTypeFollowingSymlinks(at: fp) {
 			case .none:
 				if createIfNeeded {
-					self = try fs.createDir(at: fp)
+					self = try _fs.wrapped.createDir(at: fp)
 					return
 				} else {
 					throw NoSuchNode(path: fp)
@@ -20,7 +21,7 @@ public struct Dir: Node {
 			case .some(let x): throw WrongNodeType(path: fp, actualType: x)
 		}
 
-		self.fs = fs
+		self._fs = _fs
 		self.path = fp
 	}
 
@@ -46,9 +47,9 @@ public extension Dir {
 
 		for childFilePathStat in childFilePathStats {
 			if childFilePathStat.isDirectory {
-				dirs.append(try .init(fs: self.fs, path: childFilePathStat.filePath))
+				dirs.append(try .init(_fs: self._fs, path: childFilePathStat.filePath))
 			} else {
-				files.append(try .init(fs: self.fs, path: childFilePathStat.filePath))
+				files.append(try .init(_fs: self._fs, path: childFilePathStat.filePath))
 			}
 		}
 

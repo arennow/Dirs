@@ -12,8 +12,7 @@ let package = Package(name: "Dirs",
 					  products: [
 					  	.library(name: "Dirs",
 								   targets: ["Dirs"]),
-					  	.library(name: "DirsMockFSInterface",
-								   targets: ["DirsMockFSInterface"]),
+
 					  ],
 
 					  dependencies: [
@@ -27,16 +26,14 @@ let package = Package(name: "Dirs",
 								  dependencies: [
 								  	.product(name: "Algorithms", package: "swift-algorithms"),
 								  	.product(name: "SystemPackage", package: "swift-system"),
+								  	"Locked",
 								  ],
 								  swiftSettings: [
 								  	.enableUpcomingFeature("ExistentialAny"),
 								  ]),
-					  	.target(name: "DirsMockFSInterface",
-								  dependencies: ["Dirs", "Locked"]),
 					  	.testTarget(name: "DirsTests",
 									  dependencies: [
 									  	"Dirs",
-									  	"DirsMockFSInterface",
 									  	"SortAndFilter",
 									  ]),
 					  ])

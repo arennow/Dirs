@@ -1,20 +1,21 @@
 import Foundation
-@preconcurrency import SystemPackage
+import SystemPackage
 
 public struct File: Node {
-	public let fs: any FilesystemInterface
+	let _fs: FSInterface
+	public var fs: any FilesystemInterface { self._fs.wrapped }
 	public private(set) var path: FilePath
 
-	public init(fs: any FilesystemInterface, path: some IntoFilePath) throws {
+	init(_fs: FSInterface, path: some IntoFilePath) throws {
 		let fp = path.into()
 
-		switch fs.nodeTypeFollowingSymlinks(at: fp) {
+		switch _fs.wrapped.nodeTypeFollowingSymlinks(at: fp) {
 			case .none: throw NoSuchNode(path: fp)
 			case .file: break
 			case .some(let x): throw WrongNodeType(path: fp, actualType: x)
 		}
 
-		self.fs = fs
+		self._fs = _fs
 		self.path = fp
 	}
 

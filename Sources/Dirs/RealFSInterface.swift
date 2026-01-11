@@ -169,24 +169,24 @@ public struct RealFSInterface: FilesystemInterface {
 			url = innerURL
 		}
 
-		return try Dir(fs: self, path: self.resolveToProjected(url), createIfNeeded: true)
+		return try Dir(_fs: self.asInterface, path: self.resolveToProjected(url), createIfNeeded: true)
 	}
 
 	public func createFile(at ifp: some IntoFilePath) throws -> File {
 		try Data().write(to: self.resolveToRaw(ifp), options: .withoutOverwriting)
-		return try File(fs: self, path: self.resolveToProjected(ifp))
+		return try File(_fs: self.asInterface, path: self.resolveToProjected(ifp))
 	}
 
 	public func createDir(at ifp: some IntoFilePath) throws -> Dir {
 		try FileManager.default.createDirectory(at: self.resolveToRaw(ifp),
 												withIntermediateDirectories: true)
-		return try Dir(fs: self, path: self.resolveToProjected(ifp))
+		return try Dir(_fs: self.asInterface, path: self.resolveToProjected(ifp))
 	}
 
 	public func createSymlink(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> Symlink {
 		try FileManager.default.createSymbolicLink(at: self.resolveToRaw(linkIFP),
 												   withDestinationURL: self.resolveToRaw(destIFP))
-		return try Symlink(fs: self, path: self.resolveToProjected(linkIFP))
+		return try Symlink(_fs: self.asInterface, path: self.resolveToProjected(linkIFP))
 	}
 
 	#if canImport(Darwin)
@@ -195,7 +195,7 @@ public struct RealFSInterface: FilesystemInterface {
 			let destURL: URL = self.resolveToRaw(destIFP)
 			let bookmarkData = try destURL.bookmarkData(options: .suitableForBookmarkFile)
 			try URL.writeBookmarkData(bookmarkData, to: linkURL)
-			return try FinderAlias(fs: self, path: self.resolveToProjected(linkIFP))
+			return try FinderAlias(_fs: self.asInterface, path: self.resolveToProjected(linkIFP))
 		}
 
 		public func destinationOfFinderAlias(at ifp: some IntoFilePath) throws -> FilePath {

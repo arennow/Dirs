@@ -11,10 +11,11 @@
 	public struct FinderAlias: ResolvableNode {
 		public static let resolvableKind: ResolvableKind = .finderAlias
 
-		public let fs: any FilesystemInterface
+		let _fs: FSInterface
+		public var fs: any FilesystemInterface { self._fs.wrapped }
 		public private(set) var path: FilePath
 
-		public init(fs: any FilesystemInterface, path: some IntoFilePath) throws {
+		init(_fs: FSInterface, path: some IntoFilePath) throws {
 			let fp = path.into()
 
 			// Finder aliases are effectively regular files carrying extra
@@ -24,13 +25,13 @@
 			// used for `File`/`Dir`), so we use
 			// `nodeTypeFollowingSymlinks(at:)` here rather than the symlink-
 			// preserving `nodeType(at:)`.
-			switch fs.nodeTypeFollowingSymlinks(at: fp) {
+			switch _fs.wrapped.nodeTypeFollowingSymlinks(at: fp) {
 				case .none: throw NoSuchNode(path: fp)
 				case .finderAlias: break
 				case .some(let x): throw WrongNodeType(path: fp, actualType: x)
 			}
 
-			self.fs = fs
+			self._fs = _fs
 			self.path = fp
 		}
 
@@ -48,13 +49,7 @@
 
 		public func resolve() throws -> any Node {
 			let destPath = try self.fs.destinationOfFinderAlias(at: self.path)
-			return switch self.fs.nodeType(at: destPath) {
-				case .dir: try Dir(fs: self.fs, path: destPath)
-				case .file: try File(fs: self.fs, path: destPath)
-				case .symlink: try Symlink(fs: self.fs, path: destPath)
-				case .finderAlias: try FinderAlias(fs: self.fs, path: destPath)
-				case .none: throw NoSuchNode(path: destPath)
-			}
+			return try self.fs.node(at: destPath)
 		}
 	}
 #endif

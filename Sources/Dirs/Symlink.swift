@@ -5,15 +5,16 @@
 //  Created by Aaron Rennow on 2025-06-24.
 //
 
-@preconcurrency import SystemPackage
+import SystemPackage
 
 public struct Symlink: ResolvableNode {
 	public static let resolvableKind: ResolvableKind = .symlink
 
-	public let fs: any FilesystemInterface
+	let _fs: FSInterface
+	public var fs: any FilesystemInterface { self._fs.wrapped }
 	public private(set) var path: FilePath
 
-	package init(fs: any FilesystemInterface, path: some IntoFilePath) throws {
+	init(_fs: FSInterface, path: some IntoFilePath) throws {
 		let fp = path.into()
 
 		// Intentionally check with `nodeType` (which resolves symlinks in
@@ -23,13 +24,13 @@ public struct Symlink: ResolvableNode {
 		// use `nodeTypeFollowingSymlinks` because they care about the
 		// resolved target type; `Symlink` must specifically identify the
 		// symlink node.
-		switch fs.nodeType(at: fp) {
+		switch _fs.wrapped.nodeType(at: fp) {
 			case .none: throw NoSuchNode(path: fp)
 			case .symlink: break
 			case .some(let x): throw WrongNodeType(path: fp, actualType: x)
 		}
 
-		self.fs = fs
+		self._fs = _fs
 		self.path = fp
 	}
 
@@ -47,15 +48,7 @@ public struct Symlink: ResolvableNode {
 
 	public func resolve() throws -> any Node {
 		let destPath = try self.fs.destinationOf(symlink: self.path)
-		return switch self.fs.nodeType(at: destPath) {
-			case .dir: try Dir(fs: self.fs, path: destPath)
-			case .file: try File(fs: self.fs, path: destPath)
-			case .symlink: try Symlink(fs: self.fs, path: destPath)
-			#if canImport(Darwin)
-				case .finderAlias: try FinderAlias(fs: self.fs, path: destPath)
-			#endif
-			case .none: throw NoSuchNode(path: destPath)
-		}
+		return try self.fs.node(at: destPath)
 	}
 }
 

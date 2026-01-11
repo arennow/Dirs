@@ -92,25 +92,31 @@ public extension FilesystemInterface {
 
 public extension FilesystemInterface {
 	func dir(at ifp: some IntoFilePath) throws -> Dir {
-		try Dir(fs: self, path: ifp.into())
+		try Dir(_fs: self.asInterface, path: ifp.into())
 	}
 
 	func file(at ifp: some IntoFilePath) throws -> File {
-		try File(fs: self, path: ifp.into())
+		try File(_fs: self.asInterface, path: ifp.into())
 	}
 
 	func symlink(at ifp: some IntoFilePath) throws -> Symlink {
-		try Symlink(fs: self, path: ifp.into())
+		try Symlink(_fs: self.asInterface, path: ifp.into())
 	}
+
+	#if canImport(Darwin)
+		func finderAlias(at ifp: some IntoFilePath) throws -> FinderAlias {
+			try FinderAlias(_fs: self.asInterface, path: ifp.into())
+		}
+	#endif
 
 	func node(at ifp: some IntoFilePath) throws -> any Node {
 		let fp = ifp.into()
 		return switch self.nodeType(at: fp) {
-			case .dir: try Dir(fs: self, path: fp)
-			case .file: try File(fs: self, path: fp)
-			case .symlink: try Symlink(fs: self, path: fp)
+			case .dir: try self.dir(at: fp)
+			case .file: try self.file(at: fp)
+			case .symlink: try self.symlink(at: fp)
 			#if canImport(Darwin)
-				case .finderAlias: try FinderAlias(fs: self, path: fp)
+				case .finderAlias: try self.finderAlias(at: fp)
 			#endif
 			case .none: throw NoSuchNode(path: fp)
 		}
@@ -153,6 +159,18 @@ public extension FilesystemInterface {
 	var rootDir: Dir {
 		get throws {
 			try self.dir(at: "/")
+		}
+	}
+}
+
+extension FilesystemInterface {
+	var asInterface: FSInterface {
+		if let real = self as? RealFSInterface {
+			return .real(real)
+		} else if let mock = self as? MockFSInterface {
+			return .mock(mock)
+		} else {
+			fatalError("Unknown FilesystemInterface conformer: \(type(of: self))")
 		}
 	}
 }

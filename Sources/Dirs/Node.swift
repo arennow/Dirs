@@ -24,7 +24,7 @@ public extension Node {
 
 	var parent: Dir {
 		get throws {
-			try Dir(fs: self.fs, path: self.path.removingLastComponent())
+			try self.fs.dir(at: self.path.removingLastComponent())
 		}
 	}
 

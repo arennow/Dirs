@@ -1,4 +1,3 @@
-import Dirs
 import Foundation
 import Locked
 import SystemPackage
@@ -280,7 +279,7 @@ public final class MockFSInterface: FilesystemInterface {
 			case .uniqueTemporary: "/_temporary/\(UUID().uuidString)"
 			default: "/_system_\(dlk.rawValue)"
 		}
-		return try Dir(fs: self, path: path, createIfNeeded: true)
+		return try Dir(_fs: self.asInterface, path: path, createIfNeeded: true)
 	}
 
 	@discardableResult
@@ -312,7 +311,7 @@ public final class MockFSInterface: FilesystemInterface {
 			}
 		}
 
-		return try Dir(fs: self, path: fp)
+		return try Dir(_fs: self.asInterface, path: fp)
 	}
 
 	@discardableResult
@@ -333,7 +332,7 @@ public final class MockFSInterface: FilesystemInterface {
 				case .some(let x): throw NodeAlreadyExists(path: fp, type: x.nodeType)
 			}
 		}
-		return try File(fs: self, path: fp)
+		return try File(_fs: self.asInterface, path: fp)
 	}
 
 	public func createSymlink(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> Symlink {
@@ -348,7 +347,7 @@ public final class MockFSInterface: FilesystemInterface {
 
 			ptn[resolvedFP] = .symlink(destination: destIFP.into())
 		}
-		return try Symlink(fs: self, path: linkFP)
+		return try Symlink(_fs: self.asInterface, path: linkFP)
 	}
 
 	#if canImport(Darwin)
@@ -364,7 +363,7 @@ public final class MockFSInterface: FilesystemInterface {
 
 				ptn[resolvedFP] = .finderAlias(destination: destIFP.into())
 			}
-			return try FinderAlias(fs: self, path: linkFP)
+			return try FinderAlias(_fs: self.asInterface, path: linkFP)
 		}
 
 		public func destinationOfFinderAlias(at ifp: some Dirs.IntoFilePath) throws -> FilePath {
