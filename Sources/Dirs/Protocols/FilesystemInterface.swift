@@ -3,11 +3,11 @@ import SystemPackage
 
 public struct FilePathStat: Hashable, Equatable {
 	public let filePath: FilePath
-	public let isDirectory: Bool
+	public let nodeType: NodeType
 
-	public init(filePath: FilePath, isDirectory: Bool) {
+	public init(filePath: FilePath, nodeType: NodeType) {
 		self.filePath = filePath
-		self.isDirectory = isDirectory
+		self.nodeType = nodeType
 	}
 }
 

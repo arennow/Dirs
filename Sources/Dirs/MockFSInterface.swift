@@ -232,14 +232,10 @@ public final class MockFSInterface: FilesystemInterface {
 			.filter { $0.removingLastComponent() == fp }
 
 		return childKeys.map { childFilePath in
-			switch acquisitionLock.resource[childFilePath]! {
-				case .dir: .init(filePath: childFilePath, isDirectory: true)
-				#if canImport(Darwin)
-					case .finderAlias: fallthrough
-				#endif
-				case .file: .init(filePath: childFilePath, isDirectory: false)
-				case .symlink(let destination, _): .init(filePath: childFilePath, isDirectory: acquisitionLock.resource[destination]?.nodeType == .dir)
-			}
+			// Safe force-unwrap: childFilePath came from acquisitionLock.resource.keys
+			// And we're still holding the lock
+			let node = acquisitionLock.resource[childFilePath]!
+			return FilePathStat(filePath: childFilePath, nodeType: node.nodeType)
 		}
 	}
 

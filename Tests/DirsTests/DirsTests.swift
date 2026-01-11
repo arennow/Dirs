@@ -1100,13 +1100,13 @@ extension DirsTests {
 		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
 
 		try #expect(Set(fs.contentsOf(directory: "/")) == [
-			.init(filePath: "/a", isDirectory: false),
-			.init(filePath: "/b", isDirectory: false),
-			.init(filePath: "/d", isDirectory: true),
+			.init(filePath: "/a", nodeType: .file),
+			.init(filePath: "/b", nodeType: .file),
+			.init(filePath: "/d", nodeType: .dir),
 		])
 
 		try #expect(fs.contentsOf(directory: "/d") == [
-			.init(filePath: "/d/d1", isDirectory: false),
+			.init(filePath: "/d/d1", nodeType: .file),
 		])
 	}
 
@@ -1118,18 +1118,18 @@ extension DirsTests {
 		try fs.createSymlink(at: "/s", to: "/d")
 
 		try #expect(Set(fs.contentsOf(directory: "/")) == [
-			.init(filePath: "/d", isDirectory: true),
-			.init(filePath: "/s", isDirectory: true),
+			.init(filePath: "/d", nodeType: .dir),
+			.init(filePath: "/s", nodeType: .symlink),
 		])
 
 		try #expect(Set(fs.contentsOf(directory: "/d")) == [
-			.init(filePath: "/d/d1", isDirectory: false),
-			.init(filePath: "/d/d2", isDirectory: false),
+			.init(filePath: "/d/d1", nodeType: .file),
+			.init(filePath: "/d/d2", nodeType: .file),
 		])
 
 		try #expect(Set(fs.contentsOf(directory: "/s")) == [
-			.init(filePath: "/d/d1", isDirectory: false),
-			.init(filePath: "/d/d2", isDirectory: false),
+			.init(filePath: "/d/d1", nodeType: .file),
+			.init(filePath: "/d/d2", nodeType: .file),
 		])
 	}
 
@@ -1168,6 +1168,178 @@ extension DirsTests {
 
 		try #expect(rootDir.newOrExistingChildDir(named: "d").children().all.map(\.name) == ["d1"])
 		try #expect(rootDir.newOrExistingChildDir(named: "e").children().all.map(\.name) == [])
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func childrenIncludesAllNodeTypes(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let root = try fs.rootDir
+
+		// Create one of each node type
+		try fs.createFile(at: "/file1.txt")
+		try fs.createDir(at: "/subdir")
+		try fs.createSymlink(at: "/symlink1", to: "/file1.txt")
+		#if canImport(Darwin)
+			try fs.createFinderAlias(at: "/alias1", to: "/subdir")
+		#endif
+
+		let children = try root.children()
+
+		// Verify all node types are included
+		#expect(children.files.count == 1)
+		#expect(children.directories.count == 1)
+		#expect(children.symlinks.count == 1)
+		#if canImport(Darwin)
+			#expect(children.finderAliases.count == 1)
+		#endif
+
+		// Verify specific paths
+		#expect(children.files.first?.path == "/file1.txt")
+		#expect(children.directories.first?.path == "/subdir")
+		#expect(children.symlinks.first?.path == "/symlink1")
+		#if canImport(Darwin)
+			#expect(children.finderAliases.first?.path == "/alias1")
+		#endif
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func childrenCountsMatchDirectoryContents(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let root = try fs.rootDir
+
+		// Create multiple nodes of various types
+		try fs.createFile(at: "/f1")
+		try fs.createFile(at: "/f2")
+		try fs.createFile(at: "/f3")
+		try fs.createDir(at: "/d1")
+		try fs.createDir(at: "/d2")
+		try fs.createSymlink(at: "/s1", to: "/f1")
+		try fs.createSymlink(at: "/s2", to: "/d1")
+		#if canImport(Darwin)
+			try fs.createFinderAlias(at: "/a1", to: "/f1")
+		#endif
+
+		let children = try root.children()
+		let contents = try fs.contentsOf(directory: "/")
+
+		#if canImport(Darwin)
+			// Total should match
+			#expect(children.files.count + children.directories.count + children.symlinks.count + children.finderAliases.count == contents.count)
+		#else
+			#expect(children.files.count + children.directories.count + children.symlinks.count == contents.count)
+		#endif
+
+		// Individual counts should match
+		#expect(children.files.count == contents.count(where: { $0.nodeType == .file }))
+		#expect(children.directories.count == contents.count(where: { $0.nodeType == .dir }))
+		#expect(children.symlinks.count == contents.count(where: { $0.nodeType == .symlink }))
+		#if canImport(Darwin)
+			#expect(children.finderAliases.count == contents.count(where: { $0.nodeType == .finderAlias }))
+		#endif
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func childrenAllSequenceIncludesEverything(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let root = try fs.rootDir
+
+		try fs.createFile(at: "/f1")
+		try fs.createDir(at: "/d1")
+		try fs.createSymlink(at: "/s1", to: "/f1")
+		#if canImport(Darwin)
+			try fs.createFinderAlias(at: "/a1", to: "/d1")
+		#endif
+
+		let children = try root.children()
+		let allNodes = Array(children.all)
+
+		#if canImport(Darwin)
+			#expect(allNodes.count == 4)
+		#else
+			#expect(allNodes.count == 3)
+		#endif
+
+		#expect(allNodes.contains { ($0 as? File)?.path == "/f1" })
+		#expect(allNodes.contains { ($0 as? Dir)?.path == "/d1" })
+		#expect(allNodes.contains { ($0 as? Symlink)?.path == "/s1" })
+		#if canImport(Darwin)
+			#expect(allNodes.contains { ($0 as? FinderAlias)?.path == "/a1" })
+		#endif
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func childrenIsEmptyWorks(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let emptyDir = try fs.createDir(at: "/empty")
+		#expect(try emptyDir.children().isEmpty)
+
+		let nonEmptyDir = try fs.createDir(at: "/nonempty")
+		try fs.createFile(at: "/nonempty/file")
+		#expect(try !nonEmptyDir.children().isEmpty)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func childNodeAccessorFunctions(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let root = try fs.rootDir
+
+		try fs.createFile(at: "/myfile")
+		try fs.createDir(at: "/mydir")
+		try fs.createSymlink(at: "/mylink", to: "/myfile")
+		#if canImport(Darwin)
+			try fs.createFinderAlias(at: "/myalias", to: "/mydir")
+		#endif
+
+		// Test by component
+		#expect(root.childFile(named: FilePath.Component("myfile"))?.path == "/myfile")
+		#expect(root.childDir(named: FilePath.Component("mydir"))?.path == "/mydir")
+		#expect(root.childSymlink(named: FilePath.Component("mylink"))?.path == "/mylink")
+		#if canImport(Darwin)
+			#expect(root.childFinderAlias(named: FilePath.Component("myalias"))?.path == "/myalias")
+		#endif
+
+		// Test by string
+		#expect(root.childFile(named: "myfile")?.path == "/myfile")
+		#expect(root.childDir(named: "mydir")?.path == "/mydir")
+		#expect(root.childSymlink(named: "mylink")?.path == "/mylink")
+		#if canImport(Darwin)
+			#expect(root.childFinderAlias(named: "myalias")?.path == "/myalias")
+		#endif
+
+		// Test non-existent returns nil
+		#expect(root.childFile(named: "nonexistent") == nil)
+		#expect(root.childSymlink(named: "nonexistent") == nil)
+		#if canImport(Darwin)
+			#expect(root.childFinderAlias(named: "nonexistent") == nil)
+		#endif
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func descendantNodeAccessorFunctions(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let root = try fs.rootDir
+
+		try fs.createFileAndIntermediaryDirs(at: "/a/b/file")
+		try fs.createDir(at: "/a/b/dir")
+		try fs.createSymlink(at: "/a/b/link", to: "/a/b/file")
+		#if canImport(Darwin)
+			try fs.createFinderAlias(at: "/a/b/alias", to: "/a/b/dir")
+		#endif
+
+		#expect(root.descendantFile(at: "a/b/file")?.path == "/a/b/file")
+		#expect(root.descendantDir(at: "a/b/dir")?.path == "/a/b/dir")
+		#expect(root.descendantSymlink(at: "a/b/link")?.path == "/a/b/link")
+		#if canImport(Darwin)
+			#expect(root.descendantFinderAlias(at: "a/b/alias")?.path == "/a/b/alias")
+		#endif
+
+		// Test non-existent returns nil
+		#expect(root.descendantFile(at: "a/b/nonexistent") == nil)
+		#expect(root.descendantSymlink(at: "a/b/nonexistent") == nil)
+		#if canImport(Darwin)
+			#expect(root.descendantFinderAlias(at: "a/b/nonexistent") == nil)
+		#endif
 	}
 }
 
@@ -1210,6 +1382,42 @@ extension DirsTests {
 
 		let names = Set(try fs.rootDir.allDescendantFiles().map(\.name))
 		#expect(names == ["a1f", "a2f", "a1a2f", "a1a2a3f", "b1b2b3f"])
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func descendantSequencesIncludeSymlinksAndAliases(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let root = try fs.rootDir
+
+		// Create a hierarchy with all node types
+		try fs.createFileAndIntermediaryDirs(at: "/a/file")
+		try fs.createDir(at: "/a/dir")
+		try fs.createSymlink(at: "/a/link", to: "/a/file")
+		#if canImport(Darwin)
+			try fs.createFinderAlias(at: "/a/alias", to: "/a/dir")
+		#endif
+
+		// Test individual descendant sequences
+		let files = Array(root.allDescendantFiles())
+		let dirs = Array(root.allDescendantDirs())
+		let symlinks = Array(root.allDescendantSymlinks())
+
+		#expect(Set(files.map(\.path)) == ["/a/file"])
+		#expect(Set(dirs.map(\.path)) == ["/a", "/a/dir"])
+		#expect(Set(symlinks.map(\.path)) == ["/a/link"])
+
+		#if canImport(Darwin)
+			let aliases = Array(root.allDescendantFinderAliases())
+			#expect(Set(aliases.map(\.path)) == ["/a/alias"])
+		#endif
+
+		// Test that allDescendantNodes includes everything
+		let allNodes = Array(root.allDescendantNodes())
+		#if canImport(Darwin)
+			#expect(allNodes.count == 5) // dir /a, file, dir, link, alias
+		#else
+			#expect(allNodes.count == 4) // dir /a, file, dir, link
+		#endif
 	}
 }
 

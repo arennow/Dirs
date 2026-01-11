@@ -8,6 +8,7 @@ This project is cross-platform, and is explicitly tested on macOS and Ubuntu Lin
 - New tests should structurally match the existing tests – specifically the `fsKind: FSKind` argument. They should be placed near other tests that cover similar topics or behaviors.
 - If you introduce new warnings in the editing process, resolve them or explain to me why you can't
 - Prefer to use functions on `FilesystemInterface` for instantiating the various `Node`-conforming types rather than directly intializing those types
+- Try to avoid force unwraps, but if you can't conveniently or efficiently do so, add a comment above it explaining how you can prove its safety
 
 ## Style preferences
 - Prefer to use `self.`-style references when possible

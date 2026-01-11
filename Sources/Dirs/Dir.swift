@@ -40,20 +40,8 @@ public struct Dir: Node {
 
 public extension Dir {
 	func children() throws -> Children {
-		var dirs = Array<Dir>()
-		var files = Array<File>()
-
 		let childFilePathStats = try self.fs.contentsOf(directory: self)
-
-		for childFilePathStat in childFilePathStats {
-			if childFilePathStat.isDirectory {
-				dirs.append(try .init(_fs: self._fs, path: childFilePathStat.filePath))
-			} else {
-				files.append(try .init(_fs: self._fs, path: childFilePathStat.filePath))
-			}
-		}
-
-		return Children(directories: dirs, files: files)
+		return try Children.from(self, childStats: childFilePathStats)
 	}
 
 	private func childNode<T: Node>(named component: FilePath.Component, in listKP: KeyPath<Children, Array<T>>) -> T? {
@@ -82,6 +70,28 @@ public extension Dir {
 	func childDir(named component: FilePath.Component) -> Dir? {
 		self.childNode(named: component, in: \.directories)
 	}
+
+	func childSymlink(named component: FilePath.Component) -> Symlink? {
+		self.childNode(named: component, in: \.symlinks)
+	}
+
+	func childSymlink(named name: String) -> Symlink? {
+		FilePath.Component(name).flatMap {
+			self.childNode(named: $0, in: \.symlinks)
+		}
+	}
+
+	#if canImport(Darwin)
+		func childFinderAlias(named component: FilePath.Component) -> FinderAlias? {
+			self.childNode(named: component, in: \.finderAliases)
+		}
+
+		func childFinderAlias(named name: String) -> FinderAlias? {
+			FilePath.Component(name).flatMap {
+				self.childNode(named: $0, in: \.finderAliases)
+			}
+		}
+	#endif
 
 	func newOrExistingChildFile(named name: String) throws -> File {
 		try self.childFile(named: name) ?? self.createFile(at: name)
@@ -117,6 +127,16 @@ public extension Dir {
 		self.descendantNode(at: relativePath, extractor: Dir.childDir)
 	}
 
+	func descendantSymlink(at relativePath: FilePath) -> Symlink? {
+		self.descendantNode(at: relativePath, extractor: Dir.childSymlink)
+	}
+
+	#if canImport(Darwin)
+		func descendantFinderAlias(at relativePath: FilePath) -> FinderAlias? {
+			self.descendantNode(at: relativePath, extractor: Dir.childFinderAlias)
+		}
+	#endif
+
 	func isAncestor(of other: some Node) throws -> Bool {
 		try self.impl_isAncestor(of: other)
 	}
@@ -127,28 +147,54 @@ public extension Dir {
 		struct State {
 			var dirs: Array<Dir>
 			var files: Array<File>
+			var symlinks: Array<Symlink>
+			#if canImport(Darwin)
+				var finderAliases: Array<FinderAlias>
+			#endif
 		}
 
 		let state = if let children = try? self.children() {
-			State(dirs: children.directories,
-				  files: children.files)
+			#if canImport(Darwin)
+				State(dirs: children.directories, files: children.files, symlinks: children.symlinks, finderAliases: children.finderAliases)
+			#else
+				State(dirs: children.directories, files: children.files, symlinks: children.symlinks)
+			#endif
 		} else {
-			State(dirs: [],
-				  files: [])
+			#if canImport(Darwin)
+				State(dirs: [], files: [], symlinks: [], finderAliases: [])
+			#else
+				State(dirs: [], files: [], symlinks: [])
+			#endif
 		}
 
 		return sequence(state: state) { state -> Optional<any Node> in
 			if let nextFile = state.files.popLast() {
 				return nextFile
-			} else if let nextDir = state.dirs.popLast() {
+			}
+
+			if let nextSymlink = state.symlinks.popLast() {
+				return nextSymlink
+			}
+
+			#if canImport(Darwin)
+				if let nextFinderAlias = state.finderAliases.popLast() {
+					return nextFinderAlias
+				}
+			#endif
+
+			if let nextDir = state.dirs.popLast() {
 				if let children = try? nextDir.children() {
 					state.dirs.append(contentsOf: children.directories)
 					state.files.append(contentsOf: children.files)
+					state.symlinks.append(contentsOf: children.symlinks)
+					#if canImport(Darwin)
+						state.finderAliases.append(contentsOf: children.finderAliases)
+					#endif
 				}
 				return nextDir
-			} else {
-				return nil
 			}
+
+			return nil
 		}
 	}
 
@@ -159,6 +205,16 @@ public extension Dir {
 	func allDescendantDirs() -> some Sequence<Dir> {
 		self.allDescendantNodes().compactMap { $0 as? Dir }
 	}
+
+	func allDescendantSymlinks() -> some Sequence<Symlink> {
+		self.allDescendantNodes().compactMap { $0 as? Symlink }
+	}
+
+	#if canImport(Darwin)
+		func allDescendantFinderAliases() -> some Sequence<FinderAlias> {
+			self.allDescendantNodes().compactMap { $0 as? FinderAlias }
+		}
+	#endif
 }
 
 public extension Dir {

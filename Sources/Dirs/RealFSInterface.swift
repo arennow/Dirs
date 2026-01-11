@@ -111,7 +111,7 @@ public struct RealFSInterface: FilesystemInterface {
 		let fm = FileManager.default
 
 		return try fm.contentsOfDirectory(at: rawURL,
-										  includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+										  includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .isAliasFileKey])
 			.map { rawURL in
 				var chrootRelativeFilePath = FilePath(rawURL.path)
 				if let chroot = self.chroot {
@@ -121,16 +121,30 @@ public struct RealFSInterface: FilesystemInterface {
 					chrootRelativeFilePath.root = "/"
 				}
 
-				let isDir: Bool
+				let nodeType: NodeType
 				if try rawURL.getBoolResourceValue(forKey: .isSymbolicLinkKey) {
-					var isDirObjCBool: ObjCBool = false
-					_ = fm.fileExists(atPath: rawURL.path, isDirectory: &isDirObjCBool)
-					isDir = isDirObjCBool.boolValue
+					nodeType = .symlink
 				} else {
-					isDir = try rawURL.getBoolResourceValue(forKey: .isDirectoryKey)
+					#if canImport(Darwin)
+						if try rawURL.getBoolResourceValue(forKey: .isAliasFileKey) {
+							nodeType = .finderAlias
+						} else if try rawURL.getBoolResourceValue(forKey: .isDirectoryKey) {
+							nodeType = .dir
+						} else {
+							nodeType = .file
+						}
+					#else
+						// On Linux, isAliasFileKey exists but throws NoResourceAvailable when accessed
+						// So we skip checking it entirely
+						if try rawURL.getBoolResourceValue(forKey: .isDirectoryKey) {
+							nodeType = .dir
+						} else {
+							nodeType = .file
+						}
+					#endif
 				}
 
-				return FilePathStat(filePath: chrootRelativeFilePath, isDirectory: isDir)
+				return FilePathStat(filePath: chrootRelativeFilePath, nodeType: nodeType)
 			}
 	}
 
