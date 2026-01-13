@@ -210,17 +210,19 @@ public final class MockFSInterface: FilesystemInterface {
 	}
 
 	public func contentsOf(directory ifp: some Dirs.IntoFilePath) throws -> Array<Dirs.FilePathStat> {
-		try self.contentsOf(directory: ifp, using: self.pathsToNodes.acquireIntoHandle())
+		let fp = ifp.into()
+		return try self.contentsOf(directory: fp, requestedPath: fp, using: self.pathsToNodes.acquireIntoHandle())
 	}
 
 	private func contentsOf(directory ifp: some Dirs.IntoFilePath,
+							requestedPath: FilePath,
 							using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws -> Array<Dirs.FilePathStat>
 	{
 		let fp = try Self.resolveParentSymlinks(of: ifp, in: acquisitionLock.resource)
 
 		switch acquisitionLock.resource[fp] {
 			case .none: throw NoSuchNode(path: fp)
-			case .symlink(let destination, _): return try self.contentsOf(directory: destination, using: acquisitionLock)
+			case .symlink(let destination, _): return try self.contentsOf(directory: destination, requestedPath: requestedPath, using: acquisitionLock)
 			case .dir: break
 			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
 		}
@@ -235,7 +237,20 @@ public final class MockFSInterface: FilesystemInterface {
 			// Safe force-unwrap: childFilePath came from acquisitionLock.resource.keys
 			// And we're still holding the lock
 			let node = acquisitionLock.resource[childFilePath]!
-			return FilePathStat(filePath: childFilePath, nodeType: node.nodeType)
+
+			// If we followed symlinks (requestedPath != fp), replace the resolved path prefix
+			// with the requested path prefix
+			let finalPath: FilePath
+			if requestedPath != fp {
+				var relativePath = childFilePath
+				let didRemove = relativePath.removePrefix(fp)
+				precondition(didRemove)
+				finalPath = requestedPath.appending(relativePath.components)
+			} else {
+				finalPath = childFilePath
+			}
+
+			return FilePathStat(filePath: finalPath, nodeType: node.nodeType)
 		}
 	}
 

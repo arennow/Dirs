@@ -105,7 +105,8 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
-		let (resolvedPath, _) = try self.resolveSymlinksAndGetNodeType(at: ifp)
+		let requestedPath = ifp.into()
+		let (resolvedPath, _) = try self.resolveSymlinksAndGetNodeType(at: requestedPath)
 		let rawURL = URL(fileURLWithPath: self.resolveToRaw(resolvedPath).string)
 
 		let fm = FileManager.default
@@ -119,6 +120,14 @@ public struct RealFSInterface: FilesystemInterface {
 					precondition(didRemove)
 					// removing the prefix also turns this into a relative path so:
 					chrootRelativeFilePath.root = "/"
+				}
+
+				// If the requested path differs from the resolved path (i.e., we followed symlinks),
+				// replace the resolved path prefix with the requested path prefix
+				if requestedPath != resolvedPath {
+					let didRemove = chrootRelativeFilePath.removePrefix(resolvedPath)
+					precondition(didRemove)
+					chrootRelativeFilePath = requestedPath.appending(chrootRelativeFilePath.components)
 				}
 
 				let nodeType: NodeType

@@ -9,6 +9,7 @@ This project is cross-platform, and is explicitly tested on macOS and Ubuntu Lin
 - If you introduce new warnings in the editing process, resolve them or explain to me why you can't
 - Prefer to use functions on `FilesystemInterface` for instantiating the various `Node`-conforming types rather than directly intializing those types
 - Try to avoid force unwraps, but if you can't conveniently or efficiently do so, add a comment above it explaining how you can prove its safety
+- For any "Into" types (e.g., `IntoFilePath`), don't resolve them (`.into()`) more than once on any path through a function
 
 ## Style preferences
 - Prefer to use `self.`-style references when possible

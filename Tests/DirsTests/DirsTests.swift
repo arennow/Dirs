@@ -1128,8 +1128,8 @@ extension DirsTests {
 		])
 
 		try #expect(Set(fs.contentsOf(directory: "/s")) == [
-			.init(filePath: "/d/d1", nodeType: .file),
-			.init(filePath: "/d/d2", nodeType: .file),
+			.init(filePath: "/s/d1", nodeType: .file),
+			.init(filePath: "/s/d2", nodeType: .file),
 		])
 	}
 
@@ -1340,6 +1340,69 @@ extension DirsTests {
 		#if canImport(Darwin)
 			#expect(root.descendantFinderAlias(at: "a/b/nonexistent") == nil)
 		#endif
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func descendantNodeAccessorFunctionsResolveDeeplyNestedSymlinks(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let root = try fs.rootDir
+
+		// Create a 10-layer deep structure with real directories
+		// Path: /r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/
+		try fs.createFileAndIntermediaryDirs(at: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/file")
+		try fs.createDir(at: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/dir")
+		try fs.createSymlink(at: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/link_to_file", to: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/file")
+		try fs.createSymlink(at: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/link_to_dir", to: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/dir")
+
+		// Create alternating symlinks for even-numbered levels (0, 2, 4, 6, 8)
+		// s0 -> r0, r0/r1/s2 -> r0/r1/r2, r0/r1/r2/r3/s4 -> r0/r1/r2/r3/r4, etc.
+		try fs.createSymlink(at: "/s0", to: "/r0")
+		try fs.createSymlink(at: "/r0/r1/s2", to: "/r0/r1/r2")
+		try fs.createSymlink(at: "/r0/r1/r2/r3/s4", to: "/r0/r1/r2/r3/r4")
+		try fs.createSymlink(at: "/r0/r1/r2/r3/r4/r5/s6", to: "/r0/r1/r2/r3/r4/r5/r6")
+		try fs.createSymlink(at: "/r0/r1/r2/r3/r4/r5/r6/r7/s8", to: "/r0/r1/r2/r3/r4/r5/r6/r7/r8")
+
+		// Test 1: Access file through deeply nested path with alternating symlinks
+		// Path requested: /s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/file
+		// Should resolve to: /r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/file
+		// But returned path should be the requested one (with symlinks preserved)
+		let deepFile = root.descendantFile(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/file")
+		#expect(deepFile?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/file")
+
+		// Test 2: Access directory through deeply nested path with alternating symlinks
+		let deepDir = root.descendantDir(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/dir")
+		#expect(deepDir?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/dir")
+
+		// Test 3: Access symlink through deeply nested path with alternating symlinks
+		let deepSymlink = root.descendantSymlink(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
+		#expect(deepSymlink?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
+
+		// Test 4: Final component is a symlink to a file
+		// descendantFile looks for an actual file, not a symlink-to-file, so this should be nil
+		// (This is the expected behavior - the type-specific accessors look for that specific type)
+		let fileViaSymlink = root.descendantFile(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
+		#expect(fileViaSymlink == nil)
+
+		// But we CAN get it as a symlink
+		let symlinkToFile = root.descendantSymlink(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
+		#expect(symlinkToFile?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
+
+		// Test 5: Final component is a symlink to a directory
+		// Similarly, descendantDir looks for an actual directory, not a symlink-to-directory
+		let dirViaSymlink = root.descendantDir(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_dir")
+		#expect(dirViaSymlink == nil)
+
+		// But we CAN get it as a symlink
+		let symlinkToDir = root.descendantSymlink(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_dir")
+		#expect(symlinkToDir?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_dir")
+
+		// Test 6: However, intermediate symlinks in the path ARE followed
+		// We can traverse THROUGH a symlink-to-dir in the middle of the path
+		try fs.createFile(at: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/dir/nested_file")
+
+		// This works because 's0', 's2', etc. are intermediate components that resolve to dirs
+		let nestedFileThroughPath = root.descendantFile(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/dir/nested_file")
+		#expect(nestedFileThroughPath?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/dir/nested_file")
 	}
 }
 

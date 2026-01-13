@@ -109,8 +109,13 @@ public extension Dir {
 				return extractor(currentDir)(posNextComp.element)
 			}
 
-			if let subDir = currentDir.childDir(named: posNextComp.element) {
-				currentDir = subDir
+			let componentPath = currentDir.path.appending(posNextComp.element)
+			if case .dir = self.fs.nodeTypeFollowingSymlinks(at: componentPath) {
+				if let subDir = try? self.fs.dir(at: componentPath) {
+					currentDir = subDir
+				} else {
+					break
+				}
 			} else {
 				break
 			}
