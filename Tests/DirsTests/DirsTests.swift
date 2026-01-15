@@ -1343,6 +1343,44 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
+	func descendantNodeAccessorsFunctionValidateIntermediatePaths(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let root = try fs.rootDir
+
+		try fs.createFileAndIntermediaryDirs(at: "/real/nested/file")
+		try fs.createFile(at: "/file_not_dir")
+		#if canImport(Darwin)
+			try fs.createFinderAlias(at: "/real/nested/alias", to: "/real/nested/file")
+		#endif
+
+		#expect(root.descendantFile(at: "nonexistent/nested/file") == nil)
+		#expect(root.descendantDir(at: "nonexistent/nested/dir") == nil)
+		#expect(root.descendantSymlink(at: "nonexistent/nested/link") == nil)
+		#if canImport(Darwin)
+			#expect(root.descendantFinderAlias(at: "nonexistent/nested/alias") == nil)
+		#endif
+
+		#expect(root.descendantFile(at: "file_not_dir/nested/file") == nil)
+		#expect(root.descendantDir(at: "file_not_dir/nested/dir") == nil)
+		#if canImport(Darwin)
+			#expect(root.descendantFinderAlias(at: "file_not_dir/nested/alias") == nil)
+		#endif
+
+		#expect(root.descendantFile(at: "real/nested/nonexistent") == nil)
+		#expect(root.descendantDir(at: "real/nested/nonexistent") == nil)
+		#if canImport(Darwin)
+			#expect(root.descendantFinderAlias(at: "real/nested/nonexistent") == nil)
+		#endif
+
+		#expect(root.descendantFile(at: "file_not_dir/anything") == nil)
+
+		#expect(root.descendantFile(at: "real/nested/file")?.path == "/real/nested/file")
+		#if canImport(Darwin)
+			#expect(root.descendantFinderAlias(at: "real/nested/alias")?.path == "/real/nested/alias")
+		#endif
+	}
+
+	@Test(arguments: FSKind.allCases)
 	func descendantNodeAccessorFunctionsResolveDeeplyNestedSymlinks(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 		let root = try fs.rootDir

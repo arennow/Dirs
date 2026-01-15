@@ -95,21 +95,8 @@ public extension Dir {
 	}
 
 	private func descendantNode<T: Node>(at relativePath: FilePath, nodeGetter: (any FilesystemInterface, FilePath) throws -> T) -> T? {
-		var currentPath = self.path
-
-		for posNextComp in relativePath.positionalComponents {
-			let componentPath = currentPath.appending(posNextComp.element)
-
-			if posNextComp.position.hasLast {
-				return try? nodeGetter(self.fs, componentPath)
-			} else if case .dir = self.fs.nodeTypeFollowingSymlinks(at: componentPath) {
-				currentPath = componentPath
-			} else {
-				break
-			}
-		}
-
-		return nil
+		// The FS interfaces handle all intermediate path validation
+		try? nodeGetter(self.fs, self.path.appending(relativePath.components))
 	}
 
 	func descendantFile(at relativePath: FilePath) -> File? {
