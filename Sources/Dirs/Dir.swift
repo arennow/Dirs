@@ -44,51 +44,44 @@ public extension Dir {
 		return try Children.from(self, childStats: childFilePathStats)
 	}
 
-	private func childNode<T: Node>(named component: FilePath.Component, in listKP: KeyPath<Children, Array<T>>) -> T? {
-		try? self.children()[keyPath: listKP]
-			.first { node in
-				node.path.lastComponent == component
-			}
-	}
-
 	func childFile(named component: FilePath.Component) -> File? {
-		self.childNode(named: component, in: \.files)
+		try? self.fs.file(at: self.path.appending(component))
 	}
 
 	func childFile(named name: String) -> File? {
 		FilePath.Component(name).flatMap {
-			self.childNode(named: $0, in: \.files)
+			try? self.fs.file(at: self.path.appending($0))
 		}
 	}
 
 	func childDir(named name: String) -> Dir? {
 		FilePath.Component(name).flatMap {
-			self.childNode(named: $0, in: \.directories)
+			try? self.fs.dir(at: self.path.appending($0))
 		}
 	}
 
 	func childDir(named component: FilePath.Component) -> Dir? {
-		self.childNode(named: component, in: \.directories)
+		try? self.fs.dir(at: self.path.appending(component))
 	}
 
 	func childSymlink(named component: FilePath.Component) -> Symlink? {
-		self.childNode(named: component, in: \.symlinks)
+		try? self.fs.symlink(at: self.path.appending(component))
 	}
 
 	func childSymlink(named name: String) -> Symlink? {
 		FilePath.Component(name).flatMap {
-			self.childNode(named: $0, in: \.symlinks)
+			try? self.fs.symlink(at: self.path.appending($0))
 		}
 	}
 
 	#if canImport(Darwin)
 		func childFinderAlias(named component: FilePath.Component) -> FinderAlias? {
-			self.childNode(named: component, in: \.finderAliases)
+			try? self.fs.finderAlias(at: self.path.appending(component))
 		}
 
 		func childFinderAlias(named name: String) -> FinderAlias? {
 			FilePath.Component(name).flatMap {
-				self.childNode(named: $0, in: \.finderAliases)
+				try? self.fs.finderAlias(at: self.path.appending($0))
 			}
 		}
 	#endif
@@ -101,21 +94,16 @@ public extension Dir {
 		try self.childDir(named: name) ?? self.createDir(at: name)
 	}
 
-	private func descendantNode<T: Node>(at relativePath: FilePath, extractor: (Dir) -> (FilePath.Component) -> T?) -> T? {
-		var currentDir = self
+	private func descendantNode<T: Node>(at relativePath: FilePath, nodeGetter: (any FilesystemInterface, FilePath) throws -> T) -> T? {
+		var currentPath = self.path
 
 		for posNextComp in relativePath.positionalComponents {
-			guard !posNextComp.position.hasLast else {
-				return extractor(currentDir)(posNextComp.element)
-			}
+			let componentPath = currentPath.appending(posNextComp.element)
 
-			let componentPath = currentDir.path.appending(posNextComp.element)
-			if case .dir = self.fs.nodeTypeFollowingSymlinks(at: componentPath) {
-				if let subDir = try? self.fs.dir(at: componentPath) {
-					currentDir = subDir
-				} else {
-					break
-				}
+			if posNextComp.position.hasLast {
+				return try? nodeGetter(self.fs, componentPath)
+			} else if case .dir = self.fs.nodeTypeFollowingSymlinks(at: componentPath) {
+				currentPath = componentPath
 			} else {
 				break
 			}
@@ -125,20 +113,20 @@ public extension Dir {
 	}
 
 	func descendantFile(at relativePath: FilePath) -> File? {
-		self.descendantNode(at: relativePath, extractor: Dir.childFile)
+		self.descendantNode(at: relativePath, nodeGetter: { try $0.file(at: $1) })
 	}
 
 	func descendantDir(at relativePath: FilePath) -> Dir? {
-		self.descendantNode(at: relativePath, extractor: Dir.childDir)
+		self.descendantNode(at: relativePath, nodeGetter: { try $0.dir(at: $1) })
 	}
 
 	func descendantSymlink(at relativePath: FilePath) -> Symlink? {
-		self.descendantNode(at: relativePath, extractor: Dir.childSymlink)
+		self.descendantNode(at: relativePath, nodeGetter: { try $0.symlink(at: $1) })
 	}
 
 	#if canImport(Darwin)
 		func descendantFinderAlias(at relativePath: FilePath) -> FinderAlias? {
-			self.descendantNode(at: relativePath, extractor: Dir.childFinderAlias)
+			self.descendantNode(at: relativePath, nodeGetter: { try $0.finderAlias(at: $1) })
 		}
 	#endif
 

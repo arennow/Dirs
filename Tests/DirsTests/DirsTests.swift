@@ -1378,26 +1378,24 @@ extension DirsTests {
 		#expect(deepSymlink?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
 
 		// Test 4: Final component is a symlink to a file
-		// descendantFile looks for an actual file, not a symlink-to-file, so this should be nil
-		// (This is the expected behavior - the type-specific accessors look for that specific type)
+		// We can get a file through a symlink path, and it returns the symlink path
 		let fileViaSymlink = root.descendantFile(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
-		#expect(fileViaSymlink == nil)
+		#expect(fileViaSymlink?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
 
-		// But we CAN get it as a symlink
+		// We can also still get it as a symlink using descendantSymlink
 		let symlinkToFile = root.descendantSymlink(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
 		#expect(symlinkToFile?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
 
 		// Test 5: Final component is a symlink to a directory
-		// Similarly, descendantDir looks for an actual directory, not a symlink-to-directory
+		// Similarly, descendantDir follows symlinks
 		let dirViaSymlink = root.descendantDir(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_dir")
-		#expect(dirViaSymlink == nil)
+		#expect(dirViaSymlink?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_dir")
 
-		// But we CAN get it as a symlink
+		// We can also get it as a symlink
 		let symlinkToDir = root.descendantSymlink(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_dir")
 		#expect(symlinkToDir?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_dir")
 
-		// Test 6: However, intermediate symlinks in the path ARE followed
-		// We can traverse THROUGH a symlink-to-dir in the middle of the path
+		// Test 6: We can traverse through symlinks in the path and continue into subdirectories
 		try fs.createFile(at: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/dir/nested_file")
 
 		// This works because 's0', 's2', etc. are intermediate components that resolve to dirs
