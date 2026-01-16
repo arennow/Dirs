@@ -31,9 +31,9 @@ extension URL {
 		return number.boolValue
 	}
 
-	@available(macOS, obsoleted: 13)
-	@available(iOS, obsoleted: 16)
-	@available(tvOS, obsoleted: 16)
+	@available(macOS, deprecated: 13)
+	@available(iOS, deprecated: 16)
+	@available(tvOS, deprecated: 16)
 	func pathNonPercentEncoded() -> String {
 		if #available(macOS 13, iOS 16, tvOS 16, *) {
 			self.path(percentEncoded: false)
