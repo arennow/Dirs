@@ -6,6 +6,8 @@ This project is cross-platform, and is explicitly tested on macOS and Ubuntu Lin
 ## Editing guidelines
 - Begin by adding tests that describe the desired new/changed behavior. Iterate on the tests and the `RealFSInterface` implementation until all the tests pass (with the desired behavior). Then iterate on `MockFSInterface` until it matches established and verified behavior. Do not under any circumstances conditionlize behavior based on whether the code is running on a real or mock interface.
 - New tests should structurally match the existing tests – specifically the `fsKind: FSKind` argument. They should be placed near other tests that cover similar topics or behaviors.
+- No test should ever rely on correct behavior to avoid crashing. Tests should never crash.
+	- That means, among other things, using `#require` to verify assumptions (e.g., before using literal array subscripts)
 - If you introduce new warnings in the editing process, resolve them or explain to me why you can't
 - Prefer to use functions on `FilesystemInterface` for instantiating the various `Node`-conforming types rather than directly intializing those types
 - Try to avoid force unwraps, but if you can't conveniently or efficiently do so, add a comment above it explaining how you can prove its safety
