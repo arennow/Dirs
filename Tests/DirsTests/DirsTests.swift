@@ -172,6 +172,23 @@ struct DirsTests: ~Copyable {
 		try #expect(fs.contentsOf(file: "/a") == Data("content".utf8))
 	}
 
+	@Test(arguments: FSKind.allCases)
+	func nodeIsEqual(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let file1 = try fs.createFile(at: "/file1")
+		let file2 = try fs.createFile(at: "/file2")
+		let dir = try fs.createDir(at: "/dir")
+
+		let file1AsNode: any Node = file1
+		let file2AsNode: any Node = file2
+		let dirAsNode: any Node = dir
+
+		#expect(file1.isEqual(to: file1AsNode))
+		#expect(!file1.isEqual(to: file2AsNode))
+		#expect(!file1.isEqual(to: dirAsNode))
+		#expect(dir.isEqual(to: dirAsNode))
+	}
+
 	// MARK: - Create File
 
 	@Test(arguments: FSKind.allCases)

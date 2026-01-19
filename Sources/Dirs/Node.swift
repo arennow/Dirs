@@ -14,6 +14,11 @@ public extension Node {
 		lhs.fs.isEqual(to: rhs.fs) && lhs.path == rhs.path
 	}
 
+	func isEqual(to other: any Node) -> Bool {
+		guard let other = other as? Self else { return false }
+		return self == other
+	}
+
 	func into() -> FilePath { self.path }
 }
 
