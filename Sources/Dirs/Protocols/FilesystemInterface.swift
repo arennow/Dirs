@@ -19,8 +19,8 @@ public enum NodeType: Sendable {
 }
 
 public enum DirLookupKind: String, Sendable {
-	case documents, cache, temporary
-	case uniqueTemporary
+	case home, downloads, documents, cache
+	case temporary, uniqueTemporary
 }
 
 public protocol FilesystemInterface: Equatable, Sendable {

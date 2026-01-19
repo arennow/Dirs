@@ -179,11 +179,14 @@ public struct RealFSInterface: FilesystemInterface {
 			url = temp.into()
 		} else if dlk == .temporary {
 			url = NSTemporaryDirectory().into()
+		} else if dlk == .home {
+			url = FileManager.default.homeDirectoryForCurrentUser
 		} else {
 			let fmSearchPath: FileManager.SearchPathDirectory = switch dlk {
+				case .downloads: .downloadsDirectory
 				case .documents: .documentDirectory
 				case .cache: .cachesDirectory
-				case .temporary, .uniqueTemporary: preconditionFailure("Shouldn't be reachable")
+				case .home, .temporary, .uniqueTemporary: preconditionFailure("Shouldn't be reachable")
 			}
 
 			guard let innerURL = FileManager.default.urls(for: fmSearchPath, in: .userDomainMask).first else {

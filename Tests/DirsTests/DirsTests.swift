@@ -1060,6 +1060,16 @@ extension DirsTests {
 		#expect(one == two)
 	}
 
+	@Test(arguments: FSKind.allCases, [DirLookupKind.home, .downloads])
+	func dirLookupHomeAndDownloads(_ fsKind: FSKind, dlk: DirLookupKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let one = try fs.lookUpDir(dlk)
+		let two = try fs.lookUpDir(dlk)
+
+		#expect(one == two)
+	}
+
 	@Test(arguments: FSKind.allCases)
 	func dirLookupUniqueTemporary(_ fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)

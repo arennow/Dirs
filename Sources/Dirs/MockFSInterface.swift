@@ -288,6 +288,8 @@ public final class MockFSInterface: FilesystemInterface {
 		let path = switch dlk {
 			case .temporary: "/_temporary"
 			case .uniqueTemporary: "/_temporary/\(UUID().uuidString)"
+			case .home: "/Users/TestUser"
+			case .downloads: "/Users/TestUser/Downloads"
 			default: "/_system_\(dlk.rawValue)"
 		}
 		return try Dir(_fs: self.asInterface, path: path, createIfNeeded: true)
