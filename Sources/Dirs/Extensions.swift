@@ -3,10 +3,6 @@ import SystemPackage
 
 public extension FilePath {
 	var url: URL { URL(fileURLWithPath: self.string) }
-
-	var positionalComponents: some Collection<PositionalElement<FilePath.Component>> {
-		self.components.positionEnumerated()
-	}
 }
 
 extension URL {
@@ -40,22 +36,5 @@ extension URL {
 		} else {
 			self.path
 		}
-	}
-}
-
-public extension Collection {
-	func positionEnumerated() -> some Collection<PositionalElement<Element>> {
-		let lastIndex = self.index(self.endIndex, offsetBy: -1, limitedBy: self.startIndex)
-
-		func pos(for index: Index) -> CollectionPosition {
-			var out: CollectionPosition = []
-			if index == self.startIndex { out.insert(.first) }
-			if index == lastIndex { out.insert(.last) }
-			return out
-		}
-
-		return zip(self.indices, self)
-			.lazy
-			.map { PositionalElement(position: pos(for: $0), element: $1) }
 	}
 }
