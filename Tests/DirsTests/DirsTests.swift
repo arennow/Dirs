@@ -896,9 +896,9 @@ extension DirsTests {
 	func renameFileToAbsoluteFails(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.rootDir.createFile(at: "a")
+		var file = try fs.rootDir.createFile(at: "a")
 		#expect(throws: InvalidPathForCall.needSingleComponent) {
-			try fs.renameNode(at: "/a", to: "b/c")
+			try file.rename(to: "b/c")
 		}
 	}
 
@@ -906,9 +906,9 @@ extension DirsTests {
 	func renameFileWithMultipleComponents(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.rootDir.createFile(at: "a")
+		var file = try fs.rootDir.createFile(at: "a")
 		#expect(throws: InvalidPathForCall.needSingleComponent) {
-			try fs.renameNode(at: "/a", to: "/b")
+			try file.rename(to: "/b")
 		}
 	}
 
@@ -916,8 +916,9 @@ extension DirsTests {
 	func renameFileToNewPathSucceeds(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.rootDir.createFile(at: "a").replaceContents("hello")
-		try fs.renameNode(at: "/a", to: "b")
+		var file = try fs.rootDir.createFile(at: "a")
+		try file.replaceContents("hello")
+		try file.rename(to: "b")
 
 		try #expect(fs.file(at: "/b").stringContents() == "hello")
 		#expect(fs.nodeType(at: "/a") == nil)
@@ -927,8 +928,9 @@ extension DirsTests {
 	func renameDirToNewPathSucceeds(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.rootDir.createDir(at: "dir1").createFile(at: "file").replaceContents("world")
-		try fs.renameNode(at: "/dir1", to: "dir2")
+		var dir = try fs.rootDir.createDir(at: "dir1")
+		try dir.createFile(at: "file").replaceContents("world")
+		try dir.rename(to: "dir2")
 
 		try #expect(fs.file(at: "/dir2/file").stringContents() == "world")
 		#expect(fs.nodeType(at: "/dir1") == nil)
@@ -939,9 +941,9 @@ extension DirsTests {
 		let fs = self.fs(for: fsKind)
 
 		try fs.rootDir.createFile(at: "target").replaceContents("data")
-		try fs.rootDir.createSymlink(at: "link", to: "/target")
+		var symlink = try fs.rootDir.createSymlink(at: "link", to: "/target")
 
-		try fs.renameNode(at: "/link", to: "linkRenamed")
+		try symlink.rename(to: "linkRenamed")
 
 		try #expect(fs.destinationOf(symlink: "/linkRenamed") == "/target")
 		#expect(fs.nodeType(at: "/link") == nil)
@@ -952,9 +954,9 @@ extension DirsTests {
 		let fs = self.fs(for: fsKind)
 
 		try fs.rootDir.createDir(at: "dirTarget").createFile(at: "f").replaceContents("x")
-		try fs.rootDir.createSymlink(at: "dirLink", to: "/dirTarget")
+		var symlink = try fs.rootDir.createSymlink(at: "dirLink", to: "/dirTarget")
 
-		try fs.renameNode(at: "/dirLink", to: "renamedLink")
+		try symlink.rename(to: "renamedLink")
 
 		try #expect(fs.destinationOf(symlink: "/renamedLink") == "/dirTarget")
 		#expect(fs.nodeType(at: "/dirLink") == nil)
@@ -965,47 +967,49 @@ extension DirsTests {
 		let fs = self.fs(for: fsKind)
 
 		// file→file conflict
-		try fs.rootDir.createFile(at: "src").replaceContents("x")
+		var src = try fs.rootDir.createFile(at: "src")
+		try src.replaceContents("x")
 		try fs.rootDir.createFile(at: "dest")
 		#expect(throws: NodeAlreadyExists.self) {
-			try fs.renameNode(at: "/src", to: "dest")
+			try src.rename(to: "dest")
 		}
 
 		// dir→dir conflict
-		try fs.rootDir.createDir(at: "d1")
+		var d1 = try fs.rootDir.createDir(at: "d1")
 		try fs.rootDir.createDir(at: "d2")
 		#expect(throws: NodeAlreadyExists.self) {
-			try fs.renameNode(at: "/d1", to: "d2")
+			try d1.rename(to: "d2")
 		}
 
 		// file→dir conflict
-		try fs.rootDir.createFile(at: "f")
+		var f = try fs.rootDir.createFile(at: "f")
 		try fs.rootDir.createDir(at: "d3")
 		#expect(throws: NodeAlreadyExists.self) {
-			try fs.renameNode(at: "/f", to: "d3")
+			try f.rename(to: "d3")
 		}
 
 		// dir→file conflict
-		try fs.rootDir.createDir(at: "d4")
+		var d4 = try fs.rootDir.createDir(at: "d4")
 		try fs.rootDir.createFile(at: "f2")
 		#expect(throws: NodeAlreadyExists.self) {
-			try fs.renameNode(at: "/d4", to: "f2")
+			try d4.rename(to: "f2")
 		}
 
 		// file→symlink conflict
-		try fs.rootDir.createFile(at: "file1").replaceContents("a")
+		var file1 = try fs.rootDir.createFile(at: "file1")
+		try file1.replaceContents("a")
 		try fs.rootDir.createFile(at: "targetFile")
 		try fs.rootDir.createSymlink(at: "linkToFile", to: "/targetFile")
 		#expect(throws: NodeAlreadyExists.self) {
-			try fs.renameNode(at: "/file1", to: "linkToFile")
+			try file1.rename(to: "linkToFile")
 		}
 
 		// dir→symlink conflict
-		try fs.rootDir.createDir(at: "d")
+		var d = try fs.rootDir.createDir(at: "d")
 		try fs.rootDir.createDir(at: "targetDir")
 		try fs.rootDir.createSymlink(at: "linkToDir", to: "/targetDir")
 		#expect(throws: NodeAlreadyExists.self) {
-			try fs.renameNode(at: "/d", to: "linkToDir")
+			try d.rename(to: "linkToDir")
 		}
 	}
 
