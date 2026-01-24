@@ -2460,45 +2460,59 @@ extension DirsTests {
 		#expect(retrieved == Data("dir value".utf8))
 	}
 
-	@Test(arguments: FSKind.allCases)
-	func extendedAttributesOnSymlink(fsKind: FSKind) throws {
-		#if os(Linux)
-			// Despite the existence of lsetxattr/lgetxattr/etc., the Linux kernel VFS
-			// prohibits user-namespaced xattrs on symlinks (security/system namespaced
-			// xattrs can exist in special cases, but not the normal user.* variety).
-			// From xattr(7): "User extended attributes may be assigned to files and
-			// directories for storing arbitrary additional information..."
-			// Symlinks are conspicuously absent. This is a Linux VFS policy due to
-			// mandatory xattr namespacing. Operations return EOPNOTSUPP.
-			guard fsKind == .mock else { return }
-		#endif
+	// Despite the existence of lsetxattr/lgetxattr/etc., the Linux kernel VFS
+	// prohibits user-namespaced xattrs on symlinks (security/system namespaced
+	// xattrs can exist in special cases, but not the normal user.* variety).
+	// From xattr(7): "User extended attributes may be assigned to files and
+	// directories for storing arbitrary additional information..."
+	// Symlinks are conspicuously absent. This is a Linux VFS policy due to
+	// mandatory xattr namespacing. Operations return EOPNOTSUPP.
+	#if !os(Linux)
+		@Test(arguments: FSKind.allCases)
+		func extendedAttributesOnSymlink(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			let target = try fs.createFile(at: "/target")
+			let symlink = try fs.createSymlink(at: "/link", to: "/target")
 
-		let fs = self.fs(for: fsKind)
-		let target = try fs.createFile(at: "/target")
-		let symlink = try fs.createSymlink(at: "/link", to: "/target")
+			let attrName = "user.linkattr"
+			let value1 = Data("v1".utf8)
+			let value2 = Data("v2".utf8)
 
-		let attrName = "user.linkattr"
-		let value1 = Data("v1".utf8)
-		let value2 = Data("v2".utf8)
+			#expect(try symlink.extendedAttributeNames().isEmpty)
+			#expect(try target.extendedAttributeNames().isEmpty)
 
-		#expect(try symlink.extendedAttributeNames().isEmpty)
-		#expect(try target.extendedAttributeNames().isEmpty)
+			try symlink.setExtendedAttribute(named: attrName, to: value1)
+			#expect(try symlink.extendedAttributeNames() == [attrName])
+			#expect(try target.extendedAttributeNames().isEmpty)
 
-		try symlink.setExtendedAttribute(named: attrName, to: value1)
-		#expect(try symlink.extendedAttributeNames() == [attrName])
-		#expect(try target.extendedAttributeNames().isEmpty)
+			#expect(try symlink.extendedAttribute(named: attrName) == value1)
+			#expect(try target.extendedAttribute(named: attrName) == nil)
 
-		#expect(try symlink.extendedAttribute(named: attrName) == value1)
-		#expect(try target.extendedAttribute(named: attrName) == nil)
+			try symlink.setExtendedAttribute(named: attrName, to: value2)
+			#expect(try symlink.extendedAttribute(named: attrName) == value2)
+			#expect(try target.extendedAttribute(named: attrName) == nil)
 
-		try symlink.setExtendedAttribute(named: attrName, to: value2)
-		#expect(try symlink.extendedAttribute(named: attrName) == value2)
-		#expect(try target.extendedAttribute(named: attrName) == nil)
+			try symlink.removeExtendedAttribute(named: attrName)
+			#expect(try symlink.extendedAttributeNames().isEmpty)
+			#expect(try target.extendedAttributeNames().isEmpty)
+		}
+	#else // Linux
+		@Test(arguments: FSKind.allCases)
+		func linuxProhibitsUserNamespacedXattrsOnSymlinks(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			_ = try fs.createFile(at: "/target")
 
-		try symlink.removeExtendedAttribute(named: attrName)
-		#expect(try symlink.extendedAttributeNames().isEmpty)
-		#expect(try target.extendedAttributeNames().isEmpty)
-	}
+			let symlink = try fs.createSymlink(at: "/link", to: "/target")
+			#expect(throws: (any Error).self) {
+				try symlink.setExtendedAttribute(named: "user.test", to: "value")
+			}
+
+			let brokenSymlink = try fs.createSymlink(at: "/broken", to: "/nonexistent")
+			#expect(throws: (any Error).self) {
+				try brokenSymlink.setExtendedAttribute(named: "user.broken", to: "value")
+			}
+		}
+	#endif
 
 	@Test(arguments: FSKind.allCases)
 	func extendedAttributeStringConvenience(fsKind: FSKind) throws {

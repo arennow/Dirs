@@ -587,6 +587,14 @@ public final class MockFSInterface: FilesystemInterface {
 
 			try self.pathsToNodes.mutate { ptn in
 				var (node, resolvedFP) = try Self.existingParentResolvedNode(at: fp, in: ptn)
+
+				#if os(Linux)
+					// Linux kernel VFS prohibits user-namespaced xattrs on symlinks
+					if node.nodeType == .symlink, name.hasPrefix("user.") {
+						throw POSIXError(.EOPNOTSUPP, userInfo: [NSFilePathErrorKey: fp.string])
+					}
+				#endif
+
 				node.xattrs[name] = value
 				ptn[resolvedFP] = node
 			}
