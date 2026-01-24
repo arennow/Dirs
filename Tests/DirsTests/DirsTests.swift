@@ -806,6 +806,29 @@ extension DirsTests {
 		try sym.move(to: d)
 		#expect(sym.path == "/d/s2")
 	}
+
+	@Test(arguments: FSKind.allCases, NodeType.allCases)
+	func movePreservesExtendedAttributes(fsKind: FSKind, nodeType: NodeType) throws {
+		#if os(Linux)
+			// Linux kernel VFS prohibits user-namespaced xattrs on symlinks
+			guard nodeType != .symlink else { return }
+		#endif
+
+		let fs = self.fs(for: fsKind)
+		var (node, _) = try nodeType.createNode(at: "/source", in: fs)
+
+		let originalXattrs = try node.extendedAttributeNames()
+		try node.setExtendedAttribute(named: "user.test", to: "value")
+		let expectedXattrs = originalXattrs.union(["user.test"])
+
+		try node.move(to: "/dest")
+
+		#expect(node.path == "/dest")
+		let movedXattrs = try node.extendedAttributeNames()
+		#expect(movedXattrs == expectedXattrs)
+		#expect(try node.extendedAttributeString(named: "user.test") == "value")
+		#expect(fs.nodeType(at: "/source") == nil)
+	}
 }
 
 // MARK: - Copies
@@ -901,6 +924,32 @@ extension DirsTests {
 
 		try #expect(fs.file(at: "/e/d/a").stringContents() == "a")
 		try #expect(fs.file(at: "/e/d/b/c").stringContents() == "c")
+	}
+
+	@Test(arguments: FSKind.allCases, NodeType.allCases)
+	func copyPreservesExtendedAttributes(fsKind: FSKind, nodeType: NodeType) throws {
+		#if os(Linux)
+			// Linux kernel VFS prohibits user-namespaced xattrs on symlinks
+			guard nodeType != .symlink else { return }
+		#endif
+
+		let fs = self.fs(for: fsKind)
+		let (node, _) = try nodeType.createNode(at: "/source", in: fs)
+
+		let originalXattrs = try node.extendedAttributeNames()
+		try node.setExtendedAttribute(named: "user.test", to: "value")
+		let expectedXattrs = originalXattrs.union(["user.test"])
+
+		try node.copy(to: "/dest")
+
+		let sourceXattrs = try node.extendedAttributeNames()
+		#expect(sourceXattrs == expectedXattrs)
+		#expect(try node.extendedAttributeString(named: "user.test") == "value")
+
+		let copied = try fs.node(at: "/dest")
+		let copiedXattrs = try copied.extendedAttributeNames()
+		#expect(copiedXattrs == expectedXattrs)
+		#expect(try copied.extendedAttributeString(named: "user.test") == "value")
 	}
 }
 

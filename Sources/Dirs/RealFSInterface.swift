@@ -268,8 +268,10 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func copyNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws {
+		let srcFP = source.into()
+
 		var destURL: URL = self.resolveToRaw(destination)
-		let srcURL: URL = self.resolveToRaw(source)
+		let srcURL: URL = self.resolveToRaw(srcFP)
 		let fm = FileManager.default
 
 		var isDirectory: ObjCBool = false
@@ -282,6 +284,18 @@ public struct RealFSInterface: FilesystemInterface {
 		}
 
 		try fm.copyItem(at: srcURL, to: destURL)
+
+		#if !canImport(Darwin)
+			// `FileManager.copyItem`` only preserves extended attributes on Darwin
+			// (because it uses `copyfile` under the hood). On other platforms, we have to
+			// copy them manually.
+			let xattrNames = try self.extendedAttributeNames(at: srcFP)
+			for name in xattrNames {
+				if let value = try self.extendedAttribute(named: name, at: srcFP) {
+					try self.setExtendedAttribute(named: name, to: value, at: FilePath(destURL.path))
+				}
+			}
+		#endif
 	}
 
 	public func deleteNode(at ifp: some IntoFilePath) throws {
