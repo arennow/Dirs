@@ -21,10 +21,6 @@ public struct File: Node {
 		self.path = fp
 	}
 
-	public func hash(into hasher: inout Hasher) {
-		hasher.combine(self.path)
-	}
-
 	public mutating func move(to destination: some IntoFilePath) throws {
 		self.path = try self.fs.moveNode(from: self, to: destination)
 	}

@@ -201,6 +201,28 @@ struct DirsTests: ~Copyable {
 		}
 	}
 
+	@Test(arguments: FSKind.allCases, NodeType.allCases)
+	func hashBehavior(fsKind: FSKind, nodeType: NodeType) throws {
+		let fs = self.fs(for: fsKind)
+
+		var (node, _) = try nodeType.createNode(at: "/old", in: fs)
+
+		// Equal nodes have same hash
+		let node1 = try fs.node(at: "/old")
+		let node2 = try fs.node(at: "/old")
+		#expect(node1.isEqual(to: node2))
+		#expect(node1.hashValue == node2.hashValue)
+
+		// Hash is consistent within execution
+		#expect(node.hashValue == node.hashValue)
+
+		// Hash updates after rename
+		let oldHash = node.hashValue
+		try node.rename(to: "new")
+		let newHash = node.hashValue
+		#expect(oldHash != newHash)
+	}
+
 	// MARK: - Create File
 
 	@Test(arguments: FSKind.allCases)
