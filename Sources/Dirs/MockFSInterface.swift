@@ -572,7 +572,17 @@ public final class MockFSInterface: FilesystemInterface {
 		}
 
 		public func extendedAttribute(named name: String, at ifp: some IntoFilePath) throws -> Data? {
-			try self.pathsToNodes.read { ptn in
+			let fp = ifp.into()
+
+			#if os(Linux)
+				// Linux requires extended attribute names to be properly namespaced
+				let validPrefixes = ["security.", "system.", "trusted.", "user."]
+				if !validPrefixes.contains(where: { name.hasPrefix($0) }) {
+					throw POSIXError(.EOPNOTSUPP, userInfo: [NSFilePathErrorKey: fp.string])
+				}
+			#endif
+
+			return try self.pathsToNodes.read { ptn in
 				let (node, _) = try Self.existingParentResolvedNode(at: ifp, in: ptn)
 				return node.xattrs[name]
 			}
@@ -591,6 +601,12 @@ public final class MockFSInterface: FilesystemInterface {
 				#if os(Linux)
 					// Linux kernel VFS prohibits user-namespaced xattrs on symlinks
 					if node.nodeType == .symlink, name.hasPrefix("user.") {
+						throw POSIXError(.EOPNOTSUPP, userInfo: [NSFilePathErrorKey: fp.string])
+					}
+
+					// Linux requires extended attribute names to be properly namespaced
+					let validPrefixes = ["security.", "system.", "trusted.", "user."]
+					if !validPrefixes.contains(where: { name.hasPrefix($0) }) {
 						throw POSIXError(.EOPNOTSUPP, userInfo: [NSFilePathErrorKey: fp.string])
 					}
 				#endif

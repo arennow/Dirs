@@ -2435,14 +2435,24 @@ extension DirsTests {
 		}
 
 		let file = try fs.createFile(at: "/test")
-		let longName = String(repeating: "a", count: limit + 1)
+
+		#if os(Linux)
+			// On Linux, xattr names must be properly namespaced
+			let longName = "user." + String(repeating: "a", count: limit + 1)
+		#else
+			let longName = String(repeating: "a", count: limit + 1)
+		#endif
 
 		#expect(throws: XAttrNameTooLong.self) {
 			try file.setExtendedAttribute(named: longName, to: Data("value".utf8))
 		}
 
 		if case .mock = fsKind {
-			let atLimitName = String(repeating: "b", count: limit)
+			#if os(Linux)
+				let atLimitName = "user." + String(repeating: "b", count: limit - 5)
+			#else
+				let atLimitName = String(repeating: "b", count: limit)
+			#endif
 			#expect(throws: Never.self) {
 				try file.setExtendedAttribute(named: atLimitName, to: Data("ok".utf8))
 			}
@@ -2510,6 +2520,50 @@ extension DirsTests {
 			let brokenSymlink = try fs.createSymlink(at: "/broken", to: "/nonexistent")
 			#expect(throws: (any Error).self) {
 				try brokenSymlink.setExtendedAttribute(named: "user.broken", to: "value")
+			}
+		}
+
+		@Test(arguments: FSKind.allCases, NonResolvableNodeType.allCases)
+		func linuxRequiresXattrNamespacing(fsKind: FSKind, nodeType: NonResolvableNodeType) throws {
+			// On Linux, extended attribute names must be namespaced with one of:
+			// - security.* (requires CAP_SYS_ADMIN)
+			// - system.* (for specific uses like ACLs)
+			// - trusted.* (requires CAP_SYS_ADMIN)
+			// - user.* (available to all users on regular files/dirs)
+			// Names without proper namespace prefix should fail with EOPNOTSUPP
+			// See xattr(7) for details
+			let fs = self.fs(for: fsKind)
+			let node = try nodeType.createNonResolvableNode(at: "/test", in: fs)
+
+			// Valid namespaced attribute should work
+			#expect(throws: Never.self) {
+				try node.setExtendedAttribute(named: "user.valid", to: "value")
+			}
+
+			// Invalid attribute names without proper namespace
+			let invalidNames = [
+				"nonamespace", // No namespace at all
+				"invalid.name", // Invalid namespace
+				"user", // Namespace without dot
+				".leadingdot", // Leading dot without namespace
+				"my.custom.namespace", // Custom namespace not in allowed set
+			]
+
+			for invalidName in invalidNames {
+				#expect(throws: (any Error).self) {
+					try node.setExtendedAttribute(named: invalidName, to: "test")
+				}
+
+				#expect(throws: (any Error).self) {
+					_ = try node.extendedAttribute(named: invalidName)
+				}
+			}
+
+			let validNames = try node.extendedAttributeNames()
+			#expect(validNames == ["user.valid"])
+
+			#expect(throws: Never.self) {
+				try node.removeExtendedAttribute(named: "user.valid")
 			}
 		}
 	#endif
