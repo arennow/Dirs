@@ -65,14 +65,12 @@ public extension Node {
 
 		var (otherRP, selfRP) = switch try other.impl_impl_isAncestor(of: self) {
 			// The order ⬇️ has to match the order of the function call ⬆️
-			case .noRealpath: try Self.rp(other, self)
+			case .noRealpath: (other.path, self.path)
 			case .yesRealpath(let o, let s): (o, s)
 			case .none: throw nndError
 		}
 
-		guard selfRP.removePrefix(otherRP) else {
-			throw nndError
-		}
+		_ = selfRP.removePrefix(otherRP)
 		return selfRP
 	}
 

@@ -195,6 +195,7 @@ struct DirsTests: ~Copyable {
 
 		let (newNode, optionalTarget) = try nodeType.createNode(at: "/newNode", in: fs)
 		#expect(newNode.path == "/newNode")
+		#expect(newNode.nodeType == nodeType)
 		if nodeType.isResolvable {
 			let target = try #require(optionalTarget)
 			#expect(target.path == "/target")
@@ -1721,6 +1722,17 @@ extension DirsTests {
 	func nodePathRelativeToDir(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 		let symlinks = try Self.prepareForSymlinkTests(fs)
+
+		let parent = try fs.createDir(at: "/parent")
+		let child = try parent.createFile(at: "child")
+		let deepDir = try parent.createDir(at: "deeply/nested")
+		let nested = try deepDir.createFile(at: "file")
+
+		try #expect(child.descendantPath(from: parent) == "child")
+		try #expect(nested.descendantPath(from: parent) == "deeply/nested/file")
+
+		try #expect(parent.descendantPath(from: parent) == "")
+		try #expect(child.descendantPath(from: child) == "")
 
 		let d = try fs.dir(at: "/d")
 		let descFile = try fs.file(at: "/d/e/e1")
