@@ -269,18 +269,29 @@ public struct RealFSInterface: FilesystemInterface {
 
 	public func copyNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws {
 		let srcFP = source.into()
+		let destFP = destination.into()
 
-		var destURL: URL = self.resolveToRaw(destination)
+		var destURL: URL = self.resolveToRaw(destFP)
 		let srcURL: URL = self.resolveToRaw(srcFP)
 		let fm = FileManager.default
 
-		var isDirectory: ObjCBool = false
-		if fm.fileExists(atPath: destURL.pathNonPercentEncoded(), isDirectory: &isDirectory) {
-			if isDirectory.boolValue {
+		let destType = self.nodeType(at: destFP)
+		switch destType {
+			case .symlink:
+				if let resolvedType = self.nodeTypeFollowingSymlinks(at: destFP), resolvedType == .dir {
+					destURL.appendPathComponent(srcURL.lastPathComponent)
+				} else {
+					try fm.removeItem(at: destURL)
+				}
+			case .dir:
 				destURL.appendPathComponent(srcURL.lastPathComponent)
-			} else {
+			#if canImport(Darwin)
+				case .finderAlias: fallthrough
+			#endif
+			case .file:
 				try fm.removeItem(at: destURL)
-			}
+			case .none:
+				break
 		}
 
 		try fm.copyItem(at: srcURL, to: destURL)

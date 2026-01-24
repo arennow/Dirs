@@ -307,11 +307,108 @@ struct DirsTests: ~Copyable {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func replaceContentsOfFileThroughBrokenSymlinkFails(fsKind: FSKind) throws {
+	func brokenSymlinkBehavior(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.createSymlink(at: "/s", to: "/a")
+		let brokenSym = try fs.createSymlink(at: "/s", to: "/nonexistent")
+
+		#expect(fs.nodeType(at: "/s") == .symlink)
+
+		try #expect(fs.destinationOf(symlink: "/s") == "/nonexistent")
+
 		#expect(throws: (any Error).self) { try fs.replaceContentsOfFile(at: "/s", to: "abc") }
+
+		#expect(throws: (any Error).self) { try fs.appendContentsOfFile(at: "/s", with: "abc") }
+
+		#expect(throws: (any Error).self) { try fs.createFile(at: "/s") }
+
+		#expect(throws: (any Error).self) { try fs.createDir(at: "/s") }
+
+		#expect(throws: (any Error).self) { try fs.contentsOf(directory: "/s") }
+
+		#expect(throws: (any Error).self) { try fs.contentsOf(file: "/s") }
+
+		#expect(throws: (any Error).self) { try fs.sizeOfFile(at: "/s") }
+
+		#expect(throws: (any Error).self) { try brokenSym.realpath() }
+
+		#expect(throws: NoSuchNode.self) { try brokenSym.resolve() }
+
+		#expect(throws: Never.self) { try fs.deleteNode(at: "/s") }
+		#expect(fs.nodeType(at: "/s") == nil)
+
+		// Copying a broken symlink should succeed
+		let brokenSym2 = try fs.createSymlink(at: "/s2", to: "/alsoNonexistent")
+		try brokenSym2.copy(to: "/s2_copy")
+		#expect(fs.nodeType(at: "/s2_copy") == .symlink)
+		try #expect(fs.destinationOf(symlink: "/s2_copy") == "/alsoNonexistent")
+
+		// Copying over a broken symlink should succeed
+		try fs.createFile(at: "/file").replaceContents("content")
+		_ = try fs.createSymlink(at: "/broken_dest", to: "/nowhere")
+		try fs.file(at: "/file").copy(to: "/broken_dest")
+		#expect(fs.nodeType(at: "/broken_dest") == .file)
+		try #expect(fs.file(at: "/broken_dest").stringContents() == "content")
+
+		// Realpath on a chain of symlinks that ends in a broken link should fail
+		try fs.createSymlink(at: "/chain1", to: "/chain2")
+		try fs.createSymlink(at: "/chain2", to: "/chain3")
+		try fs.createSymlink(at: "/chain3", to: "/broken_target")
+		#expect(fs.nodeType(at: "/chain1") == .symlink)
+		#expect(throws: (any Error).self) { try fs.file(at: "/chain1") }
+		let chain1Sym = try fs.symlink(at: "/chain1")
+		#expect(throws: (any Error).self) { try chain1Sym.realpath() }
+
+		// Moving a broken symlink should succeed
+		var brokenSym3 = try fs.createSymlink(at: "/broken_to_move", to: "/missing")
+		try brokenSym3.move(to: "/broken_moved")
+		#expect(brokenSym3.path == "/broken_moved")
+		#expect(fs.nodeType(at: "/broken_moved") == .symlink)
+		try #expect(fs.destinationOf(symlink: "/broken_moved") == "/missing")
+		#expect(fs.nodeType(at: "/broken_to_move") == nil)
+
+		// Renaming a broken symlink should succeed
+		var brokenSym4 = try fs.createSymlink(at: "/broken_to_rename", to: "/absent")
+		try brokenSym4.rename(to: "broken_renamed")
+		#expect(brokenSym4.path == "/broken_renamed")
+		#expect(fs.nodeType(at: "/broken_renamed") == .symlink)
+		try #expect(fs.destinationOf(symlink: "/broken_renamed") == "/absent")
+
+		// pointsToSameNode with broken symlinks should fail
+		let workingFile = try fs.createFile(at: "/working")
+		#expect(throws: (any Error).self) { try brokenSym4.pointsToSameNode(as: workingFile) }
+
+		// parent property should work on broken symlinks
+		let brokenParent = try brokenSym4.parent
+		#expect(brokenParent.path == "/")
+
+		// isAncestor should work with broken symlinks when paths match directly
+		// but fail when realpath is needed
+		let subdir = try fs.createDir(at: "/subdir")
+		let fileInSubdir = try subdir.createFile(at: "file")
+		let brokenInSubdir = try fs.createSymlink(at: "/subdir/broken", to: "/void")
+		// This works because /subdir/broken starts with /subdir (no realpath needed)
+		#expect(try subdir.isAncestor(of: brokenInSubdir))
+		// This fails because broken symlink's realpath can't be computed
+		#expect(throws: (any Error).self) { try brokenInSubdir.isAncestor(of: fileInSubdir) }
+
+		#if canImport(Darwin) || os(Linux)
+			// Extended attributes on broken symlinks
+			let brokenForXattr = try fs.createSymlink(at: "/broken_xattr", to: "/nowhere")
+			#if os(Linux)
+				// Linux kernel VFS prohibits user-namespaced xattrs on symlinks
+				#expect(throws: (any Error).self) {
+					try brokenForXattr.setExtendedAttribute(named: "user.test", to: "value")
+				}
+			#else
+				// On macOS, extended attributes on broken symlinks should work
+				try brokenForXattr.setExtendedAttribute(named: "user.test", to: "value")
+				let retrievedValue = try brokenForXattr.extendedAttributeString(named: "user.test")
+				#expect(retrievedValue == "value")
+				let xattrNames = try brokenForXattr.extendedAttributeNames()
+				#expect(xattrNames.contains("user.test"))
+			#endif
+		#endif
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -1792,6 +1889,10 @@ extension DirsTests {
 		try #expect(descFile.descendantPath(from: symlinks.dirSym) == "e/e1")
 
 		#expect(throws: NodeNotDescendantError.self, performing: { try a.descendantPath(from: d) })
+
+		let brokenSym = try fs.createSymlink(at: "/broken_desc", to: "/nonexistent")
+		#expect(throws: (any Error).self) { try a.descendantPath(from: brokenSym) }
+		#expect(throws: (any Error).self) { try brokenSym.descendantPath(from: parent) }
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -1854,6 +1955,21 @@ extension DirsTests {
 		#expect(throws: Never.self) { try fs.deleteNode(at: "/sd/d1") }
 		#expect(fs.nodeType(at: "/d/d1") == nil)
 		#expect(fs.nodeType(at: "/sd/d1") == nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func operationsThroughBrokenSymlinkInParentPathFail(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createSymlink(at: "/broken", to: "/nonexistent")
+
+		#expect(throws: (any Error).self) { try fs.createFile(at: "/broken/file") }
+		#expect(throws: (any Error).self) { try fs.createDir(at: "/broken/dir") }
+		#expect(throws: (any Error).self) { try fs.createSymlink(at: "/broken/link", to: "/target") }
+		#expect(throws: (any Error).self) { try fs.contentsOf(directory: "/broken") }
+		#expect(throws: (any Error).self) { try fs.replaceContentsOfFile(at: "/broken/file", to: "abc") }
+		#expect(throws: (any Error).self) { try fs.deleteNode(at: "/broken/file") }
+		#expect(fs.nodeType(at: "/broken/file") == nil)
 	}
 
 	@Test(arguments: FSKind.allCases)

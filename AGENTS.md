@@ -4,7 +4,8 @@ This project is a high-level abstraction of filesystem interactions. It features
 This project is cross-platform, and is explicitly tested on macOS and Ubuntu Linux. Some features only exist on some platforms or work differently on different platforms, but in all situations, the observable behavior between real and mock FS implementations must be identical.
 
 ## Editing guidelines
-- Begin by adding tests that describe the desired new/changed behavior. Iterate on the tests and the `RealFSInterface` implementation until all the tests pass (with the desired behavior). Then iterate on `MockFSInterface` until it matches established and verified behavior. Do not under any circumstances conditionlize behavior based on whether the code is running on a real or mock interface.
+- Begin by adding tests that describe the desired new/changed behavior. Iterate on the tests and the `RealFSInterface` implementation until all the tests pass (with the desired behavior). Then iterate on `MockFSInterface` until it matches established and verified behavior.
+- Do not under any circumstances conditionlize behavior based on whether the code is running on a real or mock interface. This is important, so I'll say it again differently: NEVER CONDITIONALIZE TEST CODE BASED ON REAL OR MOCK FILESYSTEM INTERFACE. This is ALWAYS wrong to do.
 - New tests should structurally match the existing tests – specifically the `fsKind: FSKind` argument. They should be placed near other tests that cover similar topics or behaviors.
 - No test should ever rely on correct behavior to avoid crashing. Tests should never crash.
 	- That means, among other things, using `#require` to verify assumptions (e.g., before using literal array subscripts)
@@ -19,6 +20,8 @@ This project is cross-platform, and is explicitly tested on macOS and Ubuntu Lin
 - Prefer a "coalescing" case (e.g., `case .some(let x): throw WrongNodeType(path: fp, actualType: x)`) instead of explicit cases for nearly identical "all the other cases" situations
 	- Unless a simple `default:` will work, then prefer that
 - Prefer `any P` over plain `P` for protocol existential types
+- Avoid writing comments that describe obvious behavior or which make reference (implicit or otherwise) to information or history only contained in the conversation history
+	- Assume the reader of the code is an experience Swift developer
 
 ## Testing instructions
 - After each change, make sure all tests pass with `swift test -q`
