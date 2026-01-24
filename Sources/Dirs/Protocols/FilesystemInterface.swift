@@ -11,13 +11,6 @@ public struct FilePathStat: Hashable, Equatable {
 	}
 }
 
-public enum NodeType: Sendable {
-	case dir, file, symlink
-	#if canImport(Darwin)
-		case finderAlias
-	#endif
-}
-
 public enum DirLookupKind: String, Sendable {
 	case home, downloads, documents, cache
 	case temporary, uniqueTemporary

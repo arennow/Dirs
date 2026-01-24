@@ -1,0 +1,80 @@
+public enum NodeType: Sendable, CaseIterable {
+	case dir, file, symlink
+	#if canImport(Darwin)
+		case finderAlias
+	#endif
+
+	public var isResolvable: Bool {
+		switch self {
+			#if canImport(Darwin)
+				case .finderAlias: fallthrough
+			#endif
+			case .symlink: return true
+			default: return false
+		}
+	}
+
+	private var nonResolvableNodeType: Optional<NonResolvableNodeType> {
+		switch self {
+			case .dir: .dir
+			case .file: .file
+			default: nil
+		}
+	}
+
+	private var resolvableNodeType: Optional<ResolvableNodeType> {
+		switch self {
+			#if canImport(Darwin)
+				case .finderAlias: .finderAlias
+			#endif
+			case .symlink: .symlink
+			default: nil
+		}
+	}
+
+	public func createNode(at pathIFP: some IntoFilePath, in fs: any FilesystemInterface) throws -> (node: any Node, target: Optional<any Node>) {
+		if let nonResolvableType = self.nonResolvableNodeType {
+			(try nonResolvableType.createNonResolvableNode(at: pathIFP, in: fs), nil)
+		} else if let resolvableType = self.resolvableNodeType {
+			try resolvableType.createTargetAndResolvableNode(at: pathIFP, in: fs)
+		} else {
+			fatalError("Unhandled node type: \(self)")
+		}
+	}
+}
+
+public enum NonResolvableNodeType: Sendable, CaseIterable {
+	case dir, file
+
+	public func createNonResolvableNode(at pathIFP: some IntoFilePath, in fs: any FilesystemInterface) throws -> any Node {
+		switch self {
+			case .dir: try fs.createDir(at: pathIFP)
+			case .file: try fs.createFile(at: pathIFP)
+		}
+	}
+}
+
+public enum ResolvableNodeType: Sendable, CaseIterable {
+	case symlink
+	#if canImport(Darwin)
+		case finderAlias
+	#endif
+
+	public func createResolvableNode(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath, in fs: any FilesystemInterface) throws -> any ResolvableNode {
+		switch self {
+			case .symlink: try fs.createSymlink(at: linkIFP, to: destIFP)
+			#if canImport(Darwin)
+				case .finderAlias: try fs.createFinderAlias(at: linkIFP, to: destIFP)
+			#endif
+		}
+	}
+
+	public func createTargetAndResolvableNode(at linkIFP: some IntoFilePath, in fs: any FilesystemInterface) throws -> (node: any Node, target: any Node) {
+		let linkFP = linkIFP.into()
+
+		let linkParent = linkFP.removingLastComponent()
+		let target = try fs.createFile(at: linkParent.appending("target"))
+		let resolvable = try self.createResolvableNode(at: linkFP, to: target, in: fs)
+		return (resolvable, target)
+	}
+}

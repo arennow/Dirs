@@ -189,6 +189,18 @@ struct DirsTests: ~Copyable {
 		#expect(dir.isEqual(to: dirAsNode))
 	}
 
+	@Test(arguments: FSKind.allCases, NodeType.allCases)
+	func createAllNodeKinds(fsKind: FSKind, nodeType: NodeType) throws {
+		let fs = self.fs(for: fsKind)
+
+		let (newNode, optionalTarget) = try nodeType.createNode(at: "/newNode", in: fs)
+		#expect(newNode.path == "/newNode")
+		if nodeType.isResolvable {
+			let target = try #require(optionalTarget)
+			#expect(target.path == "/target")
+		}
+	}
+
 	// MARK: - Create File
 
 	@Test(arguments: FSKind.allCases)
@@ -460,15 +472,14 @@ struct DirsTests: ~Copyable {
 		#expect(d.allDescendantFiles().map(\.name) == ["a"])
 	}
 
-	@Test(arguments: FSKind.allCases, ResolvableKind.allCases)
-	func resolvableKindCreateAndResolve(fsKind: FSKind, rKind: ResolvableKind) throws {
+	@Test(arguments: FSKind.allCases, ResolvableNodeType.allCases)
+	func resolvableKindCreateAndResolve(fsKind: FSKind, rType: ResolvableNodeType) throws {
 		let fs = self.fs(for: fsKind)
 		try fs.createFile(at: "/target")
 
-		let rNode = try rKind.createResolvableNode(at: "/resolvable", to: "/target", in: fs)
-
+		let rNode = try rType.createResolvableNode(at: "/resolvable", to: "/target", in: fs)
 		#expect(rNode.path == "/resolvable")
-		#expect(rNode.resolvableKind == rKind)
+		#expect(rNode.resolvableNodeType == rType)
 
 		let resolved = try rNode.resolve()
 		#expect(resolved.path == "/target")

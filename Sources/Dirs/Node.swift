@@ -2,6 +2,8 @@ import Foundation
 import SystemPackage
 
 public protocol Node: IntoFilePath, Hashable, Sendable {
+	static var nodeType: NodeType { get }
+
 	var fs: any FilesystemInterface { get }
 	var path: FilePath { get }
 
@@ -10,6 +12,8 @@ public protocol Node: IntoFilePath, Hashable, Sendable {
 }
 
 public extension Node {
+	var nodeType: NodeType { Self.nodeType }
+
 	static func == (lhs: Self, rhs: Self) -> Bool {
 		lhs.fs.isEqual(to: rhs.fs) && lhs.path == rhs.path
 	}

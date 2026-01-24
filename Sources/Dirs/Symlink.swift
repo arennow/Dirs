@@ -8,7 +8,8 @@
 import SystemPackage
 
 public struct Symlink: ResolvableNode {
-	public static let resolvableKind: ResolvableKind = .symlink
+	public static let nodeType: NodeType = .symlink
+	public static let resolvableNodeType: ResolvableNodeType = .symlink
 
 	let _fs: FSInterface
 	public var fs: any FilesystemInterface { self._fs.wrapped }

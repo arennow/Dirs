@@ -9,7 +9,8 @@
 	import SystemPackage
 
 	public struct FinderAlias: ResolvableNode {
-		public static let resolvableKind: ResolvableKind = .finderAlias
+		public static let nodeType: NodeType = .finderAlias
+		public static let resolvableNodeType: ResolvableNodeType = .finderAlias
 
 		let _fs: FSInterface
 		public var fs: any FilesystemInterface { self._fs.wrapped }

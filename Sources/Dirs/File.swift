@@ -2,6 +2,8 @@ import Foundation
 import SystemPackage
 
 public struct File: Node {
+	public static let nodeType: NodeType = .file
+
 	let _fs: FSInterface
 	public var fs: any FilesystemInterface { self._fs.wrapped }
 	public private(set) var path: FilePath
