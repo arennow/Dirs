@@ -28,3 +28,4 @@ This project is cross-platform, and is explicitly tested on macOS and Ubuntu Lin
 - After each change, make sure all tests pass with `swift test -q`
 - For some changes, I'll tell you that you should also be testing on a local Ubuntu Linux machine after each change, and to do that, run `just test_linux` (which is equivalent to running `swift test -q` on the VM via ssh)
 	- Only do this during sessions when I've told you to, otherwise the VM won't be available
+- Don't use string names for tests (`@Test("", …`); just name the functions clearly

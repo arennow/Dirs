@@ -28,7 +28,7 @@ public struct Children {
 		}
 	#endif
 
-	static func from(_ dir: Dir, childStats: Array<FilePathStat>) throws -> Self {
+	static func from(_ dir: Dir, childStats: Array<FilePathStat>) -> Self {
 		var dirs = Array<Dir>()
 		var files = Array<File>()
 		var symlinks = Array<Symlink>()
@@ -39,14 +39,14 @@ public struct Children {
 		for childStat in childStats {
 			switch childStat.nodeType {
 				case .dir:
-					dirs.append(try dir.fs.dir(at: childStat.filePath))
+					dirs.append(Dir(uncheckedAt: childStat.filePath, in: dir._fs))
 				case .file:
-					files.append(try dir.fs.file(at: childStat.filePath))
+					files.append(File(uncheckedAt: childStat.filePath, in: dir._fs))
 				case .symlink:
-					symlinks.append(try dir.fs.symlink(at: childStat.filePath))
+					symlinks.append(Symlink(uncheckedAt: childStat.filePath, in: dir._fs))
 				#if canImport(Darwin)
 					case .finderAlias:
-						finderAliases.append(try dir.fs.finderAlias(at: childStat.filePath))
+						finderAliases.append(FinderAlias(uncheckedAt: childStat.filePath, in: dir._fs))
 				#endif
 			}
 		}

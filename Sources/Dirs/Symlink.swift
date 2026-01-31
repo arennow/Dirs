@@ -35,6 +35,11 @@ public struct Symlink: ResolvableNode {
 		self.path = fp
 	}
 
+	init(uncheckedAt path: FilePath, in fs: FSInterface) {
+		self._fs = fs
+		self.path = path
+	}
+
 	public mutating func move(to destination: some IntoFilePath) throws {
 		self.path = try self.fs.moveNode(from: self, to: destination)
 	}

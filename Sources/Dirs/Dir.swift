@@ -27,6 +27,11 @@ public struct Dir: Node {
 		self.path = fp
 	}
 
+	init(uncheckedAt path: FilePath, in fs: FSInterface) {
+		self._fs = fs
+		self.path = path
+	}
+
 	public mutating func move(to destination: some IntoFilePath) throws {
 		self.path = try self.fs.moveNode(from: self, to: destination)
 	}
@@ -39,7 +44,7 @@ public struct Dir: Node {
 public extension Dir {
 	func children() throws -> Children {
 		let childFilePathStats = try self.fs.contentsOf(directory: self)
-		return try Children.from(self, childStats: childFilePathStats)
+		return Children.from(self, childStats: childFilePathStats)
 	}
 
 	func childFile(named component: FilePath.Component) -> File? {
