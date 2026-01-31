@@ -68,8 +68,14 @@ public extension Children {
 			return base
 		#endif
 	}
+}
 
-	var isEmpty: Bool {
+extension Children: Sequence {
+	public func makeIterator() -> some IteratorProtocol<any Node> {
+		self.all.makeIterator()
+	}
+
+	public var isEmpty: Bool {
 		let baseEmpty = self.directories.isEmpty
 			&& self.files.isEmpty
 			&& self.symlinks.isEmpty
@@ -80,7 +86,7 @@ public extension Children {
 		#endif
 	}
 
-	var count: Int {
+	public var count: Int {
 		let baseCount = self.directories.count + self.files.count + self.symlinks.count
 		#if canImport(Darwin)
 			return baseCount + self.finderAliases.count

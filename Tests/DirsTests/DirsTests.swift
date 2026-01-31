@@ -1463,6 +1463,9 @@ extension DirsTests {
 
 		let children = try root.children()
 		let allNodes = Array(children.all)
+		let allNodesFromSequence = Array(children)
+
+		#expect(allNodes.map(\.path) == allNodesFromSequence.map(\.path))
 
 		#if canImport(Darwin)
 			#expect(allNodes.count == 4)
