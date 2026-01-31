@@ -155,6 +155,7 @@ public extension Dir {
 			var dirs: Array<Dir>
 			var files: Array<File>
 			var symlinks: Array<Symlink>
+			var specials: Array<Special>
 			#if canImport(Darwin)
 				var finderAliases: Array<FinderAlias>
 			#endif
@@ -162,15 +163,15 @@ public extension Dir {
 
 		let state = if let children = try? self.children() {
 			#if canImport(Darwin)
-				State(dirs: children.directories, files: children.files, symlinks: children.symlinks, finderAliases: children.finderAliases)
+				State(dirs: children.directories, files: children.files, symlinks: children.symlinks, specials: children.specials, finderAliases: children.finderAliases)
 			#else
-				State(dirs: children.directories, files: children.files, symlinks: children.symlinks)
+				State(dirs: children.directories, files: children.files, symlinks: children.symlinks, specials: children.specials)
 			#endif
 		} else {
 			#if canImport(Darwin)
-				State(dirs: [], files: [], symlinks: [], finderAliases: [])
+				State(dirs: [], files: [], symlinks: [], specials: [], finderAliases: [])
 			#else
-				State(dirs: [], files: [], symlinks: [])
+				State(dirs: [], files: [], symlinks: [], specials: [])
 			#endif
 		}
 
@@ -181,6 +182,10 @@ public extension Dir {
 
 			if let nextSymlink = state.symlinks.popLast() {
 				return nextSymlink
+			}
+
+			if let nextSpecial = state.specials.popLast() {
+				return nextSpecial
 			}
 
 			#if canImport(Darwin)
@@ -194,6 +199,7 @@ public extension Dir {
 					state.dirs.append(contentsOf: children.directories)
 					state.files.append(contentsOf: children.files)
 					state.symlinks.append(contentsOf: children.symlinks)
+					state.specials.append(contentsOf: children.specials)
 					#if canImport(Darwin)
 						state.finderAliases.append(contentsOf: children.finderAliases)
 					#endif
@@ -215,6 +221,10 @@ public extension Dir {
 
 	func allDescendantSymlinks() -> some Sequence<Symlink> {
 		self.allDescendantNodes().compactMap { $0 as? Symlink }
+	}
+
+	func allDescendantSpecials() -> some Sequence<Special> {
+		self.allDescendantNodes().compactMap { $0 as? Special }
 	}
 
 	#if canImport(Darwin)

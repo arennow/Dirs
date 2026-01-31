@@ -41,11 +41,13 @@ public struct RealFSInterface: FilesystemInterface {
 					let url: URL = self.resolveToRaw(ifp)
 					let rv = try url.resourceValues(forKeys: [.fileResourceTypeKey, .isAliasFileKey])
 					switch rv.fileResourceType {
-						case .some(.directory): return .dir
-						case .some(.symbolicLink): return .symlink
-						default:
+						case .directory: return .dir
+						case .symbolicLink: return .symlink
+						case .regular:
 							if rv.isAliasFile == true { return .finderAlias }
 							return .file
+						default:
+							return .special
 					}
 				} catch {
 					return nil
@@ -59,8 +61,9 @@ public struct RealFSInterface: FilesystemInterface {
 			switch attrs?[.type] as? FileAttributeType {
 				case .typeDirectory: return .dir
 				case .typeSymbolicLink: return .symlink
+				case .typeRegular: return .file
 				case .none: return nil
-				default: return .file
+				default: return .special
 			}
 		}
 	#endif
@@ -111,8 +114,13 @@ public struct RealFSInterface: FilesystemInterface {
 
 		let fm = FileManager.default
 
-		return try fm.contentsOfDirectory(at: rawURL,
-										  includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey, .isAliasFileKey])
+		var prefetchKeys: Array<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
+
+		#if canImport(Darwin)
+			prefetchKeys.append(contentsOf: [.isAliasFileKey, .fileResourceTypeKey])
+		#endif
+
+		return try fm.contentsOfDirectory(at: rawURL, includingPropertiesForKeys: prefetchKeys)
 			.map { rawURL in
 				var chrootRelativeFilePath = FilePath(rawURL.path)
 				if let chroot = self.chroot {
@@ -133,22 +141,30 @@ public struct RealFSInterface: FilesystemInterface {
 				let nodeType: NodeType
 				if try rawURL.getBoolResourceValue(forKey: .isSymbolicLinkKey) {
 					nodeType = .symlink
+				} else if try rawURL.getBoolResourceValue(forKey: .isDirectoryKey) {
+					nodeType = .dir
 				} else {
 					#if canImport(Darwin)
 						if try rawURL.getBoolResourceValue(forKey: .isAliasFileKey) {
 							nodeType = .finderAlias
-						} else if try rawURL.getBoolResourceValue(forKey: .isDirectoryKey) {
-							nodeType = .dir
 						} else {
-							nodeType = .file
+							let resourceType = try rawURL.resourceValues(forKeys: [.fileResourceTypeKey]).fileResourceType
+							if resourceType == .regular {
+								nodeType = .file
+							} else {
+								nodeType = .special
+							}
 						}
 					#else
-						// On Linux, isAliasFileKey exists but throws NoResourceAvailable when accessed
-						// So we skip checking it entirely
-						if try rawURL.getBoolResourceValue(forKey: .isDirectoryKey) {
-							nodeType = .dir
-						} else {
+						// On Linux, isAliasFileKey exists but throws NoResourceAvailable when accessed,
+						// so we skip checking it entirely. Also, resourceValues doesn't return
+						// fileResourceType for special files, so we use attributesOfItem to detect them.
+						let attrs = try? FileManager.default.attributesOfItem(atPath: rawURL.path)
+						let fileType = attrs?[.type] as? FileAttributeType
+						if fileType == .typeRegular {
 							nodeType = .file
+						} else {
+							nodeType = .special
 						}
 					#endif
 				}
@@ -287,7 +303,7 @@ public struct RealFSInterface: FilesystemInterface {
 			#if canImport(Darwin)
 				case .finderAlias: fallthrough
 			#endif
-			case .file:
+			case .file, .special:
 				try fm.removeItem(at: destURL)
 			case .none:
 				break

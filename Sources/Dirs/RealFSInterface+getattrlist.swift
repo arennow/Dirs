@@ -64,8 +64,7 @@
 					let kIsAlias: UInt16 = 0x80_00
 					return (finderFlagsBE & kIsAlias) != 0 ? .finderAlias : .file
 				default:
-					// Treat other vnode types as "file" for this classification.
-					return .file
+					return .special
 			}
 		}
 	}

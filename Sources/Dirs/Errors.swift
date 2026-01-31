@@ -42,6 +42,14 @@ public struct DirLookupFailed: Error {
 	}
 }
 
+public struct CantBeCreated: Error {
+	public let nodeType: NodeType
+
+	package init(nodeType: NodeType) {
+		self.nodeType = nodeType
+	}
+}
+
 public enum InvalidPathForCall: Error, Equatable {
 	case needAbsoluteWithComponent
 	case needSingleComponent

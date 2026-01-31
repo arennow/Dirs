@@ -7,6 +7,7 @@ public final class MockFSInterface: FilesystemInterface {
 		case dir(xattrs: Dictionary<String, Data> = [:])
 		case file(data: Data = Data(), xattrs: Dictionary<String, Data> = [:])
 		case symlink(destination: FilePath, xattrs: Dictionary<String, Data> = [:])
+		case special(xattrs: Dictionary<String, Data> = [:])
 		#if canImport(Darwin)
 			case finderAlias(destination: FilePath, xattrs: Dictionary<String, Data> = [:])
 		#endif
@@ -19,6 +20,7 @@ public final class MockFSInterface: FilesystemInterface {
 				#endif
 				case .file: .file
 				case .symlink: .symlink
+				case .special: .special
 			}
 		}
 
@@ -27,7 +29,8 @@ public final class MockFSInterface: FilesystemInterface {
 				switch self {
 					case .dir(let xattrs),
 						 .file(_, let xattrs),
-						 .symlink(_, let xattrs):
+						 .symlink(_, let xattrs),
+						 .special(let xattrs):
 						return xattrs
 					#if canImport(Darwin)
 						case .finderAlias(_, let xattrs):
@@ -43,6 +46,8 @@ public final class MockFSInterface: FilesystemInterface {
 						self = .file(data: data, xattrs: newValue)
 					case .symlink(let destination, _):
 						self = .symlink(destination: destination, xattrs: newValue)
+					case .special:
+						self = .special(xattrs: newValue)
 					#if canImport(Darwin)
 						case .finderAlias(let destination, _):
 							self = .finderAlias(destination: destination, xattrs: newValue)
@@ -406,6 +411,23 @@ public final class MockFSInterface: FilesystemInterface {
 		}
 	#endif
 
+	/// Creates a special node (FIFO, socket, device, etc.) for testing purposes.
+	/// This is only available on MockFSInterface since this library doesn't support
+	/// creating special nodes, but we want to support mocking them for testing.
+	public func createSpecialForTesting(at ifp: some IntoFilePath) throws -> Special {
+		let fp = ifp.into()
+		try self.pathsToNodes.mutate { ptn in
+			let parentFP = fp.removingLastComponent()
+			guard Self.nodeType(at: parentFP, in: ptn, symRes: .resolve) == .dir else {
+				throw NoSuchNode(path: parentFP)
+			}
+
+			let resolvedFP = try Self.resolveParentSymlinks(of: fp, in: ptn)
+			ptn[resolvedFP] = .special()
+		}
+		return try Special(_fs: self.asInterface, path: fp)
+	}
+
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
 		try self.replaceContentsOfFile(at: ifp, to: contents, using: self.pathsToNodes.acquireIntoHandle())
 	}
@@ -485,7 +507,7 @@ public final class MockFSInterface: FilesystemInterface {
 						case .finderAlias: fallthrough
 					#endif
 
-					case .file:
+					case .file, .special:
 						acquisitionLock.resource.removeValue(forKey: destFP)
 						recursivelyMove(destFP: destFP)
 

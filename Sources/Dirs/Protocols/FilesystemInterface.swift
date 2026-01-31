@@ -96,6 +96,10 @@ public extension FilesystemInterface {
 		try Symlink(_fs: self.asInterface, path: ifp.into())
 	}
 
+	func special(at ifp: some IntoFilePath) throws -> Special {
+		try Special(_fs: self.asInterface, path: ifp.into())
+	}
+
 	#if canImport(Darwin)
 		func finderAlias(at ifp: some IntoFilePath) throws -> FinderAlias {
 			try FinderAlias(_fs: self.asInterface, path: ifp.into())
@@ -108,6 +112,7 @@ public extension FilesystemInterface {
 			case .dir: try self.dir(at: fp)
 			case .file: try self.file(at: fp)
 			case .symlink: try self.symlink(at: fp)
+			case .special: try self.special(at: fp)
 			#if canImport(Darwin)
 				case .finderAlias: try self.finderAlias(at: fp)
 			#endif
