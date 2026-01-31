@@ -142,6 +142,7 @@ fileprivate enum IsAncestorProducts {
 /// Nodes that can be resolved to another node (for example symlinks and Finder aliases).
 public protocol ResolvableNode: Node {
 	static var resolvableNodeType: ResolvableNodeType { get }
+	var destination: FilePath { get throws }
 	func resolve() throws -> any Node
 }
 

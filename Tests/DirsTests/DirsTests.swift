@@ -1855,6 +1855,7 @@ extension DirsTests {
 		_ = try fs.createFile(at: "/a")
 		let symlink = try fs.createSymlink(at: "/s", to: "/a")
 
+		#expect(try symlink.destination == "/a")
 		let resolved = try symlink.resolve()
 		#expect(resolved.path == "/a")
 		#expect(resolved.name == "a")
@@ -2343,6 +2344,7 @@ extension DirsTests {
 			try fs.createFile(at: "/target")
 			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
 
+			#expect(try alias.destination == "/target")
 			let resolved = try alias.resolve()
 			#expect(resolved.path == "/target")
 			#expect(resolved.name == "target")

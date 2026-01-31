@@ -44,8 +44,12 @@
 			self.path = try self.fs.renameNode(at: self, to: newName)
 		}
 
+		public var destination: FilePath { 
+			get throws { try self.fs.destinationOfFinderAlias(at: self.path) } 
+		}
+
 		public func resolve() throws -> any Node {
-			let destPath = try self.fs.destinationOfFinderAlias(at: self.path)
+			let destPath = try self.destination
 			return try self.fs.node(at: destPath)
 		}
 	}
