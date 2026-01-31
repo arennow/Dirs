@@ -35,6 +35,10 @@ public extension File {
 		try self.fs.contentsOf(file: self)
 	}
 
+	/// Returns the file's contents as a UTF-8 string.
+	///
+	/// Throws if the file cannot be read. Returns `nil` if the data is not valid UTF-8.
+	/// An empty file returns an empty string.
 	func stringContents() throws -> String? {
 		String(data: try self.contents(), encoding: .utf8)
 	}
