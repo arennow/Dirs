@@ -17,6 +17,7 @@ This project is cross-platform, and is explicitly tested on macOS and Ubuntu Lin
 ## Style preferences
 - Prefer to use `self.`-style references when possible
 - Prefer non-sugared forms for collection types (`Array<T>` and `Dictionary<K, V>` instead of `[T]` and `[K: V]`, respectively)
+- Prefer the non-sugared form `Optional<T>` over `(T)?` when `T?` isn't viable (e.g., `Optional<any Numeric>` instead of `(any Numeric)?`) and for non-`typealias`ed closure types (e.g., `Optional<() -> Void>` instead of `(() -> Void)?`)
 - Prefer a "coalescing" case (e.g., `case .some(let x): throw WrongNodeType(path: fp, actualType: x)`) instead of explicit cases for nearly identical "all the other cases" situations
 	- Unless a simple `default:` will work, then prefer that
 - Prefer `any P` over plain `P` for protocol existential types

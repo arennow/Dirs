@@ -79,4 +79,13 @@ public extension Children {
 			return baseEmpty
 		#endif
 	}
+
+	var count: Int {
+		let baseCount = self.directories.count + self.files.count + self.symlinks.count
+		#if canImport(Darwin)
+			return baseCount + self.finderAliases.count
+		#else
+			return baseCount
+		#endif
+	}
 }

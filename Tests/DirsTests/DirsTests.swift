@@ -1491,6 +1491,27 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
+	func childrenCountWorks(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let emptyDir = try fs.createDir(at: "/empty")
+		#expect(try emptyDir.children().count == 0)
+
+		let dir = try fs.createDir(at: "/dir")
+		try fs.createFile(at: "/dir/file1")
+		try fs.createFile(at: "/dir/file2")
+		try fs.createDir(at: "/dir/subdir")
+		try fs.createSymlink(at: "/dir/link", to: "/dir/file1")
+
+		#if canImport(Darwin)
+			try fs.createFinderAlias(at: "/dir/alias", to: "/dir/subdir")
+			#expect(try dir.children().count == 5) // 2 files, 1 dir, 1 symlink, 1 alias
+		#else
+			#expect(try dir.children().count == 4) // 2 files, 1 dir, 1 symlink
+		#endif
+	}
+
+	@Test(arguments: FSKind.allCases)
 	func childNodeAccessorFunctions(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 		let root = try fs.rootDir
@@ -1527,6 +1548,29 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
+	func childNodeGenericAccessor(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let root = try fs.rootDir
+
+		try fs.createFile(at: "/myfile")
+		try fs.createDir(at: "/mydir")
+		try fs.createSymlink(at: "/mylink", to: "/myfile")
+		#if canImport(Darwin)
+			try fs.createFinderAlias(at: "/myalias", to: "/mydir")
+		#endif
+
+		#expect(root.child(named: FilePath.Component("myfile"))?.path == "/myfile")
+		#expect(root.child(named: "myfile")?.path == "/myfile")
+		#expect(root.child(named: "myfile") is File)
+		#expect(root.child(named: "mydir") is Dir)
+		#expect(root.child(named: "mylink") is Symlink)
+		#if canImport(Darwin)
+			#expect(root.child(named: "myalias") is FinderAlias)
+		#endif
+		#expect(root.child(named: "nonexistent") == nil)
+	}
+
+	@Test(arguments: FSKind.allCases)
 	func descendantNodeAccessorFunctions(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 		let root = try fs.rootDir
@@ -1551,6 +1595,37 @@ extension DirsTests {
 		#if canImport(Darwin)
 			#expect(root.descendantFinderAlias(at: "a/b/nonexistent") == nil)
 		#endif
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func descendantNodeGenericAccessor(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let root = try fs.rootDir
+
+		try fs.createFileAndIntermediaryDirs(at: "/a/b/file")
+		try fs.createDir(at: "/a/b/dir")
+		try fs.createSymlink(at: "/a/b/link", to: "/a/b/file")
+		#if canImport(Darwin)
+			try fs.createFinderAlias(at: "/a/b/alias", to: "/a/b/dir")
+		#endif
+
+		// Test with FilePath
+		#expect(root.descendant(at: FilePath("a/b/file")) is File)
+		#expect(root.descendant(at: FilePath("a/b/dir")) is Dir)
+		#expect(root.descendant(at: FilePath("a/b/link")) is Symlink)
+		#if canImport(Darwin)
+			#expect(root.descendant(at: FilePath("a/b/alias")) is FinderAlias)
+		#endif
+
+		// Test with String
+		#expect(root.descendant(at: "a/b/file") is File)
+		#expect(root.descendant(at: "a/b/dir") is Dir)
+		#expect(root.descendant(at: "a/b/link") is Symlink)
+		#if canImport(Darwin)
+			#expect(root.descendant(at: "a/b/alias") is FinderAlias)
+		#endif
+
+		#expect(root.descendant(at: "a/b/nonexistent") == nil)
 	}
 
 	@Test(arguments: FSKind.allCases)
