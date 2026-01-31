@@ -126,7 +126,11 @@ public extension FilesystemInterface {
 			throw InvalidPathForCall.needAbsoluteWithComponent
 		}
 
-		let dir = try self.rootDir.createDir(at: path)
+		let dir: Dir = if let existingDir = try? self.dir(at: path) {
+			existingDir
+		} else {
+			try self.rootDir.createDir(at: path)
+		}
 		return try dir.createFile(at: leaf)
 	}
 }

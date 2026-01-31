@@ -83,7 +83,13 @@ public enum ResolvableNodeType: Sendable, CaseIterable {
 		let linkFP = linkIFP.into()
 
 		let linkParent = linkFP.removingLastComponent()
-		let target = try fs.createFile(at: linkParent.appending("target"))
+		let targetPath = linkParent.appending("target")
+		let target: File = if let existing = try? fs.file(at: targetPath) {
+			existing
+		} else {
+			try fs.createFile(at: targetPath)
+		}
+
 		let resolvable = try self.createResolvableNode(at: linkFP, to: target, in: fs)
 		return (resolvable, target)
 	}

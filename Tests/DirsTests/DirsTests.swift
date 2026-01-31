@@ -121,8 +121,6 @@ struct DirsTests: ~Copyable {
 
 		#expect(throws: Never.self) { try fs.dir(at: "/a") }
 		try #expect(fs.dir(at: "/a/b/c/d") == created)
-
-		#expect(throws: Never.self) { try fs.createDir(at: "/a/b/c/d") }
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -138,19 +136,10 @@ struct DirsTests: ~Copyable {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func createExistingDir(fsKind: FSKind) throws {
-		let fs = self.fs(for: fsKind)
-
-		try fs.createDir(at: "/a")
-
-		#expect(throws: Never.self) { try fs.createDir(at: "/a") }
-	}
-
-	@Test(arguments: FSKind.allCases)
 	func createRootDir(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		#expect(throws: Never.self) { try fs.createDir(at: "/") }
+		#expect(throws: NodeAlreadyExists.self) { try fs.createDir(at: "/") }
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -200,6 +189,39 @@ struct DirsTests: ~Copyable {
 			let target = try #require(optionalTarget)
 			#expect(target.path == "/target")
 		}
+	}
+
+	@Test(arguments: {
+		var combinations: Array<(FSKind, NodeType, NodeType)> = []
+		for fsKind in FSKind.allCases {
+			for firstType in NodeType.allCreatableCases {
+				for secondType in NodeType.allCreatableCases {
+					combinations.append((fsKind, firstType, secondType))
+				}
+			}
+		}
+		return combinations
+	}())
+	func creatingNodeOverExistingNodeFails(fsKind: FSKind, firstType: NodeType, secondType: NodeType) throws {
+		let fs = self.fs(for: fsKind)
+
+		let testPath: FilePath = "/test"
+
+		_ = try firstType.createNode(at: testPath, in: fs)
+		#expect(fs.nodeType(at: testPath) == firstType)
+
+		// Try to create the second node at the same path
+		#expect {
+			_ = try secondType.createNode(at: testPath, in: fs)
+		} throws: { error in
+			guard let nodeExists = error as? NodeAlreadyExists else {
+				Issue.record("Expected NodeAlreadyExists, got \(type(of: error)): \(error)")
+				return false
+			}
+			return nodeExists.path == testPath && nodeExists.type == firstType
+		}
+
+		#expect(fs.nodeType(at: testPath) == firstType)
 	}
 
 	@Test(arguments: FSKind.allCases, NodeType.allCreatableCases)
@@ -850,8 +872,6 @@ extension DirsTests {
 		let fs = self.fs(for: fsKind)
 		try Self.prepareForSymlinkTests(fs)
 
-		try fs.rootDir.createDir(at: "d")
-
 		try fs.moveNode(from: "/s", to: "/d")
 		try #expect(fs.file(at: "/d/s").stringContents() == "abc")
 
@@ -899,7 +919,7 @@ extension DirsTests {
 		try sym.move(to: "/s2")
 		#expect(sym.path == "/s2")
 
-		let d = try fs.createDir(at: "/d")
+		let d = try fs.dir(at: "/d")
 		try sym.move(to: d)
 		#expect(sym.path == "/d/s2")
 	}

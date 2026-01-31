@@ -214,29 +214,46 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func createFile(at ifp: some IntoFilePath) throws -> File {
-		try Data().write(to: self.resolveToRaw(ifp), options: .withoutOverwriting)
-		return try File(_fs: self.asInterface, path: self.resolveToProjected(ifp))
+		try self.createNode(at: ifp, factory: File.init) { fp in
+			try Data().write(to: self.resolveToRaw(fp), options: .withoutOverwriting)
+		}
 	}
 
 	public func createDir(at ifp: some IntoFilePath) throws -> Dir {
-		try FileManager.default.createDirectory(at: self.resolveToRaw(ifp),
-												withIntermediateDirectories: true)
-		return try Dir(_fs: self.asInterface, path: self.resolveToProjected(ifp))
+		try self.createNode(at: ifp, factory: { try Dir(_fs: $0, path: $1) }) { fp in
+			try FileManager.default.createDirectory(at: self.resolveToRaw(fp),
+													withIntermediateDirectories: true)
+		}
 	}
 
 	public func createSymlink(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> Symlink {
-		try FileManager.default.createSymbolicLink(at: self.resolveToRaw(linkIFP),
-												   withDestinationURL: self.resolveToRaw(destIFP))
-		return try Symlink(_fs: self.asInterface, path: self.resolveToProjected(linkIFP))
+		try self.createNode(at: linkIFP, factory: Symlink.init) { linkFP in
+			try FileManager.default.createSymbolicLink(at: self.resolveToRaw(linkFP),
+													   withDestinationURL: self.resolveToRaw(destIFP))
+		}
+	}
+
+	private func createNode<N>(at ifp: some IntoFilePath,
+							   factory: (FSInterface, FilePath) throws -> N,
+							   perform: (_ resolvedPath: FilePath) throws -> Void) throws -> N
+	{
+		let fp = ifp.into()
+
+		if let existingType = self.nodeType(at: fp) {
+			throw NodeAlreadyExists(path: fp, type: existingType)
+		}
+		try perform(fp)
+		return try factory(self.asInterface, self.resolveToProjected(fp))
 	}
 
 	#if canImport(Darwin)
 		public func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> FinderAlias {
-			let linkURL: URL = self.resolveToRaw(linkIFP)
-			let destURL: URL = self.resolveToRaw(destIFP)
-			let bookmarkData = try destURL.bookmarkData(options: .suitableForBookmarkFile)
-			try URL.writeBookmarkData(bookmarkData, to: linkURL)
-			return try FinderAlias(_fs: self.asInterface, path: self.resolveToProjected(linkIFP))
+			try self.createNode(at: linkIFP, factory: FinderAlias.init) { linkFP in
+				let linkURL: URL = self.resolveToRaw(linkFP)
+				let destURL: URL = self.resolveToRaw(destIFP)
+				let bookmarkData = try destURL.bookmarkData(options: .suitableForBookmarkFile)
+				try URL.writeBookmarkData(bookmarkData, to: linkURL)
+			}
 		}
 
 		public func destinationOfFinderAlias(at ifp: some IntoFilePath) throws -> FilePath {

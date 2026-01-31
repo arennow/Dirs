@@ -303,28 +303,45 @@ public final class MockFSInterface: FilesystemInterface {
 	@discardableResult
 	public func createDir(at ifp: some IntoFilePath) throws -> Dir {
 		let fp = ifp.into()
+
+		// Check if the final path is root – can't create root
+		if fp.root != nil, fp.components.isEmpty {
+			throw NodeAlreadyExists(path: fp, type: .dir)
+		}
+
 		let comps = fp.components
 		let eachIndex = sequence(first: comps.startIndex) { ind in
 			comps.index(ind, offsetBy: 1, limitedBy: comps.endIndex)
 		}
-		let cumulativeFilePaths = eachIndex
-			.dropFirst() // Skip root directory (always exists)
-			.map { endIndex in FilePath(root: "/", fp.components[comps.startIndex..<endIndex]) }
+		let cumulativeFilePaths = eachIndex.map { endIndex in
+			FilePath(root: "/", fp.components[comps.startIndex..<endIndex])
+		}
 
 		try self.pathsToNodes.mutate { ptn in
 			for cumulativeFP in cumulativeFilePaths {
-				guard cumulativeFP.lastComponent != nil else {
-					preconditionFailure("Path has no last component after dropFirst()")
-				}
+				// Root path will have no last component, skip it
+				guard cumulativeFP.lastComponent != nil else { continue }
 
 				let resolvedDirFP = try Self.resolveParentSymlinks(of: cumulativeFP, in: ptn)
+				let isFinalComponent = cumulativeFP == fp
 
 				switch ptn[resolvedDirFP] {
-					case .dir, .symlink:
-						break // Already exists
+					case .dir:
+						if isFinalComponent {
+							throw NodeAlreadyExists(path: cumulativeFP, type: .dir)
+						}
+					case .symlink(let destination, _):
+						if isFinalComponent {
+							throw NodeAlreadyExists(path: cumulativeFP, type: .symlink)
+						}
+
+						guard Self.nodeType(at: destination, in: ptn, symRes: .resolve) == .dir else {
+							throw WrongNodeType(path: cumulativeFP, actualType: .symlink)
+						}
 					case .none:
 						ptn[resolvedDirFP] = .dir()
-					case .some(let x): throw NodeAlreadyExists(path: cumulativeFP, type: x.nodeType)
+					case .some(let x):
+						throw NodeAlreadyExists(path: cumulativeFP, type: x.nodeType)
 				}
 			}
 		}
@@ -332,56 +349,46 @@ public final class MockFSInterface: FilesystemInterface {
 		return try Dir(_fs: self.asInterface, path: fp)
 	}
 
-	@discardableResult
-	public func createFile(at ifp: some IntoFilePath) throws -> File {
+	private func createNode<N>(at ifp: some IntoFilePath,
+							   factory: (FSInterface, FilePath) throws -> N,
+							   insertNode: (_ pathsToNodes: inout PTN, _ resolvedPath: FilePath) throws -> Void) throws -> N
+	{
 		let fp = ifp.into()
-		let parentFP = fp.removingLastComponent()
-
 		try self.pathsToNodes.mutate { ptn in
+			let parentFP = fp.removingLastComponent()
 			guard Self.nodeType(at: parentFP, in: ptn, symRes: .resolve) == .dir else {
 				throw NoSuchNode(path: parentFP)
 			}
 
 			let resolvedFP = try Self.resolveParentSymlinks(of: fp, in: ptn)
 
-			switch ptn[resolvedFP] {
-				case .none:
-					ptn[resolvedFP] = .file()
-				case .some(let x): throw NodeAlreadyExists(path: fp, type: x.nodeType)
+			if let existing = ptn[resolvedFP] {
+				throw NodeAlreadyExists(path: fp, type: existing.nodeType)
 			}
+
+			try insertNode(&ptn, resolvedFP)
 		}
-		return try File(_fs: self.asInterface, path: fp)
+		return try factory(self.asInterface, fp)
+	}
+
+	@discardableResult
+	public func createFile(at ifp: some IntoFilePath) throws -> File {
+		try self.createNode(at: ifp, factory: File.init, insertNode: { ptn, resolvedFP in
+			ptn[resolvedFP] = .file()
+		})
 	}
 
 	public func createSymlink(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> Symlink {
-		let linkFP = linkIFP.into()
-		try self.pathsToNodes.mutate { ptn in
-			let parentFP = linkFP.removingLastComponent()
-			guard Self.nodeType(at: parentFP, in: ptn, symRes: .resolve) == .dir else {
-				throw NoSuchNode(path: parentFP)
-			}
-
-			let resolvedFP = try Self.resolveParentSymlinks(of: linkFP, in: ptn)
-
+		try self.createNode(at: linkIFP, factory: Symlink.init, insertNode: { ptn, resolvedFP in
 			ptn[resolvedFP] = .symlink(destination: destIFP.into())
-		}
-		return try Symlink(_fs: self.asInterface, path: linkFP)
+		})
 	}
 
 	#if canImport(Darwin)
 		public func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> FinderAlias {
-			let linkFP = linkIFP.into()
-			try self.pathsToNodes.mutate { ptn in
-				let parentFP = linkFP.removingLastComponent()
-				guard Self.nodeType(at: parentFP, in: ptn, symRes: .resolve) == .dir else {
-					throw NoSuchNode(path: parentFP)
-				}
-
-				let resolvedFP = try Self.resolveParentSymlinks(of: linkFP, in: ptn)
-
+			try self.createNode(at: linkIFP, factory: FinderAlias.init, insertNode: { ptn, resolvedFP in
 				ptn[resolvedFP] = .finderAlias(destination: destIFP.into())
-			}
-			return try FinderAlias(_fs: self.asInterface, path: linkFP)
+			})
 		}
 
 		public func destinationOfFinderAlias(at ifp: some Dirs.IntoFilePath) throws -> FilePath {
@@ -415,17 +422,9 @@ public final class MockFSInterface: FilesystemInterface {
 	/// This is only available on MockFSInterface since this library doesn't support
 	/// creating special nodes, but we want to support mocking them for testing.
 	public func createSpecialForTesting(at ifp: some IntoFilePath) throws -> Special {
-		let fp = ifp.into()
-		try self.pathsToNodes.mutate { ptn in
-			let parentFP = fp.removingLastComponent()
-			guard Self.nodeType(at: parentFP, in: ptn, symRes: .resolve) == .dir else {
-				throw NoSuchNode(path: parentFP)
-			}
-
-			let resolvedFP = try Self.resolveParentSymlinks(of: fp, in: ptn)
+		try self.createNode(at: ifp, factory: Special.init, insertNode: { ptn, resolvedFP in
 			ptn[resolvedFP] = .special()
-		}
-		return try Special(_fs: self.asInterface, path: fp)
+		})
 	}
 
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
