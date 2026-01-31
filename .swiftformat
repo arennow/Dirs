@@ -18,5 +18,8 @@
 --disable hoistTry
 --disable conditionalAssignment
 --disable redundantStaticSelf
+--disable wrapPropertyBodies
+--disable wrapFunctionBodies
+--disable docComments
 --enable acronyms
 --enable numberFormatting

@@ -12,11 +12,6 @@ public struct NoSuchNode: Error {
 public struct NodeNotDescendantError: Error {
 	public let putativeAncestor: FilePath
 	public let putativeDescendant: FilePath
-
-	init(putativeAncestor: FilePath, putativeDescendant: FilePath) {
-		self.putativeAncestor = putativeAncestor
-		self.putativeDescendant = putativeDescendant
-	}
 }
 
 public struct WrongNodeType: Error, Equatable {

@@ -2,7 +2,6 @@
 // Modifying it is futile.
 
 import Foundation
-
 import SystemPackage
 
 public protocol IntoURL {

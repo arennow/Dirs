@@ -159,8 +159,7 @@ public struct RealFSInterface: FilesystemInterface {
 
 	public func destinationOf(symlink ifp: some IntoFilePath) throws -> FilePath {
 		let rawPathString = try FileManager.default.destinationOfSymbolicLink(atPath: self.resolveToRaw(ifp).string)
-		let projected = self.resolveToProjected(rawPathString)
-		return projected
+		return self.resolveToProjected(rawPathString)
 	}
 
 	public func realpathOf(node ifp: some IntoFilePath) throws -> FilePath {
@@ -524,9 +523,7 @@ private func realpath(_ path: String) throws -> String {
 		}
 	}
 	defer { free(resolvedCPathString) }
-	let resolvedPathString = String(cString: resolvedCPathString)
-
-	return resolvedPathString
+	return String(cString: resolvedCPathString)
 }
 
 #if canImport(Darwin) || os(Linux)
@@ -584,9 +581,9 @@ private func realpath(_ path: String) throws -> String {
 					}
 				#endif
 				return XAttrBufferTooSmall(attributeName: requiredAttributeName, path: path)
-			case ENOSPC:
+		case ENOSPC:
 				return XAttrNoSpace(attributeName: requiredAttributeName, path: path)
-			default:
+		default:
 				return NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
 		}
 	}

@@ -122,8 +122,7 @@ public extension FilesystemInterface {
 		}
 
 		let dir = try self.rootDir.createDir(at: path)
-		let file = try dir.createFile(at: leaf)
-		return file
+		return try dir.createFile(at: leaf)
 	}
 }
 
