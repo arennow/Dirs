@@ -1378,27 +1378,45 @@ extension DirsTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func newOrExistingChildFile(fsKind: FSKind) throws {
+	func newOrExistingFile(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
 		try fs.createFile(at: "/a").replaceContents("abc")
+		try fs.createFileAndIntermediaryDirs(at: "/x/y/existing").replaceContents("xyz")
 
 		let rootDir = try fs.rootDir
 
-		try #expect(rootDir.newOrExistingChildFile(named: "a").stringContents() == "abc")
-		try #expect(rootDir.newOrExistingChildFile(named: "b").stringContents() == "")
+		// Direct children
+		try #expect(rootDir.newOrExistingFile(at: "a").stringContents() == "abc")
+		try #expect(rootDir.newOrExistingFile(at: "b").stringContents() == "")
+
+		// Nested paths
+		try #expect(rootDir.newOrExistingFile(at: "x/y/existing").stringContents() == "xyz")
+		try #expect(rootDir.newOrExistingFile(at: "x/y/new").stringContents() == "")
+		try #expect(rootDir.newOrExistingFile(at: "c/d/e/deep").stringContents() == "")
+		#expect(fs.nodeType(at: "/c/d/e") == .dir)
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func newOrExistingChildDir(fsKind: FSKind) throws {
+	func newOrExistingDir(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
 		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
+		try fs.createFileAndIntermediaryDirs(at: "/x/y/z/file")
 
 		let rootDir = try fs.rootDir
 
-		try #expect(rootDir.newOrExistingChildDir(named: "d").children().all.map(\.name) == ["d1"])
-		try #expect(rootDir.newOrExistingChildDir(named: "e").children().all.map(\.name) == [])
+		// Direct children
+		try #expect(rootDir.newOrExistingDir(at: "d").children().all.map(\.name) == ["d1"])
+		try #expect(rootDir.newOrExistingDir(at: "e").children().all.map(\.name) == [])
+
+		// Nested paths - existing
+		try #expect(rootDir.newOrExistingDir(at: "x/y").descendantFile(at: "z/file") != nil)
+		// Nested paths - new
+		let newDir = try rootDir.newOrExistingDir(at: "a/b/c")
+		#expect(newDir.path == "/a/b/c")
+		#expect(fs.nodeType(at: "/a/b") == .dir)
+		#expect(fs.nodeType(at: "/a") == .dir)
 	}
 
 	@Test(arguments: FSKind.allCases)

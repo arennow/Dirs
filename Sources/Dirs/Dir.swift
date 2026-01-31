@@ -89,12 +89,25 @@ public extension Dir {
 		FilePath.Component(name).flatMap { self.child(named: $0) }
 	}
 
-	func newOrExistingChildFile(named name: String) throws -> File {
-		try self.childFile(named: name) ?? self.createFile(at: name)
+	func newOrExistingFile(at relativeIFP: some IntoFilePath) throws -> File {
+		let absolutePath = self.path.appending(relativeIFP.into().components)
+		if let existing = try? self.fs.file(at: absolutePath) {
+			return existing
+		} else {
+			if let (parent, _) = absolutePath.pathAndLeaf {
+				_ = try self.newOrExistingDir(at: parent)
+			}
+			return try self.fs.createFile(at: absolutePath)
+		}
 	}
 
-	func newOrExistingChildDir(named name: String) throws -> Dir {
-		try self.childDir(named: name) ?? self.createDir(at: name)
+	func newOrExistingDir(at relativeIFP: some IntoFilePath) throws -> Dir {
+		let absolutePath = self.path.appending(relativeIFP.into().components)
+		if let existing = try? self.fs.dir(at: absolutePath) {
+			return existing
+		} else {
+			return try self.fs.createDir(at: absolutePath)
+		}
 	}
 
 	private func descendantNode<T: Node>(at relativePath: FilePath, nodeGetter: (any FilesystemInterface, FilePath) throws -> T) -> T? {
