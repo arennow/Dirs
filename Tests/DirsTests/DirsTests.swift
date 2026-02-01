@@ -562,17 +562,6 @@ struct DirsTests: ~Copyable {
 	// MARK: - Miscellaneous
 
 	@Test(arguments: FSKind.allCases)
-	func createFileAndIntermediaryDirs(fsKind: FSKind) throws {
-		let fs = self.fs(for: fsKind)
-
-		_ = try fs.createFileAndIntermediaryDirs(at: "/a/b/c/d/file1").replaceContents("contents 1")
-		try #expect(fs.contentsOf(file: "/a/b/c/d/file1") == "contents 1".into())
-
-		_ = try fs.createFileAndIntermediaryDirs(at: "/file2").replaceContents("contents 2")
-		try #expect(fs.contentsOf(file: "/file2") == "contents 2".into())
-	}
-
-	@Test(arguments: FSKind.allCases)
 	func dirInitNonExisting(fsKind: FSKind) {
 		let fs = self.fs(for: fsKind)
 
@@ -831,8 +820,8 @@ extension DirsTests {
 	{
 		try fs.createFile(at: "/a").replaceContents("abc")
 		try fs.createFile(at: "/b").replaceContents("bcd")
-		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
-		try fs.createFileAndIntermediaryDirs(at: "/d/e/e1")
+		_ = try fs.rootDir.newOrExistingFile(at: "d/d1")
+		_ = try fs.rootDir.newOrExistingFile(at: "d/e/e1")
 
 		let fileSym = try fs.createSymlink(at: "/s", to: "/a")
 		let dirSym = try fs.createSymlink(at: "/sd", to: "/d")
@@ -1328,7 +1317,7 @@ extension DirsTests {
 		let fs = self.fs(for: fsKind)
 		try fs.createFile(at: "/a")
 		try fs.createFile(at: "/b")
-		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
+		_ = try fs.rootDir.newOrExistingFile(at: "d/d1")
 
 		try #expect(Set(fs.contentsOf(directory: "/")) == [
 			.init(filePath: "/a", nodeType: .file),
@@ -1344,8 +1333,8 @@ extension DirsTests {
 	@Test(arguments: FSKind.allCases)
 	func dirContentsSymlink(_ fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
-		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
-		try fs.createFileAndIntermediaryDirs(at: "/d/d2")
+		_ = try fs.rootDir.newOrExistingFile(at: "d/d1")
+		_ = try fs.rootDir.newOrExistingFile(at: "d/d2")
 		try fs.createSymlink(at: "/s", to: "/d")
 
 		try #expect(Set(fs.contentsOf(directory: "/")) == [
@@ -1369,7 +1358,7 @@ extension DirsTests {
 		let fs = self.fs(for: fsKind)
 
 		try fs.createFile(at: "/a").replaceContents("abc")
-		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
+		_ = try fs.rootDir.newOrExistingFile(at: "d/d1")
 
 		let rootDir = try fs.rootDir
 
@@ -1382,7 +1371,7 @@ extension DirsTests {
 		let fs = self.fs(for: fsKind)
 
 		try fs.createFile(at: "/a").replaceContents("abc")
-		try fs.createFileAndIntermediaryDirs(at: "/x/y/existing").replaceContents("xyz")
+		try fs.rootDir.newOrExistingFile(at: "x/y/existing").replaceContents("xyz")
 
 		let rootDir = try fs.rootDir
 
@@ -1401,8 +1390,8 @@ extension DirsTests {
 	func newOrExistingDir(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.createFileAndIntermediaryDirs(at: "/d/d1")
-		try fs.createFileAndIntermediaryDirs(at: "/x/y/z/file")
+		_ = try fs.rootDir.newOrExistingFile(at: "d/d1")
+		_ = try fs.rootDir.newOrExistingFile(at: "x/y/z/file")
 
 		let rootDir = try fs.rootDir
 
@@ -1616,7 +1605,7 @@ extension DirsTests {
 		let fs = self.fs(for: fsKind)
 		let root = try fs.rootDir
 
-		try fs.createFileAndIntermediaryDirs(at: "/a/b/file")
+		_ = try root.newOrExistingFile(at: "a/b/file")
 		try fs.createDir(at: "/a/b/dir")
 		try fs.createSymlink(at: "/a/b/link", to: "/a/b/file")
 		#if canImport(Darwin)
@@ -1643,7 +1632,7 @@ extension DirsTests {
 		let fs = self.fs(for: fsKind)
 		let root = try fs.rootDir
 
-		try fs.createFileAndIntermediaryDirs(at: "/a/b/file")
+		_ = try root.newOrExistingFile(at: "a/b/file")
 		try fs.createDir(at: "/a/b/dir")
 		try fs.createSymlink(at: "/a/b/link", to: "/a/b/file")
 		#if canImport(Darwin)
@@ -1674,7 +1663,7 @@ extension DirsTests {
 		let fs = self.fs(for: fsKind)
 		let root = try fs.rootDir
 
-		try fs.createFileAndIntermediaryDirs(at: "/real/nested/file")
+		_ = try root.newOrExistingFile(at: "real/nested/file")
 		try fs.createFile(at: "/file_not_dir")
 		#if canImport(Darwin)
 			try fs.createFinderAlias(at: "/real/nested/alias", to: "/real/nested/file")
@@ -1714,7 +1703,7 @@ extension DirsTests {
 
 		// Create a 10-layer deep structure with real directories
 		// Path: /r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/
-		try fs.createFileAndIntermediaryDirs(at: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/file")
+		_ = try root.newOrExistingFile(at: "r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/file")
 		try fs.createDir(at: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/dir")
 		try fs.createSymlink(at: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/link_to_file", to: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/file")
 		try fs.createSymlink(at: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/link_to_dir", to: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/dir")
@@ -1773,11 +1762,12 @@ extension DirsTests {
 
 extension DirsTests {
 	private static func prepareForRecursiveNodesTests(_ fs: any FilesystemInterface) throws {
-		try fs.createFileAndIntermediaryDirs(at: "/a1/a1f")
-		try fs.createFileAndIntermediaryDirs(at: "/a1/a2f")
-		try fs.createFileAndIntermediaryDirs(at: "/a1/a2/a1a2f")
-		try fs.createFileAndIntermediaryDirs(at: "/a1/a2/a3/a1a2a3f")
-		try fs.createFileAndIntermediaryDirs(at: "/b1/b2/b3/b1b2b3f")
+		let root = try fs.rootDir
+		_ = try root.newOrExistingFile(at: "a1/a1f")
+		_ = try root.newOrExistingFile(at: "a1/a2f")
+		_ = try root.newOrExistingFile(at: "a1/a2/a1a2f")
+		_ = try root.newOrExistingFile(at: "a1/a2/a3/a1a2a3f")
+		_ = try root.newOrExistingFile(at: "b1/b2/b3/b1b2b3f")
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -1816,7 +1806,7 @@ extension DirsTests {
 		let root = try fs.rootDir
 
 		// Create a hierarchy with all node types
-		try fs.createFileAndIntermediaryDirs(at: "/a/file")
+		_ = try root.newOrExistingFile(at: "a/file")
 		try fs.createDir(at: "/a/dir")
 		try fs.createSymlink(at: "/a/link", to: "/a/file")
 		#if canImport(Darwin)
@@ -1874,7 +1864,7 @@ extension DirsTests {
 	func symlinkRedirectsToDir(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		let f = try fs.createFileAndIntermediaryDirs(at: "/a/b/c/f")
+		let f = try fs.rootDir.newOrExistingFile(at: "a/b/c/f")
 		try f.replaceContents("abc")
 
 		try fs.createSymlink(at: "/s", to: "/a/b")
@@ -1903,9 +1893,9 @@ extension DirsTests {
 	func nodesInsideSymlinkDirResolveTypes(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		try fs.createFileAndIntermediaryDirs(at: "/a/b/c1")
-		try fs.createFileAndIntermediaryDirs(at: "/a/b/c2")
-		try fs.createFileAndIntermediaryDirs(at: "/a/f")
+		_ = try fs.rootDir.newOrExistingFile(at: "a/b/c1")
+		_ = try fs.rootDir.newOrExistingFile(at: "a/b/c2")
+		_ = try fs.rootDir.newOrExistingFile(at: "a/f")
 		try fs.createSymlink(at: "/s", to: "/a")
 		try fs.createSymlink(at: "/s2", to: "/s")
 

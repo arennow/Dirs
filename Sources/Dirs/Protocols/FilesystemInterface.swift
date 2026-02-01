@@ -119,20 +119,6 @@ public extension FilesystemInterface {
 			case .none: throw NoSuchNode(path: fp)
 		}
 	}
-
-	@discardableResult
-	func createFileAndIntermediaryDirs(at ifp: some IntoFilePath) throws -> File {
-		guard let (path, leaf) = ifp.into().pathAndLeaf else {
-			throw InvalidPathForCall.needAbsoluteWithComponent
-		}
-
-		let dir: Dir = if let existingDir = try? self.dir(at: path) {
-			existingDir
-		} else {
-			try self.rootDir.createDir(at: path)
-		}
-		return try dir.createFile(at: leaf)
-	}
 }
 
 public extension FilesystemInterface {

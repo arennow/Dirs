@@ -25,7 +25,7 @@ struct ChrootTests: ~Copyable {
 	}
 
 	@Test func makesDeepDir() throws {
-		try self.chrootFS.createFileAndIntermediaryDirs(at: "/a/b/c").replaceContents("c content")
+		try self.chrootFS.rootDir.newOrExistingFile(at: "a/b/c").replaceContents("c content")
 
 		let contentsFromFM = FileManager.default.contents(atPath: self.tempDirPath + "/a/b/c")
 		#expect(contentsFromFM == Data("c content".utf8))
