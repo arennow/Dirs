@@ -40,6 +40,18 @@ public struct Symlink: ResolvableNode {
 		self.path = path
 	}
 
+	/// Resolves a symlink destination path relative to the symlink's location.
+	/// If the destination is relative, it is resolved relative to the symlink's parent directory.
+	/// Absolute destinations are returned unchanged.
+	static func resolveDestination(_ destination: FilePath, relativeTo symlinkPath: FilePath) -> FilePath {
+		if destination.root == nil {
+			let parent = symlinkPath.removingLastComponent()
+			return parent.appending(destination.components)
+		} else {
+			return destination
+		}
+	}
+
 	public mutating func move(to destination: some IntoFilePath) throws {
 		self.path = try self.fs.moveNode(from: self, to: destination)
 	}
@@ -54,7 +66,8 @@ public struct Symlink: ResolvableNode {
 
 	public func resolve() throws -> any Node {
 		let destPath = try self.destination
-		return try self.fs.node(at: destPath)
+		let resolvedPath = Self.resolveDestination(destPath, relativeTo: self.path)
+		return try self.fs.node(at: resolvedPath)
 	}
 }
 

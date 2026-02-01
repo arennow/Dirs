@@ -42,6 +42,88 @@ extension FSTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
+	func relativeSymlinkToFile(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let target = try fs.rootDir.newOrExistingFile(at: "dir/target")
+		try target.replaceContents("content")
+		let symlink = try fs.createSymlink(at: "/dir/link", to: "target")
+
+		try #expect(symlink.destination == "target")
+		let link = try fs.file(at: "/dir/link")
+		try #expect(link.stringContents() == "content")
+
+		let resolved = try symlink.resolve()
+		#expect(resolved.name == "target")
+		try #expect(resolved.realpath() == "/dir/target")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func relativeSymlinkToDir(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		_ = try fs.rootDir.newOrExistingFile(at: "dir/subdir/file")
+		let symlink = try fs.createSymlink(at: "/dir/link", to: "subdir")
+
+		try #expect(symlink.destination == "subdir")
+		let linkAsDir = try fs.dir(at: "/dir/link")
+		#expect(try linkAsDir.children().files.compactMap(\.path.lastComponent) == ["file"])
+
+		let resolved = try symlink.resolve()
+		#expect(resolved.name == "subdir")
+		try #expect(resolved.realpath() == "/dir/subdir")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func relativeSymlinkWithDotDot(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let target = try fs.rootDir.newOrExistingFile(at: "a/target")
+		_ = try fs.rootDir.newOrExistingFile(at: "a/b/c/deep")
+		try target.replaceContents("from_a")
+
+		let symlink = try fs.createSymlink(at: "/a/b/c/link", to: "../../target")
+
+		try #expect(symlink.destination == "../../target")
+		let link = try fs.file(at: "/a/b/c/link")
+		try #expect(link.stringContents() == "from_a")
+
+		let resolved = try symlink.resolve()
+		#expect(resolved.name == "target")
+		try #expect(resolved.realpath() == "/a/target")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func relativeSymlinkChain(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let file = try fs.createFile(at: "/file")
+		try file.replaceContents("final")
+		let symlink = try fs.createSymlink(at: "/link1", to: "link2")
+		try fs.createSymlink(at: "/link2", to: "file")
+
+		try #expect(symlink.destination == "link2")
+		let link1 = try fs.file(at: "/link1")
+		try #expect(link1.stringContents() == "final")
+
+		try #expect(symlink.realpath() == "/file")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func relativeSymlinkBroken(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/dir")
+		let symlink = try fs.createSymlink(at: "/dir/broken", to: "nonexistent")
+
+		try #expect(symlink.destination == "nonexistent")
+		#expect(symlink.nodeType == .symlink)
+
+		#expect(throws: NoSuchNode.self) { try symlink.resolve() }
+		#expect(throws: (any Error).self) { try symlink.realpath() }
+	}
+
+	@Test(arguments: FSKind.allCases)
 	func resolvedSymlinkUsesTargetPathAndName(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 

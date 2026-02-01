@@ -186,7 +186,14 @@ public struct RealFSInterface: FilesystemInterface {
 
 	public func destinationOf(symlink ifp: some IntoFilePath) throws -> FilePath {
 		let rawPathString = try FileManager.default.destinationOfSymbolicLink(atPath: self.resolveToRaw(ifp).string)
-		return self.resolveToProjected(rawPathString)
+		let destination = FilePath(rawPathString)
+
+		if destination.root != nil {
+			return self.resolveToProjected(destination)
+		} else {
+			// Preserve relative path as-is
+			return destination
+		}
 	}
 
 	public func realpathOf(node ifp: some IntoFilePath) throws -> FilePath {
@@ -239,8 +246,16 @@ public struct RealFSInterface: FilesystemInterface {
 
 	public func createSymlink(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> Symlink {
 		try self.createNode(at: linkIFP, factory: Symlink.init) { linkFP in
-			try FileManager.default.createSymbolicLink(at: self.resolveToRaw(linkFP),
-													   withDestinationURL: self.resolveToRaw(destIFP))
+			let destination = destIFP.into()
+			let destString: String
+			if destination.root != nil {
+				destString = self.resolveToRaw(destination).string
+			} else {
+				// Relative destination: use as-is
+				destString = destination.string
+			}
+			try FileManager.default.createSymbolicLink(atPath: self.resolveToRaw(linkFP).string,
+													   withDestinationPath: destString)
 		}
 	}
 

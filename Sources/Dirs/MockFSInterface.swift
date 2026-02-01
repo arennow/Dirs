@@ -135,7 +135,7 @@ public final class MockFSInterface: FilesystemInterface {
 	///   - ptn: The `PTN` to consult
 	/// - Returns: The reified path
 	///
-	/// - Warning: This function does not yet handle `.`, `..`, `~`, etc.
+	/// - Warning: This function does not yet handle `~`, etc.
 	private static func realpath(of ifp: some IntoFilePath, in ptn: PTN, exceptFinalComponent: Bool = false) throws -> FilePath {
 		let fp = ifp.into()
 
@@ -145,6 +145,15 @@ public final class MockFSInterface: FilesystemInterface {
 		}
 		let components = Array(fp.components)
 		for (index, comp) in components.enumerated() {
+			if comp == FilePath.Component(".") {
+				continue
+			} else if comp == FilePath.Component("..") {
+				if !builtRealpathFPCV.isEmpty {
+					builtRealpathFPCV.removeLast()
+				}
+				continue
+			}
+
 			builtRealpathFPCV.append(comp)
 
 			let isLastComponent = index == components.count - 1
@@ -154,7 +163,13 @@ public final class MockFSInterface: FilesystemInterface {
 
 			switch ptn[builtRealpathFP] {
 				case .symlink(let destination, _):
-					builtRealpathFPCV = .init(destination.components)
+					// If the destination is relative, resolve it relative to the symlink's parent
+					if destination.root == nil {
+						builtRealpathFPCV.removeLast()
+						builtRealpathFPCV.append(contentsOf: destination.components)
+					} else {
+						builtRealpathFPCV = .init(destination.components)
+					}
 				case nil: throw NoSuchNode(path: fp)
 				default: break
 			}
@@ -208,7 +223,9 @@ public final class MockFSInterface: FilesystemInterface {
 
 		switch self.node(at: fp, symRes: .resolve) {
 			case .file(let data, _): return data
-			case .symlink(let destination, _): return try self.contentsOf(file: destination)
+			case .symlink(let destination, _):
+				let resolvedDestination = Symlink.resolveDestination(destination, relativeTo: fp)
+				return try self.contentsOf(file: resolvedDestination)
 			case .none: throw NoSuchNode(path: fp)
 			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
 		}
@@ -227,7 +244,9 @@ public final class MockFSInterface: FilesystemInterface {
 
 		switch acquisitionLock.resource[fp] {
 			case .none: throw NoSuchNode(path: fp)
-			case .symlink(let destination, _): return try self.contentsOf(directory: destination, requestedPath: requestedPath, using: acquisitionLock)
+			case .symlink(let destination, _):
+				let resolvedDestination = Symlink.resolveDestination(destination, relativeTo: fp)
+				return try self.contentsOf(directory: resolvedDestination, requestedPath: requestedPath, using: acquisitionLock)
 			case .dir: break
 			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
 		}
@@ -335,7 +354,8 @@ public final class MockFSInterface: FilesystemInterface {
 							throw NodeAlreadyExists(path: cumulativeFP, type: .symlink)
 						}
 
-						guard Self.nodeType(at: destination, in: ptn, symRes: .resolve) == .dir else {
+						let resolvedDestination = Symlink.resolveDestination(destination, relativeTo: resolvedDirFP)
+						guard Self.nodeType(at: resolvedDestination, in: ptn, symRes: .resolve) == .dir else {
 							throw WrongNodeType(path: cumulativeFP, actualType: .symlink)
 						}
 					case .none:
@@ -439,7 +459,9 @@ public final class MockFSInterface: FilesystemInterface {
 		switch acquisitionLock.resource[resolvedFP] {
 			case .none: throw NoSuchNode(path: fp)
 			case .file(_, let xattrs): acquisitionLock.resource[resolvedFP] = .file(data: contentsData, xattrs: xattrs)
-			case .symlink(let destination, _): try self.replaceContentsOfFile(at: destination, to: contentsData, using: acquisitionLock)
+			case .symlink(let destination, _):
+				let resolvedDestination = Symlink.resolveDestination(destination, relativeTo: resolvedFP)
+				try self.replaceContentsOfFile(at: resolvedDestination, to: contentsData, using: acquisitionLock)
 			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
 		}
 	}

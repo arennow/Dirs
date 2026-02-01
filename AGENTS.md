@@ -1,7 +1,7 @@
 ## Project explanation
 This project is a high-level abstraction of filesystem interactions. It features an in-memory mock filesystem interface (`MockFSInterface`), and all behavior has to work 100% the same (from a client's perspective) between the mock interface and the real interface (`RealFSInterface`). It is **a bug** if there's a difference in observable behavior between the two.
 
-This project is cross-platform, and is explicitly tested on macOS and Ubuntu Linux. Some features only exist on some platforms or work differently on different platforms, but in all situations, the observable behavior between real and mock FS implementations must be identical.
+This project is cross-platform, and is explicitly tested on macOS and Ubuntu Linux. Some features only exist on some platforms or work differently on different platforms, but in all situations, the observable behavior between real and mock FS implementations on a given platform must be identical.
 
 ## Editing guidelines
 - Begin by adding tests that describe the desired new/changed behavior. Iterate on the tests and the `RealFSInterface` implementation until all the tests pass (with the desired behavior). Then iterate on `MockFSInterface` until it matches established and verified behavior.
@@ -11,8 +11,11 @@ This project is cross-platform, and is explicitly tested on macOS and Ubuntu Lin
 	- That means, among other things, using `#require` to verify assumptions (e.g., before using literal array subscripts)
 - If you introduce new warnings in the editing process, resolve them or explain to me why you can't
 - Prefer to use functions on `FilesystemInterface` for instantiating the various `Node`-conforming types rather than directly intializing those types
+- Prefer instance functions on `Node`-conforming types over those that are defined on `FilesystemInterface` (e.g., `file.contents()` is better than `fs.contentsOf(file: file)`)
+- Prefer `file.stringContents()` over `.contents()` (which returns a `Data`) and converting it
 - Try to avoid force unwraps, but if you can't conveniently or efficiently do so, add a comment above it explaining how you can prove its safety
 - For any "Into" types (e.g., `IntoFilePath`), don't resolve them (`.into()`) more than once on any path through a function
+	- `Node` conforms to `IntoFilePath`, and it's idiomatic to use the node directly as the argument to a `some IntoFilePath` parameter, such as when making symlinks
 
 ## Style preferences
 - Prefer to use `self.`-style references when possible
