@@ -16,6 +16,8 @@ This project is cross-platform, and is explicitly tested on macOS and Ubuntu Lin
 - Try to avoid force unwraps, but if you can't conveniently or efficiently do so, add a comment above it explaining how you can prove its safety
 - For any "Into" types (e.g., `IntoFilePath`), don't resolve them (`.into()`) more than once on any path through a function
 	- `Node` conforms to `IntoFilePath`, and it's idiomatic to use the node directly as the argument to a `some IntoFilePath` parameter, such as when making symlinks
+- Functions on `Node`-conforming types that take file paths should accept both relative paths (where the path should be interpreted relative to the node's parent dir) and absolute paths
+	- Functions on `FilesystemInterface` only need to handle absolute paths
 
 ## Style preferences
 - Prefer to use `self.`-style references when possible

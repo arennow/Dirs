@@ -122,4 +122,17 @@ extension FSTests {
 		#expect(copiedXattrs == expectedXattrs)
 		#expect(try copied.extendedAttributeString(named: "user.test") == "value")
 	}
+
+	@Test(arguments: FSKind.allCases)
+	func nodeCopyHandlesRelativePaths(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let file = try fs.rootDir.newOrExistingFile(at: "parent/file.txt")
+		try file.replaceContents("content")
+
+		try file.copy(to: "../copied.txt")
+
+		try #expect(fs.file(at: "/parent/file.txt").stringContents() == "content")
+		try #expect(fs.file(at: "/copied.txt").stringContents() == "content")
+	}
 }

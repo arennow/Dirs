@@ -42,11 +42,22 @@ public extension Node {
 	}
 
 	func copy(to destination: some IntoFilePath) throws {
-		try self.fs.copyNode(from: self, to: destination)
+		try self.fs.copyNode(from: self, to: self.ensureAbsolutePath(of: destination))
 	}
 
 	func delete() throws {
 		try self.fs.deleteNode(at: self)
+	}
+
+	/// Converts a potentially relative path to an absolute path by resolving it relative to this node's parent directory.
+	func ensureAbsolutePath(of ifp: some IntoFilePath) -> FilePath {
+		let fp = ifp.into()
+		if fp.root != nil {
+			return fp
+		} else {
+			let absolutePath = self.path.removingLastComponent().appending(fp.components)
+			return FilePath.normalizeRelativeComponents(of: absolutePath)
+		}
 	}
 
 	func realpath() throws -> FilePath {

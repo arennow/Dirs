@@ -3,6 +3,25 @@ import SystemPackage
 
 public extension FilePath {
 	var url: URL { URL(fileURLWithPath: self.string) }
+
+	/// Normalizes a path by removing . and .. components without resolving symlinks.
+	/// This is done by manipulating the components directly rather than using filesystem APIs.
+	static func normalizeRelativeComponents(of ifp: some IntoFilePath) -> FilePath {
+		let fp = ifp.into()
+		let root = fp.root
+
+		var normalized: Array<FilePath.Component> = []
+		for component in fp.components {
+			if component == FilePath.Component(".") {
+				continue
+			} else if component == FilePath.Component("..") {
+				_ = normalized.popLast()
+			} else {
+				normalized.append(component)
+			}
+		}
+		return FilePath(root: root, normalized)
+	}
 }
 
 extension URL {

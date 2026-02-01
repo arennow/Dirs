@@ -42,7 +42,7 @@
 		}
 
 		public mutating func move(to destination: some IntoFilePath) throws {
-			self.path = try self.fs.moveNode(from: self, to: destination)
+			self.path = try self.fs.moveNode(from: self, to: self.ensureAbsolutePath(of: destination))
 		}
 
 		public mutating func rename(to newName: String) throws {

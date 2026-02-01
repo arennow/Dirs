@@ -298,4 +298,19 @@ extension FSTests {
 		#expect(try node.extendedAttributeString(named: "user.test") == "value")
 		#expect(fs.nodeType(at: "/source") == nil)
 	}
+
+	@Test(arguments: FSKind.allCases)
+	func nodeMoveHandlesRelativePaths(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.rootDir.createDir(at: "parent")
+		var file = try fs.rootDir.newOrExistingDir(at: "parent").createFile(at: "file.txt")
+		try file.replaceContents("content")
+
+		try file.move(to: "../moved.txt")
+
+		#expect(file.path == "/moved.txt")
+		try #expect(fs.file(at: "/moved.txt").stringContents() == "content")
+		#expect(fs.nodeType(at: "/parent/file.txt") == nil)
+	}
 }
