@@ -4,16 +4,8 @@ import SortAndFilter
 import SystemPackage
 import Testing
 
-struct DirsTests: ~Copyable {
-	let mockFS: any FilesystemInterface = MockFSInterface()
-	let realFS: any FilesystemInterface
-	let pathToDelete: FilePath?
-
-	init() throws {
-		let realFS = try RealFSInterface(chroot: .temporaryUnique())
-		self.pathToDelete = realFS.chroot
-		self.realFS = realFS
-	}
+final class DirsTests {
+	var pathToDelete: FilePath?
 
 	deinit {
 		guard let pathToDelete = self.pathToDelete else { return }
@@ -24,8 +16,13 @@ struct DirsTests: ~Copyable {
 
 	private func fs(for kind: FSKind) -> any FilesystemInterface {
 		switch kind {
-			case .mock: self.mockFS
-			case .real: self.realFS
+			case .mock:
+				return MockFSInterface()
+			case .real:
+				assert(self.pathToDelete == nil, "Each RealFSInterface test requires a unique chroot")
+				let fs = try! RealFSInterface(chroot: .temporaryUnique())
+				self.pathToDelete = fs.chroot
+				return fs
 		}
 	}
 
@@ -2598,7 +2595,7 @@ extension DirsTests {
 			case .mock:
 				(MockFSInterface(maxExtendedAttributeNameLength: 10), 10)
 			case .real:
-				(self.realFS, 10_000)
+				(self.fs(for: fsKind), 10_000)
 		}
 
 		let file = try fs.createFile(at: "/test")
