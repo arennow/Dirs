@@ -12,7 +12,37 @@ final class DirsTests {
 		try? FileManager.default.removeItem(at: pathToDelete.url)
 	}
 
-	enum FSKind: CaseIterable { case mock, real }
+	enum FSKind: CaseIterable {
+		case mock
+
+		#if canImport(Darwin)
+			// All of this silliness is required because realFS will always be able to get
+			// Finder Info because we're running on APFS, so we need to be able to simulate
+			// its absence (as would be the case on a non-Mac filesystem)
+			enum FinderInfoAvailability: CaseIterable, CustomDebugStringConvertible {
+				case available, unavailable
+
+				var debugDescription: String {
+					switch self {
+						case .available: return "withFinderInfo"
+						case .unavailable: return "withoutFinderInfo"
+					}
+				}
+			}
+
+			case real(FinderInfoAvailability)
+
+			static var allCases: [FSKind] {
+				var cases: [FSKind] = [.mock]
+				for availability in FinderInfoAvailability.allCases {
+					cases.append(.real(availability))
+				}
+				return cases
+			}
+		#else
+			case real
+		#endif
+	}
 
 	private func fs(for kind: FSKind) -> any FilesystemInterface {
 		switch kind {
@@ -20,7 +50,14 @@ final class DirsTests {
 				return MockFSInterface()
 			case .real:
 				assert(self.pathToDelete == nil, "Each RealFSInterface test requires a unique chroot")
-				let fs = try! RealFSInterface(chroot: .temporaryUnique())
+				var fs = try! RealFSInterface(chroot: .temporaryUnique())
+
+				#if canImport(Darwin)
+					if case .real(.unavailable) = kind {
+						fs.forceMissingFinderInfo = true
+					}
+				#endif
+
 				self.pathToDelete = fs.chroot
 				return fs
 		}

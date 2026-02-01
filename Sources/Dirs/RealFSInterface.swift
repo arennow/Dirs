@@ -12,6 +12,11 @@ import SystemPackage
 public struct RealFSInterface: FilesystemInterface {
 	public let chroot: FilePath?
 
+	#if DEBUG
+		/// When `true`, `nodeType(at:)` will act as if no FinderInfo is available
+		public var forceMissingFinderInfo = false
+	#endif
+
 	public init(chroot: FilePath? = nil) {
 		self.chroot = chroot
 	}
@@ -28,6 +33,12 @@ public struct RealFSInterface: FilesystemInterface {
 	#if canImport(Darwin)
 		public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
 			do {
+				#if DEBUG
+					if self.forceMissingFinderInfo {
+						throw NoFinderInfoAvailable()
+					}
+				#endif
+
 				let fp: FilePath = self.resolveToRaw(ifp)
 				// First, try the fast `getattrlist` method
 				return try Self.classifyPathKind_getattrlist(fp)
