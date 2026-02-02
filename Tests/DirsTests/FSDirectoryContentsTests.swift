@@ -53,19 +53,6 @@ extension FSTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func childNodes(fsKind: FSKind) throws {
-		let fs = self.fs(for: fsKind)
-
-		try fs.createFile(at: "/a").replaceContents("abc")
-		_ = try fs.rootDir.newOrExistingFile(at: "d/d1")
-
-		let rootDir = try fs.rootDir
-
-		try #expect(rootDir.childFile(named: "a")?.stringContents() == "abc")
-		#expect(rootDir.childDir(named: "d")?.childFile(named: "d1") != nil)
-	}
-
-	@Test(arguments: FSKind.allCases)
 	func newOrExistingFile(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
@@ -99,7 +86,7 @@ extension FSTests {
 		try #expect(rootDir.newOrExistingDir(at: "e").children().all.map(\.name) == [])
 
 		// Nested paths - existing
-		try #expect(rootDir.newOrExistingDir(at: "x/y").descendantFile(at: "z/file") != nil)
+		try #expect(rootDir.newOrExistingDir(at: "x/y").file(at: "z/file") != nil)
 		// Nested paths - new
 		let newDir = try rootDir.newOrExistingDir(at: "a/b/c")
 		#expect(newDir.path == "/a/b/c")
@@ -241,10 +228,11 @@ extension FSTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func childNodeAccessorFunctions(fsKind: FSKind) throws {
+	func nodeAccessorFunctions(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 		let root = try fs.rootDir
 
+		// Direct children
 		try fs.createFile(at: "/myfile")
 		try fs.createDir(at: "/mydir")
 		try fs.createSymlink(at: "/mylink", to: "/myfile")
@@ -252,35 +240,47 @@ extension FSTests {
 			try fs.createFinderAlias(at: "/myalias", to: "/mydir")
 		#endif
 
-		// Test by component
-		#expect(root.childFile(named: FilePath.Component("myfile"))?.path == "/myfile")
-		#expect(root.childDir(named: FilePath.Component("mydir"))?.path == "/mydir")
-		#expect(root.childSymlink(named: FilePath.Component("mylink"))?.path == "/mylink")
+		#expect(root.file(at: "myfile")?.path == "/myfile")
+		#expect(root.dir(at: "mydir")?.path == "/mydir")
+		#expect(root.symlink(at: "mylink")?.path == "/mylink")
 		#if canImport(Darwin)
-			#expect(root.childFinderAlias(named: FilePath.Component("myalias"))?.path == "/myalias")
+			#expect(root.finderAlias(at: "myalias")?.path == "/myalias")
 		#endif
 
-		// Test by string
-		#expect(root.childFile(named: "myfile")?.path == "/myfile")
-		#expect(root.childDir(named: "mydir")?.path == "/mydir")
-		#expect(root.childSymlink(named: "mylink")?.path == "/mylink")
+		// Nested paths
+		_ = try root.newOrExistingFile(at: "a/b/file")
+		try fs.createDir(at: "/a/b/dir")
+		try fs.createSymlink(at: "/a/b/link", to: "/a/b/file")
 		#if canImport(Darwin)
-			#expect(root.childFinderAlias(named: "myalias")?.path == "/myalias")
+			try fs.createFinderAlias(at: "/a/b/alias", to: "/a/b/dir")
+		#endif
+
+		#expect(root.file(at: "a/b/file")?.path == "/a/b/file")
+		#expect(root.dir(at: "a/b/dir")?.path == "/a/b/dir")
+		#expect(root.symlink(at: "a/b/link")?.path == "/a/b/link")
+		#if canImport(Darwin)
+			#expect(root.finderAlias(at: "a/b/alias")?.path == "/a/b/alias")
 		#endif
 
 		// Test non-existent returns nil
-		#expect(root.childFile(named: "nonexistent") == nil)
-		#expect(root.childSymlink(named: "nonexistent") == nil)
+		#expect(root.file(at: "nonexistent") == nil)
+		#expect(root.dir(at: "nonexistent") == nil)
+		#expect(root.symlink(at: "nonexistent") == nil)
+		#expect(root.file(at: "a/b/nonexistent") == nil)
+		#expect(root.dir(at: "a/b/nonexistent") == nil)
+		#expect(root.symlink(at: "a/b/nonexistent") == nil)
 		#if canImport(Darwin)
-			#expect(root.childFinderAlias(named: "nonexistent") == nil)
+			#expect(root.finderAlias(at: "nonexistent") == nil)
+			#expect(root.finderAlias(at: "a/b/nonexistent") == nil)
 		#endif
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func childNodeGenericAccessor(fsKind: FSKind) throws {
+	func nodeGenericAccessor(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 		let root = try fs.rootDir
 
+		// Direct children
 		try fs.createFile(at: "/myfile")
 		try fs.createDir(at: "/mydir")
 		try fs.createSymlink(at: "/mylink", to: "/myfile")
@@ -288,22 +288,15 @@ extension FSTests {
 			try fs.createFinderAlias(at: "/myalias", to: "/mydir")
 		#endif
 
-		#expect(root.child(named: FilePath.Component("myfile"))?.path == "/myfile")
-		#expect(root.child(named: "myfile")?.path == "/myfile")
-		#expect(root.child(named: "myfile") is File)
-		#expect(root.child(named: "mydir") is Dir)
-		#expect(root.child(named: "mylink") is Symlink)
+		#expect(root.node(at: "myfile")?.path == "/myfile")
+		#expect(root.node(at: "myfile") is File)
+		#expect(root.node(at: "mydir") is Dir)
+		#expect(root.node(at: "mylink") is Symlink)
 		#if canImport(Darwin)
-			#expect(root.child(named: "myalias") is FinderAlias)
+			#expect(root.node(at: "myalias") is FinderAlias)
 		#endif
-		#expect(root.child(named: "nonexistent") == nil)
-	}
 
-	@Test(arguments: FSKind.allCases)
-	func descendantNodeAccessorFunctions(fsKind: FSKind) throws {
-		let fs = self.fs(for: fsKind)
-		let root = try fs.rootDir
-
+		// Nested paths
 		_ = try root.newOrExistingFile(at: "a/b/file")
 		try fs.createDir(at: "/a/b/dir")
 		try fs.createSymlink(at: "/a/b/link", to: "/a/b/file")
@@ -311,54 +304,19 @@ extension FSTests {
 			try fs.createFinderAlias(at: "/a/b/alias", to: "/a/b/dir")
 		#endif
 
-		#expect(root.descendantFile(at: "a/b/file")?.path == "/a/b/file")
-		#expect(root.descendantDir(at: "a/b/dir")?.path == "/a/b/dir")
-		#expect(root.descendantSymlink(at: "a/b/link")?.path == "/a/b/link")
+		#expect(root.node(at: "a/b/file") is File)
+		#expect(root.node(at: "a/b/dir") is Dir)
+		#expect(root.node(at: "a/b/link") is Symlink)
 		#if canImport(Darwin)
-			#expect(root.descendantFinderAlias(at: "a/b/alias")?.path == "/a/b/alias")
+			#expect(root.node(at: "a/b/alias") is FinderAlias)
 		#endif
 
-		// Test non-existent returns nil
-		#expect(root.descendantFile(at: "a/b/nonexistent") == nil)
-		#expect(root.descendantSymlink(at: "a/b/nonexistent") == nil)
-		#if canImport(Darwin)
-			#expect(root.descendantFinderAlias(at: "a/b/nonexistent") == nil)
-		#endif
+		#expect(root.node(at: "nonexistent") == nil)
+		#expect(root.node(at: "a/b/nonexistent") == nil)
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func descendantNodeGenericAccessor(fsKind: FSKind) throws {
-		let fs = self.fs(for: fsKind)
-		let root = try fs.rootDir
-
-		_ = try root.newOrExistingFile(at: "a/b/file")
-		try fs.createDir(at: "/a/b/dir")
-		try fs.createSymlink(at: "/a/b/link", to: "/a/b/file")
-		#if canImport(Darwin)
-			try fs.createFinderAlias(at: "/a/b/alias", to: "/a/b/dir")
-		#endif
-
-		// Test with FilePath
-		#expect(root.descendant(at: FilePath("a/b/file")) is File)
-		#expect(root.descendant(at: FilePath("a/b/dir")) is Dir)
-		#expect(root.descendant(at: FilePath("a/b/link")) is Symlink)
-		#if canImport(Darwin)
-			#expect(root.descendant(at: FilePath("a/b/alias")) is FinderAlias)
-		#endif
-
-		// Test with String
-		#expect(root.descendant(at: "a/b/file") is File)
-		#expect(root.descendant(at: "a/b/dir") is Dir)
-		#expect(root.descendant(at: "a/b/link") is Symlink)
-		#if canImport(Darwin)
-			#expect(root.descendant(at: "a/b/alias") is FinderAlias)
-		#endif
-
-		#expect(root.descendant(at: "a/b/nonexistent") == nil)
-	}
-
-	@Test(arguments: FSKind.allCases)
-	func descendantNodeAccessorsFunctionValidateIntermediatePaths(fsKind: FSKind) throws {
+	func nodeAccessorsFunctionValidateIntermediatePaths(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 		let root = try fs.rootDir
 
@@ -368,35 +326,35 @@ extension FSTests {
 			try fs.createFinderAlias(at: "/real/nested/alias", to: "/real/nested/file")
 		#endif
 
-		#expect(root.descendantFile(at: "nonexistent/nested/file") == nil)
-		#expect(root.descendantDir(at: "nonexistent/nested/dir") == nil)
-		#expect(root.descendantSymlink(at: "nonexistent/nested/link") == nil)
+		#expect(root.file(at: "nonexistent/nested/file") == nil)
+		#expect(root.dir(at: "nonexistent/nested/dir") == nil)
+		#expect(root.symlink(at: "nonexistent/nested/link") == nil)
 		#if canImport(Darwin)
-			#expect(root.descendantFinderAlias(at: "nonexistent/nested/alias") == nil)
+			#expect(root.finderAlias(at: "nonexistent/nested/alias") == nil)
 		#endif
 
-		#expect(root.descendantFile(at: "file_not_dir/nested/file") == nil)
-		#expect(root.descendantDir(at: "file_not_dir/nested/dir") == nil)
+		#expect(root.file(at: "file_not_dir/nested/file") == nil)
+		#expect(root.dir(at: "file_not_dir/nested/dir") == nil)
 		#if canImport(Darwin)
-			#expect(root.descendantFinderAlias(at: "file_not_dir/nested/alias") == nil)
+			#expect(root.finderAlias(at: "file_not_dir/nested/alias") == nil)
 		#endif
 
-		#expect(root.descendantFile(at: "real/nested/nonexistent") == nil)
-		#expect(root.descendantDir(at: "real/nested/nonexistent") == nil)
+		#expect(root.file(at: "real/nested/nonexistent") == nil)
+		#expect(root.dir(at: "real/nested/nonexistent") == nil)
 		#if canImport(Darwin)
-			#expect(root.descendantFinderAlias(at: "real/nested/nonexistent") == nil)
+			#expect(root.finderAlias(at: "real/nested/nonexistent") == nil)
 		#endif
 
-		#expect(root.descendantFile(at: "file_not_dir/anything") == nil)
+		#expect(root.file(at: "file_not_dir/anything") == nil)
 
-		#expect(root.descendantFile(at: "real/nested/file")?.path == "/real/nested/file")
+		#expect(root.file(at: "real/nested/file")?.path == "/real/nested/file")
 		#if canImport(Darwin)
-			#expect(root.descendantFinderAlias(at: "real/nested/alias")?.path == "/real/nested/alias")
+			#expect(root.finderAlias(at: "real/nested/alias")?.path == "/real/nested/alias")
 		#endif
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func descendantNodeAccessorFunctionsResolveDeeplyNestedSymlinks(fsKind: FSKind) throws {
+	func nodeAccessorFunctionsResolveDeeplyNestedSymlinks(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 		let root = try fs.rootDir
 
@@ -419,40 +377,40 @@ extension FSTests {
 		// Path requested: /s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/file
 		// Should resolve to: /r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/file
 		// But returned path should be the requested one (with symlinks preserved)
-		let deepFile = root.descendantFile(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/file")
+		let deepFile = root.file(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/file")
 		#expect(deepFile?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/file")
 
 		// Test 2: Access directory through deeply nested path with alternating symlinks
-		let deepDir = root.descendantDir(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/dir")
+		let deepDir = root.dir(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/dir")
 		#expect(deepDir?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/dir")
 
 		// Test 3: Access symlink through deeply nested path with alternating symlinks
-		let deepSymlink = root.descendantSymlink(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
+		let deepSymlink = root.symlink(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
 		#expect(deepSymlink?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
 
 		// Test 4: Final component is a symlink to a file
 		// We can get a file through a symlink path, and it returns the symlink path
-		let fileViaSymlink = root.descendantFile(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
+		let fileViaSymlink = root.file(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
 		#expect(fileViaSymlink?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
 
 		// We can also still get it as a symlink using descendantSymlink
-		let symlinkToFile = root.descendantSymlink(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
+		let symlinkToFile = root.symlink(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
 		#expect(symlinkToFile?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_file")
 
 		// Test 5: Final component is a symlink to a directory
 		// Similarly, descendantDir follows symlinks
-		let dirViaSymlink = root.descendantDir(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_dir")
+		let dirViaSymlink = root.dir(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_dir")
 		#expect(dirViaSymlink?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_dir")
 
 		// We can also get it as a symlink
-		let symlinkToDir = root.descendantSymlink(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_dir")
+		let symlinkToDir = root.symlink(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_dir")
 		#expect(symlinkToDir?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/link_to_dir")
 
 		// Test 6: We can traverse through symlinks in the path and continue into subdirectories
 		try fs.createFile(at: "/r0/r1/r2/r3/r4/r5/r6/r7/r8/r9/dir/nested_file")
 
 		// This works because 's0', 's2', etc. are intermediate components that resolve to dirs
-		let nestedFileThroughPath = root.descendantFile(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/dir/nested_file")
+		let nestedFileThroughPath = root.file(at: "s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/dir/nested_file")
 		#expect(nestedFileThroughPath?.path == "/s0/r1/s2/r3/s4/r5/s6/r7/s8/r9/dir/nested_file")
 	}
 }

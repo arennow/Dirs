@@ -74,8 +74,8 @@ extension FSTests {
 
 		try dir.copy(to: "/a")
 
-		try #expect(fs.rootDir.childDir(named: "d") != nil)
-		try #expect(fs.rootDir.childDir(named: "a") != nil)
+		try #expect(fs.rootDir.dir(at: "d") != nil)
+		try #expect(fs.rootDir.dir(at: "a") != nil)
 	}
 
 	@Test(arguments: FSKind.allCases)
