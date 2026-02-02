@@ -201,4 +201,11 @@ public extension Dir {
 	func createSymlink(at ifpcv: some IntoFilePathComponentView, to destination: some IntoFilePath) throws -> Symlink {
 		try self.fs.createSymlink(at: self.path.appending(ifpcv.into()), to: destination.into())
 	}
+
+	#if canImport(Darwin)
+		@discardableResult
+		func createFinderAlias(at ifpcv: some IntoFilePathComponentView, to destination: some IntoFilePath) throws -> FinderAlias {
+			try self.fs.createFinderAlias(at: self.path.appending(ifpcv.into()), to: destination.into())
+		}
+	#endif
 }

@@ -249,12 +249,12 @@ import Testing
 		@Test(arguments: FSKind.allCases)
 		func writeFinderAlias(fsKind: FSKind) throws {
 			let fs = self.fs(for: fsKind)
-			try fs.createFile(at: "/target")
-			try fs.replaceContentsOfFile(at: "/target", to: "initial content")
-			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
+			let targetFile = try fs.rootDir.createFile(at: "target")
+			try targetFile.replaceContents("initial content")
+			let alias = try fs.rootDir.createFinderAlias(at: "alias", to: targetFile)
 
 			#expect(throws: WrongNodeType.self) {
-				try fs.replaceContentsOfFile(at: "/alias", to: "this should fail")
+				try fs.replaceContentsOfFile(at: alias, to: "this should fail")
 			}
 
 			// The target file is unchanged
@@ -268,8 +268,8 @@ import Testing
 		@Test(arguments: FSKind.allCases)
 		func finderAliasPointingToNonexistentTargetResolutionFails(fsKind: FSKind) throws {
 			let fs = self.fs(for: fsKind)
-			try fs.createFile(at: "/target")
-			try fs.createFinderAlias(at: "/alias", to: "/target")
+			let targetFile = try fs.rootDir.createFile(at: "target")
+			try fs.rootDir.createFinderAlias(at: "alias", to: targetFile)
 			try fs.deleteNode(at: "/target")
 
 			let alias = try fs.finderAlias(at: "/alias")
