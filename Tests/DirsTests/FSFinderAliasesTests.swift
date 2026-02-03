@@ -266,14 +266,23 @@ import Testing
 		}
 
 		@Test(arguments: FSKind.allCases)
-		func finderAliasPointingToNonexistentTargetResolutionFails(fsKind: FSKind) throws {
+		func detectsMissingTargetWhenResolvingFinderAlias(fsKind: FSKind) throws {
 			let fs = self.fs(for: fsKind)
-			let targetFile = try fs.rootDir.createFile(at: "target")
-			try fs.rootDir.createFinderAlias(at: "alias", to: targetFile)
+			try fs.createFile(at: "/target")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
 			try fs.deleteNode(at: "/target")
+			#expect(throws: NoSuchNode.self) {
+				try alias.resolve()
+			}
+		}
 
-			let alias = try fs.finderAlias(at: "/alias")
-			#expect(throws: Error.self) {
+		@Test(arguments: FSKind.allCases)
+		func detectsCircularSymlinksWhenResolvingFinderAlias(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+			try fs.createSymlink(at: "/s1", to: "/s2")
+			try fs.createSymlink(at: "/s2", to: "/s1")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/s1")
+			#expect(throws: NoSuchNode.self) {
 				try alias.resolve()
 			}
 		}

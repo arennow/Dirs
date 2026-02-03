@@ -432,14 +432,24 @@ public final class MockFSInterface: FilesystemInterface {
 					// Follow the chain like real macOS bookmark resolution does
 					// If destination is another alias, follow it
 					// If destination is a symlink, follow it
-					while true {
-						switch acquisitionLock.resource[destination] {
-							case .finderAlias(let nextDest, _), .symlink(let nextDest, _):
-								destination = nextDest
-							default:
-								// Final destination is not an alias or symlink
-								return destination
+					do {
+						return try detectCircularResolvables { recordPathVisited in
+							while true {
+								switch acquisitionLock.resource[destination] {
+									case .finderAlias(let nextDest, _), .symlink(let nextDest, _):
+										try recordPathVisited(destination)
+										destination = nextDest
+									default:
+										// Final destination is not an alias or symlink
+										return destination
+								}
+							}
 						}
+					} catch is CircularResolvableChain {
+						// Real filesystem bookmark resolution returns "file doesn't exist" for circular
+						// symlink chains when resolving aliases. Transform our more accurate error to
+						// match the real filesystem's behavior.
+						throw NoSuchNode(path: fp)
 					}
 				case .none: throw NoSuchNode(path: fp)
 				case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
