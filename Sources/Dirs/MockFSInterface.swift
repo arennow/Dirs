@@ -137,8 +137,12 @@ public final class MockFSInterface: FilesystemInterface {
 	///
 	/// - Warning: This function does not yet handle `~`, etc.
 	private static func realpath(of ifp: some IntoFilePath, in ptn: PTN, exceptFinalComponent: Bool = false) throws -> FilePath {
-		let fp = ifp.into()
+		try detectCircularResolvables { recordPathVisited in
+			try Self.realpathImpl(of: ifp.into(), in: ptn, exceptFinalComponent: exceptFinalComponent, recordPathVisited: recordPathVisited)
+		}
+	}
 
+	private static func realpathImpl(of fp: FilePath, in ptn: PTN, exceptFinalComponent: Bool, recordPathVisited: (FilePath) throws -> Void) throws -> FilePath {
 		var builtRealpathFPCV = FilePath.ComponentView()
 		var builtRealpathFP: FilePath {
 			FilePath(root: fp.root, builtRealpathFPCV)
@@ -163,6 +167,7 @@ public final class MockFSInterface: FilesystemInterface {
 
 			switch ptn[builtRealpathFP] {
 				case .symlink(let destination, _):
+					try recordPathVisited(builtRealpathFP)
 					// If the destination is relative, resolve it relative to the symlink's parent
 					if destination.root == nil {
 						builtRealpathFPCV.removeLast()
@@ -177,8 +182,12 @@ public final class MockFSInterface: FilesystemInterface {
 
 		let outThis = builtRealpathFP
 		if outThis != fp {
-			return try Self.realpath(of: outThis, in: ptn, exceptFinalComponent: exceptFinalComponent)
+			return try Self.realpathImpl(of: outThis, in: ptn, exceptFinalComponent: exceptFinalComponent, recordPathVisited: recordPathVisited)
 		} else {
+			// Check if the current path is itself a symlink that points to itself or has already been visited
+			if case .symlink = ptn[outThis] {
+				try recordPathVisited(outThis)
+			}
 			return outThis
 		}
 	}

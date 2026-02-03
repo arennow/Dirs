@@ -577,6 +577,8 @@ private func realpath(_ path: String) throws -> String {
 	guard let resolvedCPathString = realpath(path, nil) else {
 		if errno == ENOENT {
 			throw NoSuchNode(path: FilePath(path))
+		} else if errno == ELOOP {
+			throw CircularResolvableChain(startPath: FilePath(path))
 		} else {
 			throw InvalidPathForCall.couldNotCanonicalize(path)
 		}

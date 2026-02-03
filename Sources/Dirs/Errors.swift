@@ -117,3 +117,11 @@ public struct XAttrInvalidUTF8: Error {
 }
 
 struct XAttrNotFound: Error {}
+
+public struct CircularResolvableChain: Error {
+	public let startPath: FilePath
+
+	package init(startPath: FilePath) {
+		self.startPath = startPath
+	}
+}

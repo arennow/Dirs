@@ -533,4 +533,28 @@ extension FSTests {
 
 		return (fileSym, dirSym, fileSymSym, dirSymSym, brokenSym)
 	}
+
+	@Test(arguments: FSKind.allCases)
+	func realpathDetectsCircularSymlinkDirect(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createSymlink(at: "/loop", to: "/loop")
+
+		#expect(throws: CircularResolvableChain.self) {
+			try fs.realpathOf(node: "/loop")
+		}
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func realpathDetectsCircularSymlinkChain(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createSymlink(at: "/a", to: "/b")
+		try fs.createSymlink(at: "/b", to: "/c")
+		try fs.createSymlink(at: "/c", to: "/a")
+
+		#expect(throws: CircularResolvableChain.self) {
+			try fs.realpathOf(node: "/a")
+		}
+	}
 }
