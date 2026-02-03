@@ -68,6 +68,48 @@ public protocol FilesystemInterface: Equatable, Sendable {
 }
 
 public extension FilesystemInterface {
+	/// Returns the type of node after following all resolvable nodes (symlinks and Finder aliases)
+	/// to their final destination. This follows chains of resolvable nodes, such as a symlink pointing
+	/// to a Finder alias pointing to another symlink, until reaching a non-resolvable node.
+	///
+	/// On non-Darwin platforms, this behaves identically to `nodeTypeFollowingSymlinks` since
+	/// Finder aliases are Darwin-specific.
+	///
+	/// - Parameter ifp: The path to examine
+	/// - Returns: The type of the final non-resolvable node, or `nil` if the path doesn't exist
+	///   or forms a circular reference chain
+	func nodeTypeResolvingResolvables(at ifp: some IntoFilePath) -> NodeType? {
+		try? detectCircularResolvables { recordPathVisited in
+			var currentPath = ifp.into()
+
+			while true {
+				try recordPathVisited(currentPath)
+
+				guard let type = self.nodeType(at: currentPath) else {
+					return nil
+				}
+
+				switch type {
+					case .symlink:
+						let destPath = try self.destinationOf(symlink: currentPath)
+						currentPath = Symlink.resolveDestination(destPath, relativeTo: currentPath)
+
+					#if canImport(Darwin)
+						case .finderAlias:
+							let destPath = try self.destinationOfFinderAlias(at: currentPath)
+							// destinationOfFinderAlias already fully resolves chains, so just return the type
+							return self.nodeType(at: destPath)
+					#endif
+
+					default:
+						return type
+				}
+			}
+		}
+	}
+}
+
+public extension FilesystemInterface {
 	@discardableResult
 	func renameNode(at source: some IntoFilePath, to newName: String) throws -> FilePath {
 		if newName.contains("/") {
