@@ -1,5 +1,4 @@
 import Algorithms
-import SortAndFilter
 
 public struct Children {
 	public private(set) var directories: Array<Dir>
