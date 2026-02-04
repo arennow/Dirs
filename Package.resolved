@@ -1,5 +1,5 @@
 {
-  "originHash" : "03d99ac88df017437541c1e569ed0b96b99ba94f3331648057bbb1f263923d55",
+  "originHash" : "8cc9747c51e941368195d639d4413cb4c4a63b71f124b85f1b56df93e2b17a9d",
   "pins" : [
     {
       "identity" : "locked",
@@ -8,15 +8,6 @@
       "state" : {
         "revision" : "7555d7783fe6cd1cfcd59316295b116e337dd04a",
         "version" : "2.0.0"
-      }
-    },
-    {
-      "identity" : "sortandfilter",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/arennow/SortAndFilter.git",
-      "state" : {
-        "revision" : "08c1ba516ab68cd1e35eb8f2b431854f3e27ee4e",
-        "version" : "1.2.0"
       }
     },
     {

@@ -1,6 +1,5 @@
 import Dirs
 import Foundation
-import SortAndFilter
 import SystemPackage
 import Testing
 
