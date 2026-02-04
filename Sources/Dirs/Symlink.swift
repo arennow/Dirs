@@ -19,7 +19,7 @@ public struct Symlink: ResolvableNode {
 		let fp = path.into()
 
 		// Intentionally check with `nodeType` (which resolves symlinks in
-		// parent directories but does NOT follow the final component). We
+		// ancestor directories but does NOT follow the final component). We
 		// want to validate that the path *itself* is a symlink and not the
 		// type of its referent. Other concrete inits (e.g. `File`/`Dir`)
 		// use `nodeTypeFollowingSymlinks` because they care about the

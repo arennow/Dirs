@@ -113,9 +113,9 @@ public final class MockFSInterface: FilesystemInterface {
 		}
 	}
 
-	private static func existingParentResolvedNode(at ifp: some IntoFilePath, in ptn: PTN) throws -> (node: MockNode, resolvedPath: FilePath) {
+	private static func existingAncestorResolvedNode(at ifp: some IntoFilePath, in ptn: PTN) throws -> (node: MockNode, resolvedPath: FilePath) {
 		let fp = ifp.into()
-		let resolvedFP = try Self.resolveParentSymlinks(of: fp, in: ptn)
+		let resolvedFP = try Self.resolveAncestorSymlinks(of: fp, in: ptn)
 		guard let node = ptn[resolvedFP] else {
 			throw NoSuchNode(path: fp)
 		}
@@ -192,10 +192,10 @@ public final class MockFSInterface: FilesystemInterface {
 		}
 	}
 
-	/// Resolves symlinks in the parent directory path and returns the path with the resolved
-	/// parent and the original final component. This is used for operations that need to be
+	/// Resolves symlinks in the ancestor directory path and returns the path with the resolved
+	/// ancestors and the original final component. This is used for operations that need to be
 	/// able to work on nodes inside symlinked directories.
-	private static func resolveParentSymlinks(of ifp: some IntoFilePath, in ptn: PTN) throws -> FilePath {
+	private static func resolveAncestorSymlinks(of ifp: some IntoFilePath, in ptn: PTN) throws -> FilePath {
 		let fp = ifp.into()
 		guard let lastComponent = fp.lastComponent else {
 			// Root path has no parent to resolve
@@ -249,7 +249,7 @@ public final class MockFSInterface: FilesystemInterface {
 							requestedPath: FilePath,
 							using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws -> Array<Dirs.FilePathStat>
 	{
-		let fp = try Self.resolveParentSymlinks(of: ifp, in: acquisitionLock.resource)
+		let fp = try Self.resolveAncestorSymlinks(of: ifp, in: acquisitionLock.resource)
 
 		switch acquisitionLock.resource[fp] {
 			case .none: throw NoSuchNode(path: fp)
@@ -302,7 +302,7 @@ public final class MockFSInterface: FilesystemInterface {
 	}
 
 	private func destinationOf(symlink ifp: some Dirs.IntoFilePath, using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws -> FilePath {
-		let fp = try Self.resolveParentSymlinks(of: ifp, in: acquisitionLock.resource)
+		let fp = try Self.resolveAncestorSymlinks(of: ifp, in: acquisitionLock.resource)
 
 		switch acquisitionLock.resource[fp] {
 			case .symlink(let destination, _): return destination
@@ -350,7 +350,7 @@ public final class MockFSInterface: FilesystemInterface {
 				// Root path will have no last component, skip it
 				guard cumulativeFP.lastComponent != nil else { continue }
 
-				let resolvedDirFP = try Self.resolveParentSymlinks(of: cumulativeFP, in: ptn)
+				let resolvedDirFP = try Self.resolveAncestorSymlinks(of: cumulativeFP, in: ptn)
 				let isFinalComponent = cumulativeFP == fp
 
 				switch ptn[resolvedDirFP] {
@@ -389,7 +389,7 @@ public final class MockFSInterface: FilesystemInterface {
 				throw NoSuchNode(path: parentFP)
 			}
 
-			let resolvedFP = try Self.resolveParentSymlinks(of: fp, in: ptn)
+			let resolvedFP = try Self.resolveAncestorSymlinks(of: fp, in: ptn)
 
 			if let existing = ptn[resolvedFP] {
 				throw NodeAlreadyExists(path: fp, type: existing.nodeType)
@@ -425,7 +425,7 @@ public final class MockFSInterface: FilesystemInterface {
 		}
 
 		private func destinationOfFinderAlias(at ifp: some Dirs.IntoFilePath, using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws -> FilePath {
-			let fp = try Self.resolveParentSymlinks(of: ifp, in: acquisitionLock.resource)
+			let fp = try Self.resolveAncestorSymlinks(of: ifp, in: acquisitionLock.resource)
 
 			switch acquisitionLock.resource[fp] {
 				case .finderAlias(var destination, _):
@@ -473,7 +473,7 @@ public final class MockFSInterface: FilesystemInterface {
 	private func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData, using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws {
 		let fp = ifp.into()
 		let contentsData = contents.into()
-		let resolvedFP = try Self.resolveParentSymlinks(of: fp, in: acquisitionLock.resource)
+		let resolvedFP = try Self.resolveAncestorSymlinks(of: fp, in: acquisitionLock.resource)
 
 		switch acquisitionLock.resource[resolvedFP] {
 			case .none: throw NoSuchNode(path: fp)
@@ -497,8 +497,8 @@ public final class MockFSInterface: FilesystemInterface {
 						  to destination: some IntoFilePath,
 						  using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws -> FilePath
 	{
-		let srcFP = try Self.resolveParentSymlinks(of: source, in: acquisitionLock.resource)
-		let destFP = try Self.resolveParentSymlinks(of: destination, in: acquisitionLock.resource)
+		let srcFP = try Self.resolveAncestorSymlinks(of: source, in: acquisitionLock.resource)
+		let destFP = try Self.resolveAncestorSymlinks(of: destination, in: acquisitionLock.resource)
 
 		// This is usually just `destFP`, but if `destFP` is a dir, then we
 		// rehome into it, and this will be `destFP`+`srcFP.final`
@@ -596,7 +596,7 @@ public final class MockFSInterface: FilesystemInterface {
 							using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws
 	{
 		let fp = ifp.into()
-		let resolvedFP = try Self.resolveParentSymlinks(of: fp, in: acquisitionLock.resource)
+		let resolvedFP = try Self.resolveAncestorSymlinks(of: fp, in: acquisitionLock.resource)
 
 		let keysToDelete = acquisitionLock.resource.keys
 			.filter { $0.starts(with: resolvedFP) }
@@ -628,7 +628,7 @@ public final class MockFSInterface: FilesystemInterface {
 	#if canImport(Darwin) || os(Linux)
 		public func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String> {
 			try self.pathsToNodes.read { ptn in
-				let (node, _) = try Self.existingParentResolvedNode(at: ifp, in: ptn)
+				let (node, _) = try Self.existingAncestorResolvedNode(at: ifp, in: ptn)
 				return Set(node.xattrs.keys)
 			}
 		}
@@ -645,7 +645,7 @@ public final class MockFSInterface: FilesystemInterface {
 			#endif
 
 			return try self.pathsToNodes.read { ptn in
-				let (node, _) = try Self.existingParentResolvedNode(at: ifp, in: ptn)
+				let (node, _) = try Self.existingAncestorResolvedNode(at: ifp, in: ptn)
 				return node.xattrs[name]
 			}
 		}
@@ -658,7 +658,7 @@ public final class MockFSInterface: FilesystemInterface {
 			}
 
 			try self.pathsToNodes.mutate { ptn in
-				var (node, resolvedFP) = try Self.existingParentResolvedNode(at: fp, in: ptn)
+				var (node, resolvedFP) = try Self.existingAncestorResolvedNode(at: fp, in: ptn)
 
 				#if os(Linux)
 					// Linux kernel VFS prohibits user-namespaced xattrs on symlinks
@@ -681,7 +681,7 @@ public final class MockFSInterface: FilesystemInterface {
 		public func removeExtendedAttribute(named name: String, at ifp: some IntoFilePath) throws {
 			let fp = ifp.into()
 			try self.pathsToNodes.mutate { ptn in
-				var (node, resolvedFP) = try Self.existingParentResolvedNode(at: fp, in: ptn)
+				var (node, resolvedFP) = try Self.existingAncestorResolvedNode(at: fp, in: ptn)
 				node.xattrs.removeValue(forKey: name)
 				ptn[resolvedFP] = node
 			}
