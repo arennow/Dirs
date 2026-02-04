@@ -1,12 +1,13 @@
 import Algorithms
+import SortAndFilter
 
 public struct Children {
-	public let directories: Array<Dir>
-	public let files: Array<File>
-	public let symlinks: Array<Symlink>
-	public let specials: Array<Special>
+	public private(set) var directories: Array<Dir>
+	public private(set) var files: Array<File>
+	public private(set) var symlinks: Array<Symlink>
+	public private(set) var specials: Array<Special>
 	#if canImport(Darwin)
-		public let finderAliases: Array<FinderAlias>
+		public private(set) var finderAliases: Array<FinderAlias>
 
 		init(directories: consuming Array<Dir>,
 			 files: consuming Array<File>,
@@ -63,6 +64,32 @@ public struct Children {
 			return Self(directories: dirs, files: files, symlinks: symlinks, specials: specials, finderAliases: finderAliases)
 		#else
 			return Self(directories: dirs, files: files, symlinks: symlinks, specials: specials)
+		#endif
+	}
+
+	public mutating func resolveResolvables() throws {
+		func resolveArray(_ resolvables: inout Array<some ResolvableNode>) throws {
+			while let resolvable = resolvables.popLast() {
+				switch resolvable.fs.nodeTypeResolvingResolvables(at: resolvable.path) {
+					case .none:
+						continue // broken resolvables get filtered out
+					case .dir:
+						self.directories.append(Dir(uncheckedAt: resolvable.path, in: resolvable.fs.asInterface))
+					case .file:
+						self.files.append(File(uncheckedAt: resolvable.path, in: resolvable.fs.asInterface))
+					case .special:
+						self.specials.append(Special(uncheckedAt: resolvable.path, in: resolvable.fs.asInterface))
+					default:
+						fatalError("Unrecognized or unexpected node type returned from resolve(): \(resolvable.path)")
+				}
+			}
+
+			assert(resolvables.isEmpty)
+		}
+
+		try resolveArray(&self.symlinks)
+		#if canImport(Darwin)
+			try resolveArray(&self.finderAliases)
 		#endif
 	}
 }

@@ -5,9 +5,7 @@ import SystemPackage
 import Testing
 
 extension FSTests {
-	private func makeSpecialNode(in fs: some FilesystemInterface) throws -> Special {
-		let filename = "test_special"
-
+	func createSpecialNode(named filename: String, in fs: some FilesystemInterface) throws -> Special {
 		switch fs {
 			case let mock as MockFSInterface:
 				return try mock.createSpecialForTesting(at: "/\(filename)")
@@ -29,7 +27,7 @@ extension FSTests {
 	func specialNodeBasics(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		var special = try makeSpecialNode(in: fs)
+		var special = try createSpecialNode(named: "test_special", in: fs)
 
 		// Verify detection
 		#expect(fs.nodeType(at: "/test_special") == .special)

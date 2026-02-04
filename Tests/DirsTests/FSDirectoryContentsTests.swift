@@ -127,6 +127,44 @@ extension FSTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
+	func resolvedChildrenResolvesSymlinksAndAliases(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let root = try fs.rootDir
+
+		let targetFile = try root.createFile(at: "target_file")
+		let targetDir = try root.createDir(at: "target_dir")
+		let symToFile = try root.createSymlink(at: "symlink_to_file", to: targetFile)
+		let special = try self.createSpecialNode(named: "special", in: fs)
+		try root.createSymlink(at: "symlink2_to_file", to: targetFile)
+		try root.createSymlink(at: "symlink_to_dir", to: targetDir)
+		try root.createSymlink(at: "symlink_to_symlink_to_file", to: symToFile)
+		try root.createSymlink(at: "symlink_to_special", to: special)
+		try root.createSymlink(at: "broken", to: "/nonexistent")
+		#if canImport(Darwin)
+			try root.createFinderAlias(at: "alias_to_file", to: targetFile)
+			try root.createFinderAlias(at: "alias_to_symlink_to_file", to: symToFile)
+		#endif
+
+		let resolved = try root.resolvedChildren()
+
+		#expect(resolved.symlinks.isEmpty)
+		#if canImport(Darwin)
+			#expect(resolved.finderAliases.isEmpty)
+		#endif
+
+		var expectedFiles: Set<String> = ["target_file", "symlink_to_file", "symlink2_to_file", "symlink_to_symlink_to_file"]
+		#if canImport(Darwin)
+			expectedFiles.insert("alias_to_file")
+			expectedFiles.insert("alias_to_symlink_to_file")
+		#endif
+
+		#expect(Set(resolved.files.map(\.name)) == expectedFiles)
+		#expect(Set(resolved.directories.map(\.name)) == ["target_dir", "symlink_to_dir"])
+		#expect(Set(resolved.specials.map(\.name)) == ["symlink_to_special", "special"])
+		#expect(resolved.all.contains { $0.name == "broken" } == false)
+	}
+
+	@Test(arguments: FSKind.allCases)
 	func childrenCountsMatchDirectoryContents(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 		let root = try fs.rootDir

@@ -42,9 +42,29 @@ public struct Dir: Node {
 }
 
 public extension Dir {
+	/// Returns the immediate children of this directory without resolving
+	/// any symlinks or Finder aliases.
+	/// - Returns: A `Children` structure containing all immediate child nodes.
 	func children() throws -> Children {
 		let childFilePathStats = try self.fs.contentsOf(directory: self)
 		return Children.from(self, childStats: childFilePathStats)
+	}
+
+	/// Returns the immediate children of this directory with all
+	/// symlinks and Finder aliases resolved.
+	///
+	/// This is a convenience function that calls `children()` and then
+	/// calls `Children.resolveResolvables()` on the results
+	/// to resolve any symlinks or Finder aliases contained within them.
+	///
+	/// The returned `Children` structure will never have any members in
+	/// its `symlinks` or `finderAliases` arrays, as all such nodes will have been
+	/// resolved to their targets (which are added to the appropriate arrays).
+	/// - Returns: A `Children` structure with all resolvable nodes resolved to their final targets.
+	func resolvedChildren() throws -> Children {
+		var children = try self.children()
+		try children.resolveResolvables()
+		return children
 	}
 
 	func newOrExistingFile(at relativeIFP: some IntoFilePath) throws -> File {
