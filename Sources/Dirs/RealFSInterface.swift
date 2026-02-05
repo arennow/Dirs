@@ -118,31 +118,26 @@ public struct RealFSInterface: FilesystemInterface {
 		return UInt64(size)
 	}
 
-	public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
-		let requestedPath = ifp.into()
-		let (resolvedPath, _) = try self.resolveSymlinksAndGetNodeType(at: requestedPath)
-		let rawURL = URL(fileURLWithPath: self.resolveToRaw(resolvedPath).string)
+	#if os(Windows)
+		public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
+			let requestedPath = ifp.into()
+			let (resolvedPath, _) = try self.resolveSymlinksAndGetNodeType(at: requestedPath)
+			let rawPath = self.resolveToRaw(resolvedPath)
 
-		let fm = FileManager.default
+			let fm = FileManager.default
 
-		var prefetchKeys: Array<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
+			let contents = try fm.contentsOfDirectory(atPath: rawPath.string)
+			return contents.compactMap { name -> FilePathStat? in
+				let entryPath = rawPath.appending(name)
+				let entryPathString = entryPath.string
 
-		#if canImport(Darwin)
-			prefetchKeys.append(contentsOf: [.isAliasFileKey, .fileResourceTypeKey])
-		#endif
-
-		return try fm.contentsOfDirectory(at: rawURL, includingPropertiesForKeys: prefetchKeys)
-			.map { rawURL in
-				var chrootRelativeFilePath = FilePath(rawURL.path)
+				var chrootRelativeFilePath = entryPath
 				if let chroot = self.chroot {
 					let didRemove = chrootRelativeFilePath.removePrefix(chroot)
 					precondition(didRemove)
-					// removing the prefix also turns this into a relative path so:
 					chrootRelativeFilePath.root = "/"
 				}
 
-				// If the requested path differs from the resolved path (i.e., we followed symlinks),
-				// replace the resolved path prefix with the requested path prefix
 				if requestedPath != resolvedPath {
 					let didRemove = chrootRelativeFilePath.removePrefix(resolvedPath)
 					precondition(didRemove)
@@ -150,39 +145,95 @@ public struct RealFSInterface: FilesystemInterface {
 				}
 
 				let nodeType: NodeType
-				if try rawURL.getBoolResourceValue(forKey: .isSymbolicLinkKey) {
-					nodeType = .symlink
-				} else if try rawURL.getBoolResourceValue(forKey: .isDirectoryKey) {
-					nodeType = .dir
+				if let attrs = try? fm.attributesOfItem(atPath: entryPathString),
+				   let fileType = attrs[.type] as? FileAttributeType
+				{
+					if fileType == .typeSymbolicLink {
+						nodeType = .symlink
+					} else if fileType == .typeDirectory {
+						nodeType = .dir
+					} else if fileType == .typeRegular {
+						nodeType = .file
+					} else {
+						nodeType = .special
+					}
 				} else {
-					#if canImport(Darwin)
-						if try rawURL.getBoolResourceValue(forKey: .isAliasFileKey) {
-							nodeType = .finderAlias
-						} else {
-							let resourceType = try rawURL.resourceValues(forKeys: [.fileResourceTypeKey]).fileResourceType
-							if resourceType == .regular {
-								nodeType = .file
-							} else {
-								nodeType = .special
-							}
-						}
-					#else
-						// On Linux, isAliasFileKey exists but throws NoResourceAvailable when accessed,
-						// so we skip checking it entirely. Also, resourceValues doesn't return
-						// fileResourceType for special files, so we use attributesOfItem to detect them.
-						let attrs = try? FileManager.default.attributesOfItem(atPath: rawURL.path)
-						let fileType = attrs?[.type] as? FileAttributeType
-						if fileType == .typeRegular {
-							nodeType = .file
-						} else {
-							nodeType = .special
-						}
-					#endif
+					if (try? fm.destinationOfSymbolicLink(atPath: entryPathString)) != nil {
+						nodeType = .symlink
+					} else {
+						return nil
+					}
 				}
 
 				return FilePathStat(filePath: chrootRelativeFilePath, nodeType: nodeType)
 			}
-	}
+		}
+	#else
+		public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
+			let requestedPath = ifp.into()
+			let (resolvedPath, _) = try self.resolveSymlinksAndGetNodeType(at: requestedPath)
+			let rawURL: URL = self.resolveToRaw(resolvedPath)
+
+			let fm = FileManager.default
+
+			var prefetchKeys: Array<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
+			#if canImport(Darwin)
+				prefetchKeys.append(contentsOf: [.isAliasFileKey, .fileResourceTypeKey])
+			#endif
+
+			return try fm.contentsOfDirectory(at: rawURL, includingPropertiesForKeys: prefetchKeys)
+				.map { rawURL in
+					var chrootRelativeFilePath = FilePath(rawURL.path)
+					if let chroot = self.chroot {
+						let didRemove = chrootRelativeFilePath.removePrefix(chroot)
+						precondition(didRemove)
+						// removing the prefix also turns this into a relative path so:
+						chrootRelativeFilePath.root = "/"
+					}
+
+					// If the requested path differs from the resolved path (i.e., we followed symlinks),
+					// replace the resolved path prefix with the requested path prefix
+					if requestedPath != resolvedPath {
+						let didRemove = chrootRelativeFilePath.removePrefix(resolvedPath)
+						precondition(didRemove)
+						chrootRelativeFilePath = requestedPath.appending(chrootRelativeFilePath.components)
+					}
+
+					let nodeType: NodeType
+					if try rawURL.getBoolResourceValue(forKey: .isSymbolicLinkKey) {
+						nodeType = .symlink
+					} else if try rawURL.getBoolResourceValue(forKey: .isDirectoryKey) {
+						nodeType = .dir
+					} else {
+						#if canImport(Darwin)
+							if try rawURL.getBoolResourceValue(forKey: .isAliasFileKey) {
+								nodeType = .finderAlias
+							} else {
+								let resourceType = try rawURL.resourceValues(forKeys: [.fileResourceTypeKey]).fileResourceType
+								if resourceType == .regular {
+									nodeType = .file
+								} else {
+									nodeType = .special
+								}
+							}
+						#else
+							// On Linux, isAliasFileKey exists but throws NoResourceAvailable when accessed,
+							// so we skip checking it entirely. Also, resourceValues doesn't return
+							// fileResourceType for special files, so we use attributesOfItem to detect them.
+							let attrs = try? FileManager.default.attributesOfItem(atPath: rawURL.path)
+							let fileType = attrs?[.type] as? FileAttributeType
+							if fileType == .typeRegular {
+								nodeType = .file
+							} else {
+								nodeType = .special
+							}
+						#endif
+					}
+
+					return FilePathStat(filePath: chrootRelativeFilePath, nodeType: nodeType)
+				}
+		}
+	#endif
 
 	public func destinationOf(symlink ifp: some IntoFilePath) throws -> FilePath {
 		let rawPathString = try FileManager.default.destinationOfSymbolicLink(atPath: self.resolveToRaw(ifp).string)
