@@ -275,28 +275,30 @@ extension FSTests {
 		#expect(sym.path == "/d/s2")
 	}
 
-	@Test(arguments: FSKind.allCases, NodeType.allCreatableCases)
-	func movePreservesExtendedAttributes(fsKind: FSKind, nodeType: NodeType) throws {
-		#if os(Linux)
-			// Linux kernel VFS prohibits user-namespaced xattrs on symlinks
-			guard nodeType != .symlink else { return }
-		#endif
+	#if canImport(Darwin) || os(Linux)
+		@Test(arguments: FSKind.allCases, NodeType.allCreatableCases)
+		func movePreservesExtendedAttributes(fsKind: FSKind, nodeType: NodeType) throws {
+			#if os(Linux)
+				// Linux kernel VFS prohibits user-namespaced xattrs on symlinks
+				guard nodeType != .symlink else { return }
+			#endif
 
-		let fs = self.fs(for: fsKind)
-		var (node, _) = try nodeType.createNode(at: "/source", in: fs)
+			let fs = self.fs(for: fsKind)
+			var (node, _) = try nodeType.createNode(at: "/source", in: fs)
 
-		let originalXattrs = try node.extendedAttributeNames()
-		try node.setExtendedAttribute(named: "user.test", to: "value")
-		let expectedXattrs = originalXattrs.union(["user.test"])
+			let originalXattrs = try node.extendedAttributeNames()
+			try node.setExtendedAttribute(named: "user.test", to: "value")
+			let expectedXattrs = originalXattrs.union(["user.test"])
 
-		try node.move(to: "/dest")
+			try node.move(to: "/dest")
 
-		#expect(node.path == "/dest")
-		let movedXattrs = try node.extendedAttributeNames()
-		#expect(movedXattrs == expectedXattrs)
-		#expect(try node.extendedAttributeString(named: "user.test") == "value")
-		#expect(fs.nodeType(at: "/source") == nil)
-	}
+			#expect(node.path == "/dest")
+			let movedXattrs = try node.extendedAttributeNames()
+			#expect(movedXattrs == expectedXattrs)
+			#expect(try node.extendedAttributeString(named: "user.test") == "value")
+			#expect(fs.nodeType(at: "/source") == nil)
+		}
+	#endif
 
 	@Test(arguments: FSKind.allCases)
 	func nodeMoveHandlesRelativePaths(fsKind: FSKind) throws {

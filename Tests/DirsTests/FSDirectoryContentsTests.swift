@@ -133,11 +133,15 @@ extension FSTests {
 		let targetFile = try root.createFile(at: "target_file")
 		let targetDir = try root.createDir(at: "target_dir")
 		let symToFile = try root.createSymlink(at: "symlink_to_file", to: targetFile)
-		let special = try self.createSpecialNode(named: "special", in: fs)
+		#if !os(Windows)
+			let special = try self.createSpecialNode(named: "special", in: fs)
+		#endif
 		try root.createSymlink(at: "symlink2_to_file", to: targetFile)
 		try root.createSymlink(at: "symlink_to_dir", to: targetDir)
 		try root.createSymlink(at: "symlink_to_symlink_to_file", to: symToFile)
-		try root.createSymlink(at: "symlink_to_special", to: special)
+		#if !os(Windows)
+			try root.createSymlink(at: "symlink_to_special", to: special)
+		#endif
 		try root.createSymlink(at: "broken", to: "/nonexistent")
 		#if canImport(Darwin)
 			try root.createFinderAlias(at: "alias_to_file", to: targetFile)
@@ -159,7 +163,9 @@ extension FSTests {
 
 		#expect(Set(resolved.files.map(\.name)) == expectedFiles)
 		#expect(Set(resolved.directories.map(\.name)) == ["target_dir", "symlink_to_dir"])
-		#expect(Set(resolved.specials.map(\.name)) == ["symlink_to_special", "special"])
+		#if !os(Windows)
+			#expect(Set(resolved.specials.map(\.name)) == ["symlink_to_special", "special"])
+		#endif
 		#expect(resolved.all.contains { $0.name == "broken" } == false)
 	}
 

@@ -96,31 +96,33 @@ extension FSTests {
 		try #expect(fs.file(at: "/e/d/b/c").stringContents() == "c")
 	}
 
-	@Test(arguments: FSKind.allCases, NodeType.allCreatableCases)
-	func copyPreservesExtendedAttributes(fsKind: FSKind, nodeType: NodeType) throws {
-		#if os(Linux)
-			// Linux kernel VFS prohibits user-namespaced xattrs on symlinks
-			guard nodeType != .symlink else { return }
-		#endif
+	#if canImport(Darwin) || os(Linux)
+		@Test(arguments: FSKind.allCases, NodeType.allCreatableCases)
+		func copyPreservesExtendedAttributes(fsKind: FSKind, nodeType: NodeType) throws {
+			#if os(Linux)
+				// Linux kernel VFS prohibits user-namespaced xattrs on symlinks
+				guard nodeType != .symlink else { return }
+			#endif
 
-		let fs = self.fs(for: fsKind)
-		let (node, _) = try nodeType.createNode(at: "/source", in: fs)
+			let fs = self.fs(for: fsKind)
+			let (node, _) = try nodeType.createNode(at: "/source", in: fs)
 
-		let originalXattrs = try node.extendedAttributeNames()
-		try node.setExtendedAttribute(named: "user.test", to: "value")
-		let expectedXattrs = originalXattrs.union(["user.test"])
+			let originalXattrs = try node.extendedAttributeNames()
+			try node.setExtendedAttribute(named: "user.test", to: "value")
+			let expectedXattrs = originalXattrs.union(["user.test"])
 
-		try node.copy(to: "/dest")
+			try node.copy(to: "/dest")
 
-		let sourceXattrs = try node.extendedAttributeNames()
-		#expect(sourceXattrs == expectedXattrs)
-		#expect(try node.extendedAttributeString(named: "user.test") == "value")
+			let sourceXattrs = try node.extendedAttributeNames()
+			#expect(sourceXattrs == expectedXattrs)
+			#expect(try node.extendedAttributeString(named: "user.test") == "value")
 
-		let copied = try fs.node(at: "/dest")
-		let copiedXattrs = try copied.extendedAttributeNames()
-		#expect(copiedXattrs == expectedXattrs)
-		#expect(try copied.extendedAttributeString(named: "user.test") == "value")
-	}
+			let copied = try fs.node(at: "/dest")
+			let copiedXattrs = try copied.extendedAttributeNames()
+			#expect(copiedXattrs == expectedXattrs)
+			#expect(try copied.extendedAttributeString(named: "user.test") == "value")
+		}
+	#endif
 
 	@Test(arguments: FSKind.allCases)
 	func nodeCopyHandlesRelativePaths(fsKind: FSKind) throws {

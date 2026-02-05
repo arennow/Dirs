@@ -90,35 +90,37 @@ public extension Node {
 		try self.move(to: dir)
 	}
 
-	func extendedAttributeNames() throws -> Set<String> {
-		try self.fs.extendedAttributeNames(at: self)
-	}
-
-	func extendedAttribute(named name: String) throws -> Data? {
-		try self.fs.extendedAttribute(named: name, at: self)
-	}
-
-	func setExtendedAttribute(named name: String, to value: Data) throws {
-		try self.fs.setExtendedAttribute(named: name, to: value, at: self)
-	}
-
-	func removeExtendedAttribute(named name: String) throws {
-		try self.fs.removeExtendedAttribute(named: name, at: self)
-	}
-
-	func extendedAttributeString(named name: String) throws -> String? {
-		guard let data = try self.extendedAttribute(named: name) else {
-			return nil
+	#if canImport(Darwin) || os(Linux)
+		func extendedAttributeNames() throws -> Set<String> {
+			try self.fs.extendedAttributeNames(at: self)
 		}
-		guard let string = String(data: data, encoding: .utf8) else {
-			throw XAttrInvalidUTF8(attributeName: name, path: self.path, data: data)
-		}
-		return string
-	}
 
-	func setExtendedAttribute(named name: String, to value: String) throws {
-		try self.setExtendedAttribute(named: name, to: Data(value.utf8))
-	}
+		func extendedAttribute(named name: String) throws -> Data? {
+			try self.fs.extendedAttribute(named: name, at: self)
+		}
+
+		func setExtendedAttribute(named name: String, to value: Data) throws {
+			try self.fs.setExtendedAttribute(named: name, to: value, at: self)
+		}
+
+		func removeExtendedAttribute(named name: String) throws {
+			try self.fs.removeExtendedAttribute(named: name, at: self)
+		}
+
+		func extendedAttributeString(named name: String) throws -> String? {
+			guard let data = try self.extendedAttribute(named: name) else {
+				return nil
+			}
+			guard let string = String(data: data, encoding: .utf8) else {
+				throw XAttrInvalidUTF8(attributeName: name, path: self.path, data: data)
+			}
+			return string
+		}
+
+		func setExtendedAttribute(named name: String, to value: String) throws {
+			try self.setExtendedAttribute(named: name, to: Data(value.utf8))
+		}
+	#endif
 }
 
 extension Node {

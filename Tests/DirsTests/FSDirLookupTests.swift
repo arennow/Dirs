@@ -4,19 +4,8 @@ import SystemPackage
 import Testing
 
 extension FSTests {
-	@Test(arguments: FSKind.allCases, [DirLookupKind.documents, .cache])
+	@Test(arguments: FSKind.allCases, [DirLookupKind.documents, .cache, .home, .downloads])
 	func dirLookupNonTemporary(_ fsKind: FSKind, dlk: DirLookupKind) throws {
-		let fs = self.fs(for: fsKind)
-
-		let one = try fs.lookUpDir(dlk)
-		let two = try fs.lookUpDir(dlk)
-
-		#expect(one.path.string.localizedCaseInsensitiveContains(dlk.rawValue))
-		#expect(one == two)
-	}
-
-	@Test(arguments: FSKind.allCases, [DirLookupKind.home, .downloads])
-	func dirLookupHomeAndDownloads(_ fsKind: FSKind, dlk: DirLookupKind) throws {
 		let fs = self.fs(for: fsKind)
 
 		let one = try fs.lookUpDir(dlk)

@@ -363,7 +363,7 @@ public struct RealFSInterface: FilesystemInterface {
 
 		try fm.copyItem(at: srcURL, to: destURL)
 
-		#if !canImport(Darwin)
+		#if os(Linux)
 			// `FileManager.copyItem`` only preserves extended attributes on Darwin
 			// (because it uses `copyfile` under the hood). On other platforms, we have to
 			// copy them manually.
@@ -582,19 +582,120 @@ private extension RealFSInterface {
 	}
 }
 
-private func realpath(_ path: String) throws -> String {
-	guard let resolvedCPathString = realpath(path, nil) else {
-		if errno == ENOENT {
-			throw NoSuchNode(path: FilePath(path))
-		} else if errno == ELOOP {
-			throw CircularResolvableChain(startPath: FilePath(path))
-		} else {
-			throw InvalidPathForCall.couldNotCanonicalize(path)
+#if os(Windows)
+	import WinSDK
+
+	private func realpath(_ path: String) throws -> String {
+		// 1) Make absolute (GetFullPathNameW)
+		let fullPathW: [WCHAR] = try path.withCString(encodedAs: UTF16.self) { inW -> [WCHAR] in
+			let needed = GetFullPathNameW(inW, 0, nil, nil)
+			if needed == 0 {
+				throw windowsRealpathError(path: path, win32Error: GetLastError())
+			}
+
+			var buf = Array<WCHAR>(repeating: 0, count: Int(needed) + 1)
+			let written = GetFullPathNameW(inW, DWORD(buf.count), &buf, nil)
+			if written == 0 {
+				throw windowsRealpathError(path: path, win32Error: GetLastError())
+			}
+
+			// Ensure NUL-termination and trim to actual length.
+			buf[Int(written)] = 0
+			while buf.count > written + 1 {
+				buf.removeLast()
+			}
+			return buf
+		}
+
+		// 2) Open a handle and ask Windows for the final resolved path
+		let handle: HANDLE = fullPathW.withUnsafeBufferPointer { p -> HANDLE in
+			// NOTE:
+			// - FILE_FLAG_BACKUP_SEMANTICS is required for directories.
+			// - Do NOT set FILE_FLAG_OPEN_REPARSE_POINT (we want to follow reparse points).
+			CreateFileW(p.baseAddress!,
+						DWORD(FILE_READ_ATTRIBUTES), // minimal access for metadata
+						DWORD(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE),
+						nil,
+						DWORD(OPEN_EXISTING),
+						DWORD(FILE_FLAG_BACKUP_SEMANTICS),
+						nil)
+		}
+
+		if handle == INVALID_HANDLE_VALUE {
+			throw windowsRealpathError(path: path, win32Error: GetLastError())
+		}
+		defer { CloseHandle(handle) }
+
+		// GetFinalPathNameByHandleW returns things like:
+		//   \\?\C:\...
+		//   \\?\UNC\server\share\...
+		let finalW: [WCHAR] = {
+			let flags = DWORD(FILE_NAME_NORMALIZED | VOLUME_NAME_DOS)
+			let needed = GetFinalPathNameByHandleW(handle, nil, 0, flags)
+			if needed == 0 {
+				return [] // handled below as error
+			}
+
+			var buf = Array<WCHAR>(repeating: 0, count: Int(needed) + 1)
+			let written = GetFinalPathNameByHandleW(handle, &buf, DWORD(buf.count), flags)
+			if written == 0 {
+				return []
+			}
+
+			// Ensure NUL-termination and trim to actual length.
+			buf[Int(written)] = 0
+			while buf.count > written + 1 {
+				buf.removeLast()
+			}
+			return buf
+		}()
+
+		if finalW.isEmpty {
+			throw windowsRealpathError(path: path, win32Error: GetLastError())
+		}
+
+		var finalStr = finalW.withUnsafeBufferPointer { p in
+			String(decodingCString: p.baseAddress!, as: UTF16.self)
+		}
+
+		// 3) Normalize away the Win32 extended-length prefix
+		//    \\?\C:\foo  -> C:\foo
+		//    \\?\UNC\a\b -> \\a\b
+		if finalStr.hasPrefix(#"\\?\UNC\"#) {
+			finalStr.removeFirst(#"\\?\UNC"#.count) // leaves "\server\share\..."
+			finalStr = #"\"# + finalStr // make it "\\server\share\..."
+		} else if finalStr.hasPrefix(#"\\?\"#) {
+			finalStr.removeFirst(#"\\?\"#.count)
+		}
+
+		return finalStr
+	}
+
+	private func windowsRealpathError(path: String, win32Error: DWORD) -> any Error {
+		switch win32Error {
+			case DWORD(ERROR_FILE_NOT_FOUND), DWORD(ERROR_PATH_NOT_FOUND):
+				NoSuchNode(path: FilePath(path))
+			case DWORD(ERROR_CANT_RESOLVE_FILENAME):
+				CircularResolvableChain(startPath: FilePath(path))
+			default:
+				InvalidPathForCall.couldNotCanonicalize(path)
 		}
 	}
-	defer { free(resolvedCPathString) }
-	return String(cString: resolvedCPathString)
-}
+#else // Non-Windows
+	private func realpath(_ path: String) throws -> String {
+		guard let resolvedCPathString = realpath(path, nil) else {
+			if errno == ENOENT {
+				throw NoSuchNode(path: FilePath(path))
+			} else if errno == ELOOP {
+				throw CircularResolvableChain(startPath: FilePath(path))
+			} else {
+				throw InvalidPathForCall.couldNotCanonicalize(path)
+			}
+		}
+		defer { free(resolvedCPathString) }
+		return String(cString: resolvedCPathString)
+	}
+#endif
 
 #if canImport(Darwin) || os(Linux)
 	#if os(Linux)
