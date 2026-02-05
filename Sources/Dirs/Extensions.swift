@@ -46,14 +46,13 @@ extension URL {
 		return number.boolValue
 	}
 
-	@available(macOS, deprecated: 13)
-	@available(iOS, deprecated: 16)
-	@available(tvOS, deprecated: 16)
+	@inline(__always)
 	func pathNonPercentEncoded() -> String {
-		if #available(macOS 13, iOS 16, tvOS 16, *) {
-			self.path(percentEncoded: false)
-		} else {
-			self.path
-		}
+		// This function used to conditionally call `self.path(percentEncoded: false)`
+		// on platforms where it was available, but:
+		// 1. This function is very important, and it's kinda silly to have it behave differently
+		//    on different OS versions
+		// 2. It [presently] doesn't work correctly on Windows
+		self.path
 	}
 }
