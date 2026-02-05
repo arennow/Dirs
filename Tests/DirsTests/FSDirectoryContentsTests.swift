@@ -98,30 +98,46 @@ extension FSTests {
 		let fs = self.fs(for: fsKind)
 		let root = try fs.rootDir
 
-		// Create one of each node type
-		try fs.createFile(at: "/file1.txt")
-		try fs.createDir(at: "/subdir")
-		try fs.createSymlink(at: "/symlink1", to: "/file1.txt")
+		// Each node type
+		let file = try root.createFile(at: "file.txt")
+		let dir = try root.createDir(at: "subdir")
+		#if !os(Windows)
+			let special = try self.createSpecialNode(named: "special", in: fs)
+			try root.createSymlink(at: "symlink_to_special", to: special)
+		#endif
+		try root.createSymlink(at: "symlink", to: file)
+		try root.createSymlink(at: "broken", to: "/nonexistent")
 		#if canImport(Darwin)
-			try fs.createFinderAlias(at: "/alias1", to: "/subdir")
+			try root.createFinderAlias(at: "alias", to: dir)
 		#endif
 
 		let children = try root.children()
 
-		// Verify all node types are included
+		// Verify counts
 		#expect(children.files.count == 1)
 		#expect(children.directories.count == 1)
-		#expect(children.symlinks.count == 1)
+		#if os(Windows)
+			#expect(children.symlinks.count == 2)
+			#expect(children.specials.count == 0)
+		#else
+			#expect(children.symlinks.count == 3)
+			#expect(children.specials.count == 1)
+		#endif
 		#if canImport(Darwin)
 			#expect(children.finderAliases.count == 1)
 		#endif
 
 		// Verify specific paths
-		#expect(children.files.first?.path == "/file1.txt")
-		#expect(children.directories.first?.path == "/subdir")
-		#expect(children.symlinks.first?.path == "/symlink1")
+		#expect(children.files.map(\.name) == ["file.txt"])
+		#expect(children.directories.map(\.name) == ["subdir"])
+		#if os(Windows)
+			#expect(children.symlinks.map(\.name).sorted() == ["broken", "symlink"])
+		#else
+			#expect(children.specials.map(\.name) == ["special"])
+			#expect(children.symlinks.map(\.name).sorted() == ["broken", "symlink", "symlink_to_special"])
+		#endif
 		#if canImport(Darwin)
-			#expect(children.finderAliases.first?.path == "/alias1")
+			#expect(children.finderAliases.map(\.name) == ["alias"])
 		#endif
 	}
 
