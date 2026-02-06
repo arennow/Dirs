@@ -1,11 +1,18 @@
 public enum NodeType: Sendable, CaseIterable {
-	case dir, file, symlink, special
+	case dir, file, symlink
+	#if SPECIALS_ENABLED
+		case special
+	#endif
 	#if FINDER_ALIASES_ENABLED
 		case finderAlias
 	#endif
 
 	public static var allCreatableCases: Array<Self> {
-		self.allCases.filter { $0 != .special }
+		#if os(Windows)
+			self.allCases
+		#else
+			self.allCases.filter { $0 != .special }
+		#endif
 	}
 
 	public var isResolvable: Bool {
@@ -22,7 +29,9 @@ public enum NodeType: Sendable, CaseIterable {
 		switch self {
 			case .dir: .dir
 			case .file: .file
-			case .special: .special
+			#if SPECIALS_ENABLED
+				case .special: .special
+			#endif
 			default: nil
 		}
 	}
@@ -49,17 +58,26 @@ public enum NodeType: Sendable, CaseIterable {
 }
 
 public enum NonResolvableNodeType: Sendable, CaseIterable {
-	case dir, file, special
+	case dir, file
+	#if SPECIALS_ENABLED
+		case special
+	#endif
 
 	public static var allCreatableCases: Array<Self> {
-		self.allCases.filter { $0 != .special }
+		#if SPECIALS_ENABLED
+			self.allCases.filter { $0 != .special }
+		#else
+			self.allCases
+		#endif
 	}
 
 	public func createNonResolvableNode(at pathIFP: some IntoFilePath, in fs: any FilesystemInterface) throws -> any Node {
 		switch self {
 			case .dir: try fs.createDir(at: pathIFP)
 			case .file: try fs.createFile(at: pathIFP)
-			case .special: throw CantBeCreated(nodeType: .special)
+			#if SPECIALS_ENABLED
+				case .special: throw CantBeCreated(nodeType: .special)
+			#endif
 		}
 	}
 }

@@ -101,7 +101,7 @@ extension FSTests {
 		// Each node type
 		let file = try root.createFile(at: "file.txt")
 		let dir = try root.createDir(at: "subdir")
-		#if !os(Windows)
+		#if SPECIALS_ENABLED
 			let special = try self.createSpecialNode(named: "special", in: fs)
 			try root.createSymlink(at: "symlink_to_special", to: special)
 		#endif
@@ -116,12 +116,11 @@ extension FSTests {
 		// Verify counts
 		#expect(children.files.count == 1)
 		#expect(children.directories.count == 1)
-		#if os(Windows)
-			#expect(children.symlinks.count == 2)
-			#expect(children.specials.count == 0)
-		#else
+		#if SPECIALS_ENABLED
 			#expect(children.symlinks.count == 3)
 			#expect(children.specials.count == 1)
+		#else
+			#expect(children.symlinks.count == 2)
 		#endif
 		#if FINDER_ALIASES_ENABLED
 			#expect(children.finderAliases.count == 1)
@@ -130,11 +129,11 @@ extension FSTests {
 		// Verify specific paths
 		#expect(children.files.map(\.name) == ["file.txt"])
 		#expect(children.directories.map(\.name) == ["subdir"])
-		#if os(Windows)
-			#expect(children.symlinks.map(\.name).sorted() == ["broken", "symlink"])
-		#else
+		#if SPECIALS_ENABLED
 			#expect(children.specials.map(\.name) == ["special"])
 			#expect(children.symlinks.map(\.name).sorted() == ["broken", "symlink", "symlink_to_special"])
+		#else
+			#expect(children.symlinks.map(\.name).sorted() == ["broken", "symlink"])
 		#endif
 		#if FINDER_ALIASES_ENABLED
 			#expect(children.finderAliases.map(\.name) == ["alias"])
@@ -149,13 +148,13 @@ extension FSTests {
 		let targetFile = try root.createFile(at: "target_file")
 		let targetDir = try root.createDir(at: "target_dir")
 		let symToFile = try root.createSymlink(at: "symlink_to_file", to: targetFile)
-		#if !os(Windows)
+		#if SPECIALS_ENABLED
 			let special = try self.createSpecialNode(named: "special", in: fs)
 		#endif
 		try root.createSymlink(at: "symlink2_to_file", to: targetFile)
 		try root.createSymlink(at: "symlink_to_dir", to: targetDir)
 		try root.createSymlink(at: "symlink_to_symlink_to_file", to: symToFile)
-		#if !os(Windows)
+		#if SPECIALS_ENABLED
 			try root.createSymlink(at: "symlink_to_special", to: special)
 		#endif
 		try root.createSymlink(at: "broken", to: "/nonexistent")
@@ -179,7 +178,7 @@ extension FSTests {
 
 		#expect(Set(resolved.files.map(\.name)) == expectedFiles)
 		#expect(Set(resolved.directories.map(\.name)) == ["target_dir", "symlink_to_dir"])
-		#if !os(Windows)
+		#if SPECIALS_ENABLED
 			#expect(Set(resolved.specials.map(\.name)) == ["symlink_to_special", "special"])
 		#endif
 		#expect(resolved.all.contains { $0.name == "broken" } == false)
@@ -228,6 +227,9 @@ extension FSTests {
 		try fs.createFile(at: "/f1")
 		try fs.createDir(at: "/d1")
 		try fs.createSymlink(at: "/s1", to: "/f1")
+		#if SPECIALS_ENABLED
+			_ = try self.createSpecialNode(named: "sp1", in: fs)
+		#endif
 		#if FINDER_ALIASES_ENABLED
 			try fs.createFinderAlias(at: "/a1", to: "/d1")
 		#endif
@@ -239,6 +241,8 @@ extension FSTests {
 		#expect(allNodes.map(\.path) == allNodesFromSequence.map(\.path))
 
 		#if FINDER_ALIASES_ENABLED
+			#expect(allNodes.count == 5)
+		#elseif SPECIALS_ENABLED
 			#expect(allNodes.count == 4)
 		#else
 			#expect(allNodes.count == 3)
@@ -247,6 +251,9 @@ extension FSTests {
 		#expect(allNodes.contains { ($0 as? File)?.path == "/f1" })
 		#expect(allNodes.contains { ($0 as? Dir)?.path == "/d1" })
 		#expect(allNodes.contains { ($0 as? Symlink)?.path == "/s1" })
+		#if SPECIALS_ENABLED
+			#expect(allNodes.contains { ($0 as? Special)?.path == "/sp1" })
+		#endif
 		#if FINDER_ALIASES_ENABLED
 			#expect(allNodes.contains { ($0 as? FinderAlias)?.path == "/a1" })
 		#endif

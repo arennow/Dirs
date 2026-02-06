@@ -7,7 +7,9 @@ public final class MockFSInterface: FilesystemInterface {
 		case dir(xattrs: Dictionary<String, Data> = [:])
 		case file(data: Data = Data(), xattrs: Dictionary<String, Data> = [:])
 		case symlink(destination: FilePath, xattrs: Dictionary<String, Data> = [:])
-		case special(xattrs: Dictionary<String, Data> = [:])
+		#if SPECIALS_ENABLED
+			case special(xattrs: Dictionary<String, Data> = [:])
+		#endif
 		#if FINDER_ALIASES_ENABLED
 			case finderAlias(destination: FilePath, xattrs: Dictionary<String, Data> = [:])
 		#endif
@@ -20,7 +22,9 @@ public final class MockFSInterface: FilesystemInterface {
 				#endif
 				case .file: .file
 				case .symlink: .symlink
-				case .special: .special
+				#if SPECIALS_ENABLED
+					case .special: .special
+				#endif
 			}
 		}
 
@@ -29,9 +33,12 @@ public final class MockFSInterface: FilesystemInterface {
 				switch self {
 					case .dir(let xattrs),
 						 .file(_, let xattrs),
-						 .symlink(_, let xattrs),
-						 .special(let xattrs):
+						 .symlink(_, let xattrs):
 						return xattrs
+					#if SPECIALS_ENABLED
+						case .special(let xattrs):
+							return xattrs
+					#endif
 					#if FINDER_ALIASES_ENABLED
 						case .finderAlias(_, let xattrs):
 							return xattrs
@@ -46,8 +53,10 @@ public final class MockFSInterface: FilesystemInterface {
 						self = .file(data: data, xattrs: newValue)
 					case .symlink(let destination, _):
 						self = .symlink(destination: destination, xattrs: newValue)
-					case .special:
-						self = .special(xattrs: newValue)
+					#if SPECIALS_ENABLED
+						case .special:
+							self = .special(xattrs: newValue)
+					#endif
 					#if FINDER_ALIASES_ENABLED
 						case .finderAlias(let destination, _):
 							self = .finderAlias(destination: destination, xattrs: newValue)
@@ -457,14 +466,16 @@ public final class MockFSInterface: FilesystemInterface {
 		}
 	#endif
 
-	/// Creates a special node (FIFO, socket, device, etc.) for testing purposes.
-	/// This is only available on MockFSInterface since this library doesn't support
-	/// creating special nodes, but we want to support mocking them for testing.
-	public func createSpecialForTesting(at ifp: some IntoFilePath) throws -> Special {
-		try self.createNode(at: ifp, factory: Special.init, insertNode: { ptn, resolvedFP in
-			ptn[resolvedFP] = .special()
-		})
-	}
+	#if SPECIALS_ENABLED
+		/// Creates a special node (FIFO, socket, device, etc.) for testing purposes.
+		/// This is only available on MockFSInterface since this library doesn't support
+		/// creating special nodes, but we want to support mocking them for testing.
+		public func createSpecialForTesting(at ifp: some IntoFilePath) throws -> Special {
+			try self.createNode(at: ifp, factory: Special.init, insertNode: { ptn, resolvedFP in
+				ptn[resolvedFP] = .special()
+			})
+		}
+	#endif
 
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
 		try self.replaceContentsOfFile(at: ifp, to: contents, using: self.pathsToNodes.acquireIntoHandle())
@@ -547,7 +558,11 @@ public final class MockFSInterface: FilesystemInterface {
 						case .finderAlias: fallthrough
 					#endif
 
-					case .file, .special:
+					#if SPECIALS_ENABLED
+						case .special: fallthrough
+					#endif
+
+					case .file:
 						acquisitionLock.resource.removeValue(forKey: destFP)
 						recursivelyMove(destFP: destFP)
 

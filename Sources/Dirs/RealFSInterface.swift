@@ -66,7 +66,7 @@ public struct RealFSInterface: FilesystemInterface {
 				}
 			}
 		}
-	#else
+	#else // !FINDER_ALIASES_ENABLED
 		public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
 			let url: URL = self.resolveToRaw(ifp)
 			let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
@@ -75,7 +75,11 @@ public struct RealFSInterface: FilesystemInterface {
 				case .typeSymbolicLink: return .symlink
 				case .typeRegular: return .file
 				case .none: return nil
-				default: return .special
+				#if os(Windows)
+					default: return .file
+				#else
+					default: return .special
+				#endif
 			}
 		}
 	#endif
@@ -153,10 +157,8 @@ public struct RealFSInterface: FilesystemInterface {
 						nodeType = .symlink
 					} else if fileType == .typeDirectory {
 						nodeType = .dir
-					} else if fileType == .typeRegular {
-						nodeType = .file
 					} else {
-						nodeType = .special
+						nodeType = .file
 					}
 				} else {
 					if (try? fm.destinationOfSymbolicLink(atPath: entryPathString)) != nil {
@@ -407,7 +409,10 @@ public struct RealFSInterface: FilesystemInterface {
 			#if FINDER_ALIASES_ENABLED
 				case .finderAlias: fallthrough
 			#endif
-			case .file, .special:
+			#if SPECIALS_ENABLED
+				case .special: fallthrough
+			#endif
+			case .file:
 				try fm.removeItem(at: destURL)
 			case .none:
 				break

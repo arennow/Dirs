@@ -3,8 +3,7 @@ import Foundation
 import SystemPackage
 import Testing
 
-// TODO: Figure out how to test special nodes on Windows
-#if !os(Windows)
+#if SPECIALS_ENABLED
 	extension FSTests {
 		func createSpecialNode(named filename: String, in fs: some FilesystemInterface) throws -> Special {
 			switch fs {

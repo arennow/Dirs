@@ -138,9 +138,11 @@ public extension FilesystemInterface {
 		try Symlink(_fs: self.asInterface, path: ifp.into())
 	}
 
-	func special(at ifp: some IntoFilePath) throws -> Special {
-		try Special(_fs: self.asInterface, path: ifp.into())
-	}
+	#if SPECIALS_ENABLED
+		func special(at ifp: some IntoFilePath) throws -> Special {
+			try Special(_fs: self.asInterface, path: ifp.into())
+		}
+	#endif
 
 	#if FINDER_ALIASES_ENABLED
 		func finderAlias(at ifp: some IntoFilePath) throws -> FinderAlias {
@@ -154,7 +156,9 @@ public extension FilesystemInterface {
 			case .dir: try self.dir(at: fp)
 			case .file: try self.file(at: fp)
 			case .symlink: try self.symlink(at: fp)
-			case .special: try self.special(at: fp)
+			#if SPECIALS_ENABLED
+				case .special: try self.special(at: fp)
+			#endif
 			#if FINDER_ALIASES_ENABLED
 				case .finderAlias: try self.finderAlias(at: fp)
 			#endif

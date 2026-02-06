@@ -124,27 +124,27 @@ public extension Dir {
 public extension Dir {
 	func allDescendantNodes() -> some Sequence<any Node> {
 		struct State {
-			var dirs: Array<Dir>
-			var files: Array<File>
-			var symlinks: Array<Symlink>
-			var specials: Array<Special>
+			var dirs: Array<Dir> = []
+			var files: Array<File> = []
+			var symlinks: Array<Symlink> = []
+			#if SPECIALS_ENABLED
+				var specials: Array<Special> = []
+			#endif
 			#if FINDER_ALIASES_ENABLED
-				var finderAliases: Array<FinderAlias>
+				var finderAliases: Array<FinderAlias> = []
 			#endif
 		}
 
 		let state = if let children = try? self.children() {
 			#if FINDER_ALIASES_ENABLED
 				State(dirs: children.directories, files: children.files, symlinks: children.symlinks, specials: children.specials, finderAliases: children.finderAliases)
-			#else
+			#elseif SPECIALS_ENABLED
 				State(dirs: children.directories, files: children.files, symlinks: children.symlinks, specials: children.specials)
+			#else
+				State(dirs: children.directories, files: children.files, symlinks: children.symlinks)
 			#endif
 		} else {
-			#if FINDER_ALIASES_ENABLED
-				State(dirs: [], files: [], symlinks: [], specials: [], finderAliases: [])
-			#else
-				State(dirs: [], files: [], symlinks: [], specials: [])
-			#endif
+			State()
 		}
 
 		return sequence(state: state) { state -> Optional<any Node> in
@@ -156,9 +156,11 @@ public extension Dir {
 				return nextSymlink
 			}
 
-			if let nextSpecial = state.specials.popLast() {
-				return nextSpecial
-			}
+			#if SPECIALS_ENABLED
+				if let nextSpecial = state.specials.popLast() {
+					return nextSpecial
+				}
+			#endif
 
 			#if FINDER_ALIASES_ENABLED
 				if let nextFinderAlias = state.finderAliases.popLast() {
@@ -171,7 +173,9 @@ public extension Dir {
 					state.dirs.append(contentsOf: children.directories)
 					state.files.append(contentsOf: children.files)
 					state.symlinks.append(contentsOf: children.symlinks)
-					state.specials.append(contentsOf: children.specials)
+					#if SPECIALS_ENABLED
+						state.specials.append(contentsOf: children.specials)
+					#endif
 					#if FINDER_ALIASES_ENABLED
 						state.finderAliases.append(contentsOf: children.finderAliases)
 					#endif
@@ -195,9 +199,11 @@ public extension Dir {
 		self.allDescendantNodes().compactMap { $0 as? Symlink }
 	}
 
-	func allDescendantSpecials() -> some Sequence<Special> {
-		self.allDescendantNodes().compactMap { $0 as? Special }
-	}
+	#if SPECIALS_ENABLED
+		func allDescendantSpecials() -> some Sequence<Special> {
+			self.allDescendantNodes().compactMap { $0 as? Special }
+		}
+	#endif
 
 	#if FINDER_ALIASES_ENABLED
 		func allDescendantFinderAliases() -> some Sequence<FinderAlias> {

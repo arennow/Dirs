@@ -3,15 +3,25 @@
 
 import PackageDescription
 
+let allPlatforms: Array<Platform> = [
+	.macOS,
+	.iOS,
+	.tvOS,
+	.watchOS,
+	.visionOS,
+	.linux,
+	.windows,
+]
+
+func allPlatformsExcept(_ excluded: Platform...) -> Array<Platform> {
+	allPlatforms.filter { !excluded.contains($0) }
+}
+
 let swiftSettings: Array<SwiftSetting> = [
 	.enableUpcomingFeature("ExistentialAny"),
-	.define("XATTRS_ENABLED", .when(platforms: [
-		.macOS, .iOS, .tvOS, .watchOS, .visionOS,
-		.linux,
-	])),
-	.define("FINDER_ALIASES_ENABLED", .when(platforms: [
-		.macOS, .iOS, .tvOS, .watchOS, .visionOS,
-	])),
+	.define("XATTRS_ENABLED", .when(platforms: allPlatformsExcept(.windows))),
+	.define("FINDER_ALIASES_ENABLED", .when(platforms: allPlatformsExcept(.linux, .windows))),
+	.define("SPECIALS_ENABLED", .when(platforms: allPlatformsExcept(.windows))),
 ]
 
 let package = Package(name: "Dirs",
@@ -19,6 +29,8 @@ let package = Package(name: "Dirs",
 					  	.macOS(.v10_15),
 					  	.iOS(.v13),
 					  	.tvOS(.v13),
+					  	.watchOS(.v6),
+					  	.visionOS(.v1),
 					  ],
 					  products: [
 					  	.library(name: "Dirs",
