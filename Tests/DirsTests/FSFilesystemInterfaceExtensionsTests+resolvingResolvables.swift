@@ -65,7 +65,7 @@ extension FSTests {
 		#expect(fs.nodeTypeResolvingResolvables(at: broken) == nil)
 	}
 
-	#if canImport(Darwin)
+	#if FINDER_ALIASES_ENABLED
 		@Test(arguments: FSKind.allCases)
 		func resolvingResolvablesFollowsFinderAliases(fsKind: FSKind) throws {
 			let fs = self.fs(for: fsKind)

@@ -31,7 +31,7 @@ struct MemoryLayoutTests {
 		#expect(MemoryLayout<Symlink>.size <= 24)
 	}
 
-	#if canImport(Darwin)
+	#if FINDER_ALIASES_ENABLED
 		@Test
 		func finderAliasFitsInExistentialInlineBuffer() {
 			#expect(MemoryLayout<FinderAlias>.size <= 24)

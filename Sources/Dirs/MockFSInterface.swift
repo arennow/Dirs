@@ -8,14 +8,14 @@ public final class MockFSInterface: FilesystemInterface {
 		case file(data: Data = Data(), xattrs: Dictionary<String, Data> = [:])
 		case symlink(destination: FilePath, xattrs: Dictionary<String, Data> = [:])
 		case special(xattrs: Dictionary<String, Data> = [:])
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			case finderAlias(destination: FilePath, xattrs: Dictionary<String, Data> = [:])
 		#endif
 
 		var nodeType: NodeType {
 			switch self {
 				case .dir: .dir
-				#if canImport(Darwin)
+				#if FINDER_ALIASES_ENABLED
 					case .finderAlias: .finderAlias
 				#endif
 				case .file: .file
@@ -32,7 +32,7 @@ public final class MockFSInterface: FilesystemInterface {
 						 .symlink(_, let xattrs),
 						 .special(let xattrs):
 						return xattrs
-					#if canImport(Darwin)
+					#if FINDER_ALIASES_ENABLED
 						case .finderAlias(_, let xattrs):
 							return xattrs
 					#endif
@@ -48,7 +48,7 @@ public final class MockFSInterface: FilesystemInterface {
 						self = .symlink(destination: destination, xattrs: newValue)
 					case .special:
 						self = .special(xattrs: newValue)
-					#if canImport(Darwin)
+					#if FINDER_ALIASES_ENABLED
 						case .finderAlias(let destination, _):
 							self = .finderAlias(destination: destination, xattrs: newValue)
 					#endif
@@ -413,7 +413,7 @@ public final class MockFSInterface: FilesystemInterface {
 		})
 	}
 
-	#if canImport(Darwin)
+	#if FINDER_ALIASES_ENABLED
 		public func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> FinderAlias {
 			try self.createNode(at: linkIFP, factory: FinderAlias.init, insertNode: { ptn, resolvedFP in
 				ptn[resolvedFP] = .finderAlias(destination: destIFP.into())
@@ -543,7 +543,7 @@ public final class MockFSInterface: FilesystemInterface {
 							fallthrough
 						}
 
-					#if canImport(Darwin)
+					#if FINDER_ALIASES_ENABLED
 						case .finderAlias: fallthrough
 					#endif
 

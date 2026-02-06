@@ -107,7 +107,7 @@ extension FSTests {
 		#endif
 		try root.createSymlink(at: "symlink", to: file)
 		try root.createSymlink(at: "broken", to: "/nonexistent")
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			try root.createFinderAlias(at: "alias", to: dir)
 		#endif
 
@@ -123,7 +123,7 @@ extension FSTests {
 			#expect(children.symlinks.count == 3)
 			#expect(children.specials.count == 1)
 		#endif
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(children.finderAliases.count == 1)
 		#endif
 
@@ -136,7 +136,7 @@ extension FSTests {
 			#expect(children.specials.map(\.name) == ["special"])
 			#expect(children.symlinks.map(\.name).sorted() == ["broken", "symlink", "symlink_to_special"])
 		#endif
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(children.finderAliases.map(\.name) == ["alias"])
 		#endif
 	}
@@ -159,7 +159,7 @@ extension FSTests {
 			try root.createSymlink(at: "symlink_to_special", to: special)
 		#endif
 		try root.createSymlink(at: "broken", to: "/nonexistent")
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			try root.createFinderAlias(at: "alias_to_file", to: targetFile)
 			try root.createFinderAlias(at: "alias_to_symlink_to_file", to: symToFile)
 		#endif
@@ -167,12 +167,12 @@ extension FSTests {
 		let resolved = try root.resolvedChildren()
 
 		#expect(resolved.symlinks.isEmpty)
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(resolved.finderAliases.isEmpty)
 		#endif
 
 		var expectedFiles: Set<String> = ["target_file", "symlink_to_file", "symlink2_to_file", "symlink_to_symlink_to_file"]
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			expectedFiles.insert("alias_to_file")
 			expectedFiles.insert("alias_to_symlink_to_file")
 		#endif
@@ -198,15 +198,14 @@ extension FSTests {
 		try fs.createDir(at: "/d2")
 		try fs.createSymlink(at: "/s1", to: "/f1")
 		try fs.createSymlink(at: "/s2", to: "/d1")
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			try fs.createFinderAlias(at: "/a1", to: "/f1")
 		#endif
 
 		let children = try root.children()
 		let contents = try fs.contentsOf(directory: "/")
 
-		#if canImport(Darwin)
-			// Total should match
+		#if FINDER_ALIASES_ENABLED
 			#expect(children.files.count + children.directories.count + children.symlinks.count + children.finderAliases.count == contents.count)
 		#else
 			#expect(children.files.count + children.directories.count + children.symlinks.count == contents.count)
@@ -216,7 +215,7 @@ extension FSTests {
 		#expect(children.files.count == contents.count(where: { $0.nodeType == .file }))
 		#expect(children.directories.count == contents.count(where: { $0.nodeType == .dir }))
 		#expect(children.symlinks.count == contents.count(where: { $0.nodeType == .symlink }))
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(children.finderAliases.count == contents.count(where: { $0.nodeType == .finderAlias }))
 		#endif
 	}
@@ -229,7 +228,7 @@ extension FSTests {
 		try fs.createFile(at: "/f1")
 		try fs.createDir(at: "/d1")
 		try fs.createSymlink(at: "/s1", to: "/f1")
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			try fs.createFinderAlias(at: "/a1", to: "/d1")
 		#endif
 
@@ -239,7 +238,7 @@ extension FSTests {
 
 		#expect(allNodes.map(\.path) == allNodesFromSequence.map(\.path))
 
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(allNodes.count == 4)
 		#else
 			#expect(allNodes.count == 3)
@@ -248,7 +247,7 @@ extension FSTests {
 		#expect(allNodes.contains { ($0 as? File)?.path == "/f1" })
 		#expect(allNodes.contains { ($0 as? Dir)?.path == "/d1" })
 		#expect(allNodes.contains { ($0 as? Symlink)?.path == "/s1" })
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(allNodes.contains { ($0 as? FinderAlias)?.path == "/a1" })
 		#endif
 	}
@@ -278,7 +277,7 @@ extension FSTests {
 		try fs.createDir(at: "/dir/subdir")
 		try fs.createSymlink(at: "/dir/link", to: "/dir/file1")
 
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			try fs.createFinderAlias(at: "/dir/alias", to: "/dir/subdir")
 			#expect(try dir.children().count == 5) // 2 files, 1 dir, 1 symlink, 1 alias
 		#else
@@ -295,14 +294,14 @@ extension FSTests {
 		try fs.createFile(at: "/myfile")
 		try fs.createDir(at: "/mydir")
 		try fs.createSymlink(at: "/mylink", to: "/myfile")
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			try fs.createFinderAlias(at: "/myalias", to: "/mydir")
 		#endif
 
 		#expect(root.file(at: "myfile")?.path == "/myfile")
 		#expect(root.dir(at: "mydir")?.path == "/mydir")
 		#expect(root.symlink(at: "mylink")?.path == "/mylink")
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(root.finderAlias(at: "myalias")?.path == "/myalias")
 		#endif
 
@@ -310,14 +309,14 @@ extension FSTests {
 		_ = try root.newOrExistingFile(at: "a/b/file")
 		try fs.createDir(at: "/a/b/dir")
 		try fs.createSymlink(at: "/a/b/link", to: "/a/b/file")
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			try fs.createFinderAlias(at: "/a/b/alias", to: "/a/b/dir")
 		#endif
 
 		#expect(root.file(at: "a/b/file")?.path == "/a/b/file")
 		#expect(root.dir(at: "a/b/dir")?.path == "/a/b/dir")
 		#expect(root.symlink(at: "a/b/link")?.path == "/a/b/link")
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(root.finderAlias(at: "a/b/alias")?.path == "/a/b/alias")
 		#endif
 
@@ -328,7 +327,7 @@ extension FSTests {
 		#expect(root.file(at: "a/b/nonexistent") == nil)
 		#expect(root.dir(at: "a/b/nonexistent") == nil)
 		#expect(root.symlink(at: "a/b/nonexistent") == nil)
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(root.finderAlias(at: "nonexistent") == nil)
 			#expect(root.finderAlias(at: "a/b/nonexistent") == nil)
 		#endif
@@ -343,7 +342,7 @@ extension FSTests {
 		try fs.createFile(at: "/myfile")
 		try fs.createDir(at: "/mydir")
 		try fs.createSymlink(at: "/mylink", to: "/myfile")
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			try fs.createFinderAlias(at: "/myalias", to: "/mydir")
 		#endif
 
@@ -351,7 +350,7 @@ extension FSTests {
 		#expect(root.node(at: "myfile") is File)
 		#expect(root.node(at: "mydir") is Dir)
 		#expect(root.node(at: "mylink") is Symlink)
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(root.node(at: "myalias") is FinderAlias)
 		#endif
 
@@ -359,14 +358,14 @@ extension FSTests {
 		_ = try root.newOrExistingFile(at: "a/b/file")
 		try fs.createDir(at: "/a/b/dir")
 		try fs.createSymlink(at: "/a/b/link", to: "/a/b/file")
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			try fs.createFinderAlias(at: "/a/b/alias", to: "/a/b/dir")
 		#endif
 
 		#expect(root.node(at: "a/b/file") is File)
 		#expect(root.node(at: "a/b/dir") is Dir)
 		#expect(root.node(at: "a/b/link") is Symlink)
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(root.node(at: "a/b/alias") is FinderAlias)
 		#endif
 
@@ -381,33 +380,33 @@ extension FSTests {
 
 		_ = try root.newOrExistingFile(at: "real/nested/file")
 		try fs.createFile(at: "/file_not_dir")
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			try fs.createFinderAlias(at: "/real/nested/alias", to: "/real/nested/file")
 		#endif
 
 		#expect(root.file(at: "nonexistent/nested/file") == nil)
 		#expect(root.dir(at: "nonexistent/nested/dir") == nil)
 		#expect(root.symlink(at: "nonexistent/nested/link") == nil)
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(root.finderAlias(at: "nonexistent/nested/alias") == nil)
 		#endif
 
 		#expect(root.file(at: "file_not_dir/nested/file") == nil)
 		#expect(root.dir(at: "file_not_dir/nested/dir") == nil)
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(root.finderAlias(at: "file_not_dir/nested/alias") == nil)
 		#endif
 
 		#expect(root.file(at: "real/nested/nonexistent") == nil)
 		#expect(root.dir(at: "real/nested/nonexistent") == nil)
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(root.finderAlias(at: "real/nested/nonexistent") == nil)
 		#endif
 
 		#expect(root.file(at: "file_not_dir/anything") == nil)
 
 		#expect(root.file(at: "real/nested/file")?.path == "/real/nested/file")
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(root.finderAlias(at: "real/nested/alias")?.path == "/real/nested/alias")
 		#endif
 	}

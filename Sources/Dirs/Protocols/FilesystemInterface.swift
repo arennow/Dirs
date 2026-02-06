@@ -50,7 +50,7 @@ public protocol FilesystemInterface: Equatable, Sendable {
 
 	// Finder Aliases are a macOS/Darwin-only system feature;
 	// expose these APIs only when Darwin/Foundation is available
-	#if canImport(Darwin)
+	#if FINDER_ALIASES_ENABLED
 		@discardableResult
 		func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> FinderAlias
 		// By observation, the macOS implementation of this ⬇️ resolves the alias fully,
@@ -94,7 +94,7 @@ public extension FilesystemInterface {
 						let destPath = try self.destinationOf(symlink: currentPath)
 						currentPath = Symlink.resolveDestination(destPath, relativeTo: currentPath)
 
-					#if canImport(Darwin)
+					#if FINDER_ALIASES_ENABLED
 						case .finderAlias:
 							let destPath = try self.destinationOfFinderAlias(at: currentPath)
 							// destinationOfFinderAlias already fully resolves chains, so just return the type
@@ -142,7 +142,7 @@ public extension FilesystemInterface {
 		try Special(_fs: self.asInterface, path: ifp.into())
 	}
 
-	#if canImport(Darwin)
+	#if FINDER_ALIASES_ENABLED
 		func finderAlias(at ifp: some IntoFilePath) throws -> FinderAlias {
 			try FinderAlias(_fs: self.asInterface, path: ifp.into())
 		}
@@ -155,7 +155,7 @@ public extension FilesystemInterface {
 			case .file: try self.file(at: fp)
 			case .symlink: try self.symlink(at: fp)
 			case .special: try self.special(at: fp)
-			#if canImport(Darwin)
+			#if FINDER_ALIASES_ENABLED
 				case .finderAlias: try self.finderAlias(at: fp)
 			#endif
 			case .none: throw NoSuchNode(path: fp)

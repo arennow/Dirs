@@ -110,7 +110,7 @@ public extension Dir {
 		self.typedNode(at: relativeIFP, nodeGetter: { try $0.symlink(at: $1) })
 	}
 
-	#if canImport(Darwin)
+	#if FINDER_ALIASES_ENABLED
 		func finderAlias(at relativeIFP: some IntoFilePath) -> FinderAlias? {
 			self.typedNode(at: relativeIFP, nodeGetter: { try $0.finderAlias(at: $1) })
 		}
@@ -128,19 +128,19 @@ public extension Dir {
 			var files: Array<File>
 			var symlinks: Array<Symlink>
 			var specials: Array<Special>
-			#if canImport(Darwin)
+			#if FINDER_ALIASES_ENABLED
 				var finderAliases: Array<FinderAlias>
 			#endif
 		}
 
 		let state = if let children = try? self.children() {
-			#if canImport(Darwin)
+			#if FINDER_ALIASES_ENABLED
 				State(dirs: children.directories, files: children.files, symlinks: children.symlinks, specials: children.specials, finderAliases: children.finderAliases)
 			#else
 				State(dirs: children.directories, files: children.files, symlinks: children.symlinks, specials: children.specials)
 			#endif
 		} else {
-			#if canImport(Darwin)
+			#if FINDER_ALIASES_ENABLED
 				State(dirs: [], files: [], symlinks: [], specials: [], finderAliases: [])
 			#else
 				State(dirs: [], files: [], symlinks: [], specials: [])
@@ -160,7 +160,7 @@ public extension Dir {
 				return nextSpecial
 			}
 
-			#if canImport(Darwin)
+			#if FINDER_ALIASES_ENABLED
 				if let nextFinderAlias = state.finderAliases.popLast() {
 					return nextFinderAlias
 				}
@@ -172,7 +172,7 @@ public extension Dir {
 					state.files.append(contentsOf: children.files)
 					state.symlinks.append(contentsOf: children.symlinks)
 					state.specials.append(contentsOf: children.specials)
-					#if canImport(Darwin)
+					#if FINDER_ALIASES_ENABLED
 						state.finderAliases.append(contentsOf: children.finderAliases)
 					#endif
 				}
@@ -199,7 +199,7 @@ public extension Dir {
 		self.allDescendantNodes().compactMap { $0 as? Special }
 	}
 
-	#if canImport(Darwin)
+	#if FINDER_ALIASES_ENABLED
 		func allDescendantFinderAliases() -> some Sequence<FinderAlias> {
 			self.allDescendantNodes().compactMap { $0 as? FinderAlias }
 		}
@@ -222,7 +222,7 @@ public extension Dir {
 		try self.fs.createSymlink(at: self.path.appending(ifpcv.into()), to: destination.into())
 	}
 
-	#if canImport(Darwin)
+	#if FINDER_ALIASES_ENABLED
 		@discardableResult
 		func createFinderAlias(at ifpcv: some IntoFilePathComponentView, to destination: some IntoFilePath) throws -> FinderAlias {
 			try self.fs.createFinderAlias(at: self.path.appending(ifpcv.into()), to: destination.into())

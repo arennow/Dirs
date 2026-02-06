@@ -5,7 +5,7 @@
 //  Created by Aaron Rennow on 2025-01-05.
 //
 
-#if canImport(Darwin)
+#if FINDER_ALIASES_ENABLED
 	import SystemPackage
 
 	public struct FinderAlias: ResolvableNode {

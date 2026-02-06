@@ -1,4 +1,4 @@
-#if canImport(Darwin)
+#if FINDER_ALIASES_ENABLED
 	import Darwin
 	import Foundation
 	import SystemPackage

@@ -5,7 +5,7 @@ public struct Children {
 	public private(set) var files: Array<File>
 	public private(set) var symlinks: Array<Symlink>
 	public private(set) var specials: Array<Special>
-	#if canImport(Darwin)
+	#if FINDER_ALIASES_ENABLED
 		public private(set) var finderAliases: Array<FinderAlias>
 
 		init(directories: consuming Array<Dir>,
@@ -38,7 +38,7 @@ public struct Children {
 		var files = Array<File>()
 		var symlinks = Array<Symlink>()
 		var specials = Array<Special>()
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			var finderAliases = Array<FinderAlias>()
 		#endif
 
@@ -52,14 +52,14 @@ public struct Children {
 					symlinks.append(Symlink(uncheckedAt: childStat.filePath, in: dir._fs))
 				case .special:
 					specials.append(Special(uncheckedAt: childStat.filePath, in: dir._fs))
-				#if canImport(Darwin)
+				#if FINDER_ALIASES_ENABLED
 					case .finderAlias:
 						finderAliases.append(FinderAlias(uncheckedAt: childStat.filePath, in: dir._fs))
 				#endif
 			}
 		}
 
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			return Self(directories: dirs, files: files, symlinks: symlinks, specials: specials, finderAliases: finderAliases)
 		#else
 			return Self(directories: dirs, files: files, symlinks: symlinks, specials: specials)
@@ -87,7 +87,7 @@ public struct Children {
 		}
 
 		try resolveArray(&self.symlinks)
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			try resolveArray(&self.finderAliases)
 		#endif
 	}
@@ -96,7 +96,7 @@ public struct Children {
 public extension Children {
 	var all: some Sequence<any Node> {
 		let base: some Sequence<any Node> = chain(chain(chain(self.directories, self.files), self.symlinks), self.specials)
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			return chain(base, self.finderAliases)
 		#else
 			return base
@@ -114,7 +114,7 @@ extension Children: Sequence {
 			&& self.files.isEmpty
 			&& self.symlinks.isEmpty
 			&& self.specials.isEmpty
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			return baseEmpty && self.finderAliases.isEmpty
 		#else
 			return baseEmpty
@@ -123,7 +123,7 @@ extension Children: Sequence {
 
 	public var count: Int {
 		let baseCount = self.directories.count + self.files.count + self.symlinks.count + self.specials.count
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			return baseCount + self.finderAliases.count
 		#else
 			return baseCount

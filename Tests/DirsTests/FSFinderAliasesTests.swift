@@ -3,7 +3,7 @@ import Foundation
 import SystemPackage
 import Testing
 
-#if canImport(Darwin)
+#if FINDER_ALIASES_ENABLED
 	extension FSTests {
 		@Test(arguments: FSKind.allCases)
 		func finderAliasRoundTrip(fsKind: FSKind) throws {

@@ -169,7 +169,7 @@ extension FSTests {
 		#expect(fs.nodeTypeFollowingSymlinks(at: "/s2") == .dir)
 		_ = try fs.symlink(at: "/s2")
 
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			try fs.createFile(at: "/a/target")
 			try fs.createFinderAlias(at: "/a/alias", to: "/a/target")
 			#expect(fs.nodeType(at: "/s/alias") == .finderAlias)

@@ -1,4 +1,4 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.2
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -8,6 +8,9 @@ let swiftSettings: Array<SwiftSetting> = [
 	.define("XATTRS_ENABLED", .when(platforms: [
 		.macOS, .iOS, .tvOS, .watchOS, .visionOS,
 		.linux,
+	])),
+	.define("FINDER_ALIASES_ENABLED", .when(platforms: [
+		.macOS, .iOS, .tvOS, .watchOS, .visionOS,
 	])),
 ]
 
@@ -20,7 +23,6 @@ let package = Package(name: "Dirs",
 					  products: [
 					  	.library(name: "Dirs",
 								   targets: ["Dirs"]),
-
 					  ],
 
 					  dependencies: [

@@ -12,7 +12,7 @@ import SystemPackage
 public struct RealFSInterface: FilesystemInterface {
 	public let chroot: FilePath?
 
-	#if DEBUG
+	#if DEBUG && FINDER_ALIASES_ENABLED
 		/// When `true`, `nodeType(at:)` will act as if no FinderInfo is available
 		public var forceMissingFinderInfo = false
 	#endif
@@ -30,7 +30,8 @@ public struct RealFSInterface: FilesystemInterface {
 		self.init(chroot: FilePath(resolvedPathString))
 	}
 
-	#if canImport(Darwin)
+	// We only do this more complicated implementation if Finder aliases are enabled
+	#if FINDER_ALIASES_ENABLED
 		public func nodeType(at ifp: some IntoFilePath) -> NodeType? {
 			do {
 				#if DEBUG
@@ -177,7 +178,7 @@ public struct RealFSInterface: FilesystemInterface {
 			let fm = FileManager.default
 
 			var prefetchKeys: Array<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
-			#if canImport(Darwin)
+			#if FINDER_ALIASES_ENABLED
 				prefetchKeys.append(contentsOf: [.isAliasFileKey, .fileResourceTypeKey])
 			#endif
 
@@ -205,7 +206,7 @@ public struct RealFSInterface: FilesystemInterface {
 					} else if try rawURL.getBoolResourceValue(forKey: .isDirectoryKey) {
 						nodeType = .dir
 					} else {
-						#if canImport(Darwin)
+						#if FINDER_ALIASES_ENABLED
 							if try rawURL.getBoolResourceValue(forKey: .isAliasFileKey) {
 								nodeType = .finderAlias
 							} else {
@@ -323,7 +324,7 @@ public struct RealFSInterface: FilesystemInterface {
 		return try factory(self.asInterface, self.resolveToProjected(fp))
 	}
 
-	#if canImport(Darwin)
+	#if FINDER_ALIASES_ENABLED
 		public func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> FinderAlias {
 			try self.createNode(at: linkIFP, factory: FinderAlias.init) { linkFP in
 				let linkURL: URL = self.resolveToRaw(linkFP)
@@ -403,7 +404,7 @@ public struct RealFSInterface: FilesystemInterface {
 				}
 			case .dir:
 				destURL.appendPathComponent(srcURL.lastPathComponent)
-			#if canImport(Darwin)
+			#if FINDER_ALIASES_ENABLED
 				case .finderAlias: fallthrough
 			#endif
 			case .file, .special:

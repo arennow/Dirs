@@ -14,7 +14,7 @@ final class FSTests {
 	enum FSKind: CaseIterable {
 		case mock
 
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			// All of this silliness is required because realFS will always be able to get
 			// Finder Info because we're running on APFS, so we need to be able to simulate
 			// its absence (as would be the case on a non-Mac filesystem)
@@ -51,7 +51,7 @@ final class FSTests {
 				assert(self.pathToDelete == nil, "Each RealFSInterface test requires a unique chroot")
 				var fs = try! RealFSInterface(chroot: .temporaryUnique())
 
-				#if canImport(Darwin)
+				#if FINDER_ALIASES_ENABLED
 					if case .real(.unavailable) = kind {
 						fs.forceMissingFinderInfo = true
 					}

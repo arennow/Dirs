@@ -52,7 +52,7 @@ extension FSTests {
 		_ = try root.newOrExistingFile(at: "a/file")
 		try fs.createDir(at: "/a/dir")
 		try fs.createSymlink(at: "/a/link", to: "/a/file")
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			try fs.createFinderAlias(at: "/a/alias", to: "/a/dir")
 		#endif
 
@@ -65,14 +65,14 @@ extension FSTests {
 		#expect(Set(dirs.map(\.path)) == ["/a", "/a/dir"])
 		#expect(Set(symlinks.map(\.path)) == ["/a/link"])
 
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			let aliases = Array(root.allDescendantFinderAliases())
 			#expect(Set(aliases.map(\.path)) == ["/a/alias"])
 		#endif
 
 		// Test that allDescendantNodes includes everything
 		let allNodes = Array(root.allDescendantNodes())
-		#if canImport(Darwin)
+		#if FINDER_ALIASES_ENABLED
 			#expect(allNodes.count == 5) // dir /a, file, dir, link, alias
 		#else
 			#expect(allNodes.count == 4) // dir /a, file, dir, link

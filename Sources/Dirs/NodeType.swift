@@ -1,6 +1,6 @@
 public enum NodeType: Sendable, CaseIterable {
 	case dir, file, symlink, special
-	#if canImport(Darwin)
+	#if FINDER_ALIASES_ENABLED
 		case finderAlias
 	#endif
 
@@ -10,7 +10,7 @@ public enum NodeType: Sendable, CaseIterable {
 
 	public var isResolvable: Bool {
 		switch self {
-			#if canImport(Darwin)
+			#if FINDER_ALIASES_ENABLED
 				case .finderAlias: fallthrough
 			#endif
 			case .symlink: return true
@@ -29,7 +29,7 @@ public enum NodeType: Sendable, CaseIterable {
 
 	private var resolvableNodeType: Optional<ResolvableNodeType> {
 		switch self {
-			#if canImport(Darwin)
+			#if FINDER_ALIASES_ENABLED
 				case .finderAlias: .finderAlias
 			#endif
 			case .symlink: .symlink
@@ -66,14 +66,14 @@ public enum NonResolvableNodeType: Sendable, CaseIterable {
 
 public enum ResolvableNodeType: Sendable, CaseIterable {
 	case symlink
-	#if canImport(Darwin)
+	#if FINDER_ALIASES_ENABLED
 		case finderAlias
 	#endif
 
 	public func createResolvableNode(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath, in fs: any FilesystemInterface) throws -> any ResolvableNode {
 		switch self {
 			case .symlink: try fs.createSymlink(at: linkIFP, to: destIFP)
-			#if canImport(Darwin)
+			#if FINDER_ALIASES_ENABLED
 				case .finderAlias: try fs.createFinderAlias(at: linkIFP, to: destIFP)
 			#endif
 		}
