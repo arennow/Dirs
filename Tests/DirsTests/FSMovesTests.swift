@@ -275,7 +275,7 @@ extension FSTests {
 		#expect(sym.path == "/d/s2")
 	}
 
-	#if canImport(Darwin) || os(Linux)
+	#if XATTRS_ENABLED
 		@Test(arguments: FSKind.allCases, NodeType.allCreatableCases)
 		func movePreservesExtendedAttributes(fsKind: FSKind, nodeType: NodeType) throws {
 			#if os(Linux)

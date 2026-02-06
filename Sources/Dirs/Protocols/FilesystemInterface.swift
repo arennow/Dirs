@@ -59,7 +59,7 @@ public protocol FilesystemInterface: Equatable, Sendable {
 		func destinationOfFinderAlias(at ifp: some IntoFilePath) throws -> FilePath
 	#endif
 
-	#if canImport(Darwin) || os(Linux)
+	#if XATTRS_ENABLED
 		func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String>
 		func extendedAttribute(named name: String, at ifp: some IntoFilePath) throws -> Data?
 		func setExtendedAttribute(named name: String, to value: Data, at ifp: some IntoFilePath) throws

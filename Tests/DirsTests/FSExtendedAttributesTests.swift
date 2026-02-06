@@ -3,7 +3,7 @@ import Foundation
 import SystemPackage
 import Testing
 
-#if canImport(Darwin) || os(Linux)
+#if XATTRS_ENABLED
 	extension FSTests {
 		@Test(arguments: FSKind.allCases)
 		func setAndGetExtendedAttribute(fsKind: FSKind) throws {

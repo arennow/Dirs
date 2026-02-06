@@ -625,7 +625,7 @@ public final class MockFSInterface: FilesystemInterface {
 		}
 	}
 
-	#if canImport(Darwin) || os(Linux)
+	#if XATTRS_ENABLED
 		public func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String> {
 			try self.pathsToNodes.read { ptn in
 				let (node, _) = try Self.existingAncestorResolvedNode(at: ifp, in: ptn)

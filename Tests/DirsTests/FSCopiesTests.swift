@@ -96,7 +96,7 @@ extension FSTests {
 		try #expect(fs.file(at: "/e/d/b/c").stringContents() == "c")
 	}
 
-	#if canImport(Darwin) || os(Linux)
+	#if XATTRS_ENABLED
 		@Test(arguments: FSKind.allCases, NodeType.allCreatableCases)
 		func copyPreservesExtendedAttributes(fsKind: FSKind, nodeType: NodeType) throws {
 			#if os(Linux)

@@ -3,6 +3,14 @@
 
 import PackageDescription
 
+let swiftSettings: Array<SwiftSetting> = [
+	.enableUpcomingFeature("ExistentialAny"),
+	.define("XATTRS_ENABLED", .when(platforms: [
+		.macOS, .iOS, .tvOS, .watchOS, .visionOS,
+		.linux,
+	])),
+]
+
 let package = Package(name: "Dirs",
 					  platforms: [
 					  	.macOS(.v10_15),
@@ -27,11 +35,10 @@ let package = Package(name: "Dirs",
 								  	.product(name: "SystemPackage", package: "swift-system"),
 								  	"Locked",
 								  ],
-								  swiftSettings: [
-								  	.enableUpcomingFeature("ExistentialAny"),
-								  ]),
+								  swiftSettings: swiftSettings),
 					  	.testTarget(name: "DirsTests",
 									  dependencies: [
 									  	"Dirs",
-									  ]),
+									  ],
+									  swiftSettings: swiftSettings),
 					  ])

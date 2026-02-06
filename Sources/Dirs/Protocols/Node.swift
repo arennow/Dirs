@@ -90,7 +90,7 @@ public extension Node {
 		try self.move(to: dir)
 	}
 
-	#if canImport(Darwin) || os(Linux)
+	#if XATTRS_ENABLED
 		func extendedAttributeNames() throws -> Set<String> {
 			try self.fs.extendedAttributeNames(at: self)
 		}

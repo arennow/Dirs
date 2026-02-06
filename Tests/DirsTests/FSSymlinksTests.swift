@@ -492,7 +492,7 @@ extension FSTests {
 		// This fails because broken symlink's realpath can't be computed
 		#expect(throws: (any Error).self) { try brokenInSubdir.isAncestor(of: fileInSubdir) }
 
-		#if canImport(Darwin) || os(Linux)
+		#if XATTRS_ENABLED
 			// Extended attributes on broken symlinks
 			let brokenForXattr = try fs.createSymlink(at: "/broken_xattr", to: "/nowhere")
 			#if os(Linux)

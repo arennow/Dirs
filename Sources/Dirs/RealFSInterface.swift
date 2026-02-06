@@ -414,7 +414,7 @@ public struct RealFSInterface: FilesystemInterface {
 
 		try fm.copyItem(at: srcURL, to: destURL)
 
-		#if os(Linux)
+		#if XATTRS_ENABLED && os(Linux)
 			// `FileManager.copyItem`` only preserves extended attributes on Darwin
 			// (because it uses `copyfile` under the hood). On other platforms, we have to
 			// copy them manually.
@@ -466,7 +466,7 @@ public struct RealFSInterface: FilesystemInterface {
 		return self.resolveToProjected(destURL)
 	}
 
-	#if canImport(Darwin) || os(Linux)
+	#if XATTRS_ENABLED
 		public func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String> {
 			let fp = ifp.into()
 			let path = self.resolveToRaw(fp).string
@@ -748,7 +748,7 @@ private extension RealFSInterface {
 	}
 #endif
 
-#if canImport(Darwin) || os(Linux)
+#if XATTRS_ENABLED
 	#if os(Linux)
 		// Linux VFS limit for extended attribute names (see xattr(7) man page)
 		private let XATTR_MAXNAMELEN = 255
