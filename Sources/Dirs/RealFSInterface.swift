@@ -472,6 +472,19 @@ public struct RealFSInterface: FilesystemInterface {
 		return self.resolveToProjected(destURL)
 	}
 
+	public func date(of type: NodeDateType, at ifp: some IntoFilePath) throws -> Date? {
+		let fp = ifp.into()
+		let path = self.resolveToRaw(fp).string
+
+		let attrs = try FileManager.default.attributesOfItem(atPath: path)
+		switch type {
+			case .creation:
+				return attrs[.creationDate] as? Date
+			case .modification:
+				return attrs[.modificationDate] as? Date
+		}
+	}
+
 	#if XATTRS_ENABLED
 		public func extendedAttributeNames(at ifp: some IntoFilePath) throws -> Set<String> {
 			let fp = ifp.into()

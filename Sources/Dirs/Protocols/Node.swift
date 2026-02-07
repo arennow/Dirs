@@ -68,6 +68,10 @@ public extension Node {
 		try self.realpath() == other.realpath()
 	}
 
+	func date(of type: NodeDateType) throws -> Date? {
+		try self.fs.date(of: type, at: self)
+	}
+
 	func descendantPath(from other: some Node) throws -> FilePath {
 		var nndError: NodeNotDescendantError {
 			NodeNotDescendantError(putativeAncestor: other.path,

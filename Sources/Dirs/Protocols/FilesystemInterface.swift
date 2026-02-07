@@ -16,6 +16,10 @@ public enum DirLookupKind: String, Sendable {
 	case temporary, uniqueTemporary
 }
 
+public enum NodeDateType: String, Sendable, CaseIterable {
+	case creation, modification
+}
+
 public protocol FilesystemInterface: Equatable, Sendable {
 	/// Returns the type of node at the given path, resolving symlinks in ancestor directories
 	/// but not the final component. This allows finding nodes inside symlinked directories
@@ -47,6 +51,8 @@ public protocol FilesystemInterface: Equatable, Sendable {
 	func deleteNode(at ifp: some IntoFilePath) throws
 	@discardableResult
 	func moveNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws -> FilePath
+
+	func date(of type: NodeDateType, at ifp: some IntoFilePath) throws -> Date?
 
 	// Finder Aliases are a macOS/Darwin-only system feature;
 	// expose these APIs only when Darwin/Foundation is available

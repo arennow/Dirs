@@ -6,6 +6,7 @@ public final class MockFSInterface: FilesystemInterface {
 	private enum MockNode: Equatable {
 		struct Metadata: Equatable {
 			var xattrs: Dictionary<String, Data> = [:]
+			var dates: Dictionary<NodeDateType, Date> = [:]
 		}
 
 		case dir(metadata: Metadata = Metadata())
@@ -68,6 +69,48 @@ public final class MockFSInterface: FilesystemInterface {
 					#if FINDER_ALIASES_ENABLED
 						case .finderAlias(let destination, var metadata):
 							metadata.xattrs = newValue
+							self = .finderAlias(destination: destination, metadata: metadata)
+					#endif
+				}
+			}
+		}
+
+		var dates: Dictionary<NodeDateType, Date> {
+			get {
+				switch self {
+					case .dir(let metadata),
+						 .file(_, let metadata),
+						 .symlink(_, let metadata):
+						return metadata.dates
+					#if SPECIALS_ENABLED
+						case .special(let metadata):
+							return metadata.dates
+					#endif
+					#if FINDER_ALIASES_ENABLED
+						case .finderAlias(_, let metadata):
+							return metadata.dates
+					#endif
+				}
+			}
+			set {
+				switch self {
+					case .dir(var metadata):
+						metadata.dates = newValue
+						self = .dir(metadata: metadata)
+					case .file(let data, var metadata):
+						metadata.dates = newValue
+						self = .file(data: data, metadata: metadata)
+					case .symlink(let destination, var metadata):
+						metadata.dates = newValue
+						self = .symlink(destination: destination, metadata: metadata)
+					#if SPECIALS_ENABLED
+						case .special(var metadata):
+							metadata.dates = newValue
+							self = .special(metadata: metadata)
+					#endif
+					#if FINDER_ALIASES_ENABLED
+						case .finderAlias(let destination, var metadata):
+							metadata.dates = newValue
 							self = .finderAlias(destination: destination, metadata: metadata)
 					#endif
 				}
@@ -386,7 +429,11 @@ public final class MockFSInterface: FilesystemInterface {
 							throw WrongNodeType(path: cumulativeFP, actualType: .symlink)
 						}
 					case .none:
-						ptn[resolvedDirFP] = .dir()
+						let now = Date()
+						var metadata = MockNode.Metadata()
+						metadata.dates[.creation] = now
+						metadata.dates[.modification] = now
+						ptn[resolvedDirFP] = .dir(metadata: metadata)
 					case .some(let x):
 						throw NodeAlreadyExists(path: cumulativeFP, type: x.nodeType)
 				}
@@ -398,7 +445,7 @@ public final class MockFSInterface: FilesystemInterface {
 
 	private func createNode<N>(at ifp: some IntoFilePath,
 							   factory: (FSInterface, FilePath) throws -> N,
-							   insertNode: (_ pathsToNodes: inout PTN, _ resolvedPath: FilePath) throws -> Void) throws -> N
+							   insertNode: (_ pathsToNodes: inout PTN, _ resolvedPath: FilePath, _ metadata: MockNode.Metadata) throws -> Void) throws -> N
 	{
 		let fp = ifp.into()
 		try self.pathsToNodes.mutate { ptn in
@@ -413,28 +460,33 @@ public final class MockFSInterface: FilesystemInterface {
 				throw NodeAlreadyExists(path: fp, type: existing.nodeType)
 			}
 
-			try insertNode(&ptn, resolvedFP)
+			let now = Date()
+			var metadata = MockNode.Metadata()
+			metadata.dates[.creation] = now
+			metadata.dates[.modification] = now
+
+			try insertNode(&ptn, resolvedFP, metadata)
 		}
 		return try factory(self.asInterface, fp)
 	}
 
 	@discardableResult
 	public func createFile(at ifp: some IntoFilePath) throws -> File {
-		try self.createNode(at: ifp, factory: File.init, insertNode: { ptn, resolvedFP in
-			ptn[resolvedFP] = .file()
+		try self.createNode(at: ifp, factory: File.init, insertNode: { ptn, resolvedFP, metadata in
+			ptn[resolvedFP] = .file(metadata: metadata)
 		})
 	}
 
 	public func createSymlink(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> Symlink {
-		try self.createNode(at: linkIFP, factory: Symlink.init, insertNode: { ptn, resolvedFP in
-			ptn[resolvedFP] = .symlink(destination: destIFP.into())
+		try self.createNode(at: linkIFP, factory: Symlink.init, insertNode: { ptn, resolvedFP, metadata in
+			ptn[resolvedFP] = .symlink(destination: destIFP.into(), metadata: metadata)
 		})
 	}
 
 	#if FINDER_ALIASES_ENABLED
 		public func createFinderAlias(at linkIFP: some IntoFilePath, to destIFP: some IntoFilePath) throws -> FinderAlias {
-			try self.createNode(at: linkIFP, factory: FinderAlias.init, insertNode: { ptn, resolvedFP in
-				ptn[resolvedFP] = .finderAlias(destination: destIFP.into())
+			try self.createNode(at: linkIFP, factory: FinderAlias.init, insertNode: { ptn, resolvedFP, metadata in
+				ptn[resolvedFP] = .finderAlias(destination: destIFP.into(), metadata: metadata)
 			})
 		}
 
@@ -480,8 +532,8 @@ public final class MockFSInterface: FilesystemInterface {
 		/// This is only available on MockFSInterface since this library doesn't support
 		/// creating special nodes, but we want to support mocking them for testing.
 		public func createSpecialForTesting(at ifp: some IntoFilePath) throws -> Special {
-			try self.createNode(at: ifp, factory: Special.init, insertNode: { ptn, resolvedFP in
-				ptn[resolvedFP] = .special()
+			try self.createNode(at: ifp, factory: Special.init, insertNode: { ptn, resolvedFP, metadata in
+				ptn[resolvedFP] = .special(metadata: metadata)
 			})
 		}
 	#endif
@@ -498,7 +550,8 @@ public final class MockFSInterface: FilesystemInterface {
 		switch acquisitionLock.resource[resolvedFP] {
 			case .none:
 				throw NoSuchNode(path: fp)
-			case .file(_, let metadata):
+			case .file(_, var metadata):
+				metadata.dates[.modification] = Date()
 				acquisitionLock.resource[resolvedFP] = .file(data: contentsData, metadata: metadata)
 			case .symlink(let destination, _):
 				let resolvedDestination = Symlink.resolveDestination(destination, relativeTo: resolvedFP)
@@ -649,6 +702,13 @@ public final class MockFSInterface: FilesystemInterface {
 		} catch {
 			acquisitionLock.resource = before
 			throw error
+		}
+	}
+
+	public func date(of type: NodeDateType, at ifp: some IntoFilePath) throws -> Date? {
+		try self.pathsToNodes.read { ptn in
+			let (node, _) = try Self.existingAncestorResolvedNode(at: ifp, in: ptn)
+			return node.dates[type]
 		}
 	}
 
