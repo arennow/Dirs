@@ -4,14 +4,18 @@ import SystemPackage
 
 public final class MockFSInterface: FilesystemInterface {
 	private enum MockNode: Equatable {
-		case dir(xattrs: Dictionary<String, Data> = [:])
-		case file(data: Data = Data(), xattrs: Dictionary<String, Data> = [:])
-		case symlink(destination: FilePath, xattrs: Dictionary<String, Data> = [:])
+		struct Metadata: Equatable {
+			var xattrs: Dictionary<String, Data> = [:]
+		}
+
+		case dir(metadata: Metadata = Metadata())
+		case file(data: Data = Data(), metadata: Metadata = Metadata())
+		case symlink(destination: FilePath, metadata: Metadata = Metadata())
 		#if SPECIALS_ENABLED
-			case special(xattrs: Dictionary<String, Data> = [:])
+			case special(metadata: Metadata = Metadata())
 		#endif
 		#if FINDER_ALIASES_ENABLED
-			case finderAlias(destination: FilePath, xattrs: Dictionary<String, Data> = [:])
+			case finderAlias(destination: FilePath, metadata: Metadata = Metadata())
 		#endif
 
 		var nodeType: NodeType {
@@ -31,35 +35,40 @@ public final class MockFSInterface: FilesystemInterface {
 		var xattrs: Dictionary<String, Data> {
 			get {
 				switch self {
-					case .dir(let xattrs),
-						 .file(_, let xattrs),
-						 .symlink(_, let xattrs):
-						return xattrs
+					case .dir(let metadata),
+						 .file(_, let metadata),
+						 .symlink(_, let metadata):
+						return metadata.xattrs
 					#if SPECIALS_ENABLED
-						case .special(let xattrs):
-							return xattrs
+						case .special(let metadata):
+							return metadata.xattrs
 					#endif
 					#if FINDER_ALIASES_ENABLED
-						case .finderAlias(_, let xattrs):
-							return xattrs
+						case .finderAlias(_, let metadata):
+							return metadata.xattrs
 					#endif
 				}
 			}
 			set {
 				switch self {
-					case .dir:
-						self = .dir(xattrs: newValue)
-					case .file(let data, _):
-						self = .file(data: data, xattrs: newValue)
-					case .symlink(let destination, _):
-						self = .symlink(destination: destination, xattrs: newValue)
+					case .dir(var metadata):
+						metadata.xattrs = newValue
+						self = .dir(metadata: metadata)
+					case .file(let data, var metadata):
+						metadata.xattrs = newValue
+						self = .file(data: data, metadata: metadata)
+					case .symlink(let destination, var metadata):
+						metadata.xattrs = newValue
+						self = .symlink(destination: destination, metadata: metadata)
 					#if SPECIALS_ENABLED
-						case .special:
-							self = .special(xattrs: newValue)
+						case .special(var metadata):
+							metadata.xattrs = newValue
+							self = .special(metadata: metadata)
 					#endif
 					#if FINDER_ALIASES_ENABLED
-						case .finderAlias(let destination, _):
-							self = .finderAlias(destination: destination, xattrs: newValue)
+						case .finderAlias(let destination, var metadata):
+							metadata.xattrs = newValue
+							self = .finderAlias(destination: destination, metadata: metadata)
 					#endif
 				}
 			}
@@ -487,12 +496,15 @@ public final class MockFSInterface: FilesystemInterface {
 		let resolvedFP = try Self.resolveAncestorSymlinks(of: fp, in: acquisitionLock.resource)
 
 		switch acquisitionLock.resource[resolvedFP] {
-			case .none: throw NoSuchNode(path: fp)
-			case .file(_, let xattrs): acquisitionLock.resource[resolvedFP] = .file(data: contentsData, xattrs: xattrs)
+			case .none:
+				throw NoSuchNode(path: fp)
+			case .file(_, let metadata):
+				acquisitionLock.resource[resolvedFP] = .file(data: contentsData, metadata: metadata)
 			case .symlink(let destination, _):
 				let resolvedDestination = Symlink.resolveDestination(destination, relativeTo: resolvedFP)
 				try self.replaceContentsOfFile(at: resolvedDestination, to: contentsData, using: acquisitionLock)
-			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
+			case .some(let x):
+				throw WrongNodeType(path: fp, actualType: x.nodeType)
 		}
 	}
 
