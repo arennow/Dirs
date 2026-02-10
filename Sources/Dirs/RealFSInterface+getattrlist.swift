@@ -44,7 +44,7 @@
 			let rc = withUnsafeMutablePointer(to: &alist) { alPtr in
 				withUnsafeMutablePointer(to: &out) { outPtr in
 					filePath.withPlatformString { filePathPlatString in
-						getattrlist(filePathPlatString, alPtr, outPtr, MemoryLayout<OutBuf>.size, opts)
+						getattrlist(filePathPlatString, alPtr, outPtr, MemoryLayout<OutBuf>.size, numericCast(opts))
 					}
 				}
 			}

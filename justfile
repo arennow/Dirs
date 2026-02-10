@@ -80,13 +80,13 @@ test_darwin PLATFORM:
 		-destination "platform=${platform} Simulator,id=${SIM_ID}" \
 		| xcbeautify --quieter
 
-build_all_darwin:
+build_darwin_all:
 	just build_darwin iOS
 	just build_darwin tvOS
 	just build_darwin watchOS
 	just build_darwin visionOS
 
-test_all_darwin:
+test_darwin_all:
 	just test_darwin iOS
 	just test_darwin tvOS
 	just test_darwin watchOS
