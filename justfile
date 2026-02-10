@@ -18,12 +18,12 @@ test_linux:
 test_windows:
 	ssh -T winvm 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "C:\Users\aaron\Downloads\copy_dirs_repo_and_test.ps1"'
 
-build_darwin PLATFORM:
+build_non_mac_darwin PLATFORM:
 	#!/usr/bin/env bash
 	set -o pipefail
 	xcodebuild build -scheme Dirs -destination "generic/platform={{PLATFORM}}" | xcbeautify --quiet
 
-test_darwin PLATFORM:
+test_non_mac_darwin PLATFORM:
 	#!/usr/bin/env bash
 	set -o pipefail
 	
@@ -80,14 +80,14 @@ test_darwin PLATFORM:
 		-destination "platform=${platform} Simulator,id=${SIM_ID}" \
 		| xcbeautify --quieter
 
-build_darwin_all:
-	just build_darwin iOS
-	just build_darwin tvOS
-	just build_darwin watchOS
-	just build_darwin visionOS
+build_non_mac_darwin_all:
+	just build_non_mac_darwin iOS
+	just build_non_mac_darwin tvOS
+	just build_non_mac_darwin watchOS
+	just build_non_mac_darwin visionOS
 
-test_darwin_all:
-	just test_darwin iOS
-	just test_darwin tvOS
-	just test_darwin watchOS
-	just test_darwin visionOS
+test_non_mac_darwin_all:
+	just test_non_mac_darwin iOS
+	just test_non_mac_darwin tvOS
+	just test_non_mac_darwin watchOS
+	just test_non_mac_darwin visionOS
