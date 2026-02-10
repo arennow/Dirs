@@ -149,9 +149,6 @@ public final class MockFSInterface: FilesystemInterface {
 		lhs.id == rhs.id
 	}
 
-	@available(*, deprecated, message: "Use init() instead")
-	public static func empty() -> Self { Self() }
-
 	// To allow us to avoid traversing our fake FS for deep equality
 	private let id = UUID()
 	private let pathsToNodes: Locked<PTN>
@@ -775,6 +772,3 @@ public final class MockFSInterface: FilesystemInterface {
 		}
 	#endif
 }
-
-@available(*, deprecated, renamed: "MockFSInterface")
-public typealias MockFilesystemInterface = MockFSInterface
