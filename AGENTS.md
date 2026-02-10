@@ -36,3 +36,13 @@ This project is cross-platform, and is well tested on macOS and Ubuntu Linux. It
 - For some changes, I'll tell you that you should also be testing on a local Ubuntu Linux virtual machine after each change, and to do that, run `just test_linux` (which is equivalent to running `swift test -q` on the VM via ssh). Likewise, I'll sometimes tell you that a local Windows virtual machine is available, and it can be used to test the code by running `just test_windows` (which is also equivalent to running `swift test -q` on that Windows VM).
 	- Only do this during sessions when I've told you to, otherwise the VM won't be available
 - Don't use string names for tests (`@Test("", …`); just name the functions clearly
+
+## Release notes
+- When asked to generate notes for a new release, you should:
+	- Look at the full diffs between the current commit and the previous tagged release (or whichever release you're told to compare against)
+	- List any breaking changes first, then new features, then more minor features and then fixes
+		- A breaking change is any change in public API or in user-visible behavior or semantics
+		- Don't mention things that have no meaningful effect to users of this library, like content moving among files
+	- The tone of all of this should be concise and high-level. Never describe tests in release notes. The audience is a developer of a program that uses this library who wants to see what's changed
+		- "high-level" means, among other things, focusing on capabilities rather than implementations
+	- Present it to me as a markdown blob so I can copy it
