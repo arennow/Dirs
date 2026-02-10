@@ -3,6 +3,12 @@
 	import Foundation
 	import SystemPackage
 
+	// vnode type constants from <sys/vnode.h>, which is not available on iOS.
+	// These are stable kernel ABI values, so we can hardcode them here.
+	private let _VREG = fsobj_type_t(1)
+	private let _VDIR = fsobj_type_t(2)
+	private let _VLNK = fsobj_type_t(5)
+
 	extension RealFSInterface {
 		/// Error indicating that no FinderInfo was available from `getattrlist()`.
 		/// We need that to distinguish Finder aliases from regular files.
@@ -53,11 +59,11 @@
 			}
 
 			switch out.objtype {
-				case fsobj_type_t(VDIR.rawValue):
+				case _VDIR:
 					return .dir
-				case fsobj_type_t(VLNK.rawValue):
+				case _VLNK:
 					return .symlink
-				case fsobj_type_t(VREG.rawValue):
+				case _VREG:
 					// FileInfo layout: type[0..3], creator[4..7], finderFlags[8..9] (big-endian).
 					let bytes = withUnsafeBytes(of: out.fndrinfo) { Array($0) }
 					let finderFlagsBE = UInt16(bytes[8]) << 8 | UInt16(bytes[9])

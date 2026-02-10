@@ -267,7 +267,7 @@ public struct RealFSInterface: FilesystemInterface {
 		} else if dlk == .temporary {
 			url = NSTemporaryDirectory().into()
 		} else if dlk == .home {
-			url = FileManager.default.homeDirectoryForCurrentUser
+			url = URL(fileURLWithPath: NSHomeDirectory())
 		} else {
 			let fmSearchPath: FileManager.SearchPathDirectory = switch dlk {
 				case .downloads: .downloadsDirectory
