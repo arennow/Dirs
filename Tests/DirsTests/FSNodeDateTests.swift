@@ -8,7 +8,7 @@ extension FSTests {
 	func dateForNonExistentNodeThrows(fsKind: FSKind, dateType: NodeDateType) throws {
 		let fs = self.fs(for: fsKind)
 
-		#expect(throws: (any Error).self) {
+		#expect(throws: NoSuchNode(path: "/nonexistent")) {
 			_ = try fs.date(of: dateType, at: "/nonexistent")
 		}
 	}

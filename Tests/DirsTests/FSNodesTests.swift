@@ -97,16 +97,16 @@ extension FSTests {
 		try fs.createDir(at: "/f")
 
 		try fs.deleteNode(at: "/a")
-		#expect(throws: (any Error).self) { try fs.contentsOf(file: "/a") }
+		#expect(throws: NoSuchNode(path: "/a")) { try fs.contentsOf(file: "/a") }
 
 		try fs.deleteNode(at: "/d")
-		#expect(throws: (any Error).self) { try fs.contentsOf(file: "/d/E") }
+		#expect(throws: NoSuchNode(path: "/d/E")) { try fs.contentsOf(file: "/d/E") }
 	}
 
 	@Test(arguments: FSKind.allCases)
 	func deleteNonexistentNodeFails(fsKind: FSKind) {
 		let fs = self.fs(for: fsKind)
-		#expect(throws: (any Error).self) { try fs.deleteNode(at: "/a") }
+		#expect(throws: NoSuchNode(path: "/a")) { try fs.deleteNode(at: "/a") }
 	}
 
 	@Test(arguments: FSKind.allCases, ResolvableNodeType.allCases)

@@ -417,8 +417,9 @@ public struct RealFSInterface: FilesystemInterface {
 			case .none:
 				break
 		}
-
-		try fm.copyItem(at: srcURL, to: destURL)
+		try mapCocoaErrorsToDirsErrors {
+			try fm.copyItem(at: srcURL, to: destURL)
+		}
 
 		#if XATTRS_ENABLED && os(Linux)
 			// `FileManager.copyItem`` only preserves extended attributes on Darwin
@@ -434,7 +435,9 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func deleteNode(at ifp: some IntoFilePath) throws {
-		try FileManager.default.removeItem(at: self.resolveToRaw(ifp))
+		try self.mapCocoaErrorsToDirsErrors {
+			try FileManager.default.removeItem(at: self.resolveToRaw(ifp))
+		}
 	}
 
 	@discardableResult
@@ -468,7 +471,9 @@ public struct RealFSInterface: FilesystemInterface {
 			}
 		}
 
-		try fm.moveItem(at: srcURL, to: destURL)
+		try self.mapCocoaErrorsToDirsErrors {
+			try fm.moveItem(at: srcURL, to: destURL)
+		}
 		return self.resolveToProjected(destURL)
 	}
 
@@ -476,12 +481,14 @@ public struct RealFSInterface: FilesystemInterface {
 		let fp = ifp.into()
 		let path = self.resolveToRaw(fp).string
 
-		let attrs = try FileManager.default.attributesOfItem(atPath: path)
-		switch type {
-			case .creation:
-				return attrs[.creationDate] as? Date
-			case .modification:
-				return attrs[.modificationDate] as? Date
+		return try self.mapCocoaErrorsToDirsErrors {
+			let attrs = try FileManager.default.attributesOfItem(atPath: path)
+			switch type {
+				case .creation:
+					return attrs[.creationDate] as? Date
+				case .modification:
+					return attrs[.modificationDate] as? Date
+			}
 		}
 	}
 
@@ -649,6 +656,23 @@ private extension RealFSInterface {
 	@_disfavoredOverload
 	func resolveToRaw(_ ifp: some IntoFilePath) -> URL {
 		(self.resolveToRaw(ifp) as FilePath).url
+	}
+
+	func mapCocoaErrorsToDirsErrors<R>(in operation: () throws -> R) throws -> R {
+		do {
+			return try operation()
+		} catch let error as CocoaError {
+			if error.code == .fileNoSuchFile || error.code == .fileReadNoSuchFile {
+				let errorPath: FilePath = if let rawStringPath = error.userInfo[NSFilePathErrorKey] as? String {
+					self.resolveToProjected(rawStringPath)
+				} else {
+					"/__UNKNOWN__PATH__".into()
+				}
+				throw NoSuchNode(path: errorPath)
+			} else {
+				throw error
+			}
+		}
 	}
 }
 

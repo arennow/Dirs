@@ -8,7 +8,7 @@ extension FSTests {
 	func copyNonexistentSourceFails(fsKind: FSKind) {
 		let fs = self.fs(for: fsKind)
 
-		#expect(throws: (any Error).self) {
+		#expect(throws: NoSuchNode(path: "/a")) {
 			try fs.copyNode(from: "/a", to: "/b")
 		}
 	}

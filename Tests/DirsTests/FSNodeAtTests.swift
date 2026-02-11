@@ -51,6 +51,6 @@ extension FSTests {
 	func nodeAtFunctionThrowsForNonexistent(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
-		#expect(throws: (any Error).self) { try fs.node(at: "/nonexistent") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.node(at: "/nonexistent") }
 	}
 }

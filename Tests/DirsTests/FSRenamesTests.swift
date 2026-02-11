@@ -7,8 +7,8 @@ extension FSTests {
 	@Test(arguments: FSKind.allCases)
 	func renameNonexistentSourceFails(fsKind: FSKind) {
 		let fs = self.fs(for: fsKind)
-		#expect(throws: (any Error).self) {
-			try fs.renameNode(at: "/nope", to: "/dest")
+		#expect(throws: NoSuchNode(path: "/nope")) {
+			try fs.renameNode(at: "/nope", to: "dest")
 		}
 	}
 

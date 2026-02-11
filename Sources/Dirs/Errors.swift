@@ -1,7 +1,7 @@
 import Foundation
 import SystemPackage
 
-public struct NoSuchNode: Error {
+public struct NoSuchNode: Error, Equatable {
 	public let path: FilePath
 
 	package init(path ifp: some IntoFilePath) {

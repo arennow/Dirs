@@ -56,7 +56,7 @@ extension FSTests {
 	func dirInitNonExisting(fsKind: FSKind) {
 		let fs = self.fs(for: fsKind)
 
-		#expect(throws: (any Error).self) {
+		#expect(throws: NoSuchNode(path: "/a")) {
 			try fs.dir(at: "/a")
 		}
 	}
