@@ -893,6 +893,8 @@ private extension RealFSInterface {
 				return XAttrBufferTooSmall(attributeName: requiredAttributeName, path: path)
 		case ENOSPC:
 				return XAttrNoSpace(attributeName: requiredAttributeName, path: path)
+		case EPERM:
+				return XAttrNotAllowed(path: path)
 		default:
 				return NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
 		}

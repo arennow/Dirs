@@ -56,7 +56,19 @@ public enum InvalidPathForCall: Error, Equatable {
 	case couldNotCanonicalize(String)
 }
 
-public struct XAttrNotSupported: Error {
+/// On some platforms, xattr names have to be namespaced (e.g. "user.foo")
+/// This generally corresponds to `EOPNOTSUPP` or `ENOTSUP`
+public struct XAttrNotSupported: Error, Equatable {
+	public let path: FilePath
+
+	package init(path: FilePath) {
+		self.path = path
+	}
+}
+
+/// On some platforms, certain nodes types may not support xattrs by policy (e.g. symlinks on Linux)
+/// This generally corresponds to `EPERM`
+public struct XAttrNotAllowed: Error, Equatable {
 	public let path: FilePath
 
 	package init(path: FilePath) {

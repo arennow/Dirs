@@ -184,12 +184,12 @@ import Testing
 				_ = try fs.createFile(at: "/target")
 
 				let symlink = try fs.createSymlink(at: "/link", to: "/target")
-				#expect(throws: (any Error).self) {
+				#expect(throws: XAttrNotAllowed(path: "/link")) {
 					try symlink.setExtendedAttribute(named: "user.test", to: "value")
 				}
 
 				let brokenSymlink = try fs.createSymlink(at: "/broken", to: "/nonexistent")
-				#expect(throws: (any Error).self) {
+				#expect(throws: XAttrNotAllowed(path: "/broken")) {
 					try brokenSymlink.setExtendedAttribute(named: "user.broken", to: "value")
 				}
 			}
@@ -221,11 +221,11 @@ import Testing
 				]
 
 				for invalidName in invalidNames {
-					#expect(throws: (any Error).self) {
+					#expect(throws: XAttrNotSupported(path: "/test")) {
 						try node.setExtendedAttribute(named: invalidName, to: "test")
 					}
 
-					#expect(throws: (any Error).self) {
+					#expect(throws: XAttrNotSupported(path: "/test")) {
 						_ = try node.extendedAttribute(named: invalidName)
 					}
 				}

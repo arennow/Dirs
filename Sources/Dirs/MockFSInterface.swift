@@ -730,12 +730,12 @@ public final class MockFSInterface: FilesystemInterface {
 				// Linux requires extended attribute names to be properly namespaced
 				let validPrefixes = ["security.", "system.", "trusted.", "user."]
 				if !validPrefixes.contains(where: { name.hasPrefix($0) }) {
-					throw POSIXError(.EOPNOTSUPP, userInfo: [NSFilePathErrorKey: fp.string])
+					throw XAttrNotSupported(path: fp)
 				}
 			#endif
 
 			return try self.pathsToNodes.read { ptn in
-				let (node, _) = try Self.existingAncestorResolvedNode(at: ifp, in: ptn)
+				let (node, _) = try Self.existingAncestorResolvedNode(at: fp, in: ptn)
 				return node.xattrs[name]
 			}
 		}
@@ -753,13 +753,13 @@ public final class MockFSInterface: FilesystemInterface {
 				#if os(Linux)
 					// Linux kernel VFS prohibits user-namespaced xattrs on symlinks
 					if node.nodeType == .symlink, name.hasPrefix("user.") {
-						throw POSIXError(.EOPNOTSUPP, userInfo: [NSFilePathErrorKey: fp.string])
+						throw XAttrNotAllowed(path: fp)
 					}
 
 					// Linux requires extended attribute names to be properly namespaced
 					let validPrefixes = ["security.", "system.", "trusted.", "user."]
 					if !validPrefixes.contains(where: { name.hasPrefix($0) }) {
-						throw POSIXError(.EOPNOTSUPP, userInfo: [NSFilePathErrorKey: fp.string])
+						throw XAttrNotSupported(path: fp)
 					}
 				#endif
 
