@@ -24,7 +24,7 @@ extension FSTests {
 		try fs.createFile(at: "/a").replaceContents("content")
 
 		let root = try fs.rootDir
-		#expect(throws: (any Error).self) { try root.createFile(at: "a") }
+		#expect(throws: NodeAlreadyExists(path: "/a", type: .file)) { try root.createFile(at: "a") }
 		try #expect(fs.contentsOf(file: "/a") == Data("content".utf8))
 	}
 
@@ -35,7 +35,7 @@ extension FSTests {
 		try fs.createDir(at: "/a")
 
 		let root = try fs.dir(at: "/")
-		#expect(throws: (any Error).self) { try root.createFile(at: "a") }
+		#expect(throws: NodeAlreadyExists(path: "/a", type: .dir)) { try root.createFile(at: "a") }
 		#expect(fs.nodeType(at: "/a") == .dir)
 	}
 
@@ -44,7 +44,7 @@ extension FSTests {
 		let fs = self.fs(for: fsKind)
 
 		try fs.createSymlink(at: "/s", to: "/a")
-		#expect(throws: (any Error).self) { try fs.createFile(at: "/s") }
+		#expect(throws: NodeAlreadyExists(path: "/s", type: .symlink)) { try fs.createFile(at: "/s") }
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -53,7 +53,7 @@ extension FSTests {
 
 		try fs.createFile(at: "/a")
 		try fs.createSymlink(at: "/s", to: "/a")
-		#expect(throws: (any Error).self) { try fs.createFile(at: "/s") }
+		#expect(throws: NodeAlreadyExists(path: "/s", type: .symlink)) { try fs.createFile(at: "/s") }
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -62,7 +62,7 @@ extension FSTests {
 
 		try fs.createDir(at: "/d")
 		try fs.createSymlink(at: "/s", to: "/d")
-		#expect(throws: (any Error).self) { try fs.createFile(at: "/s") }
+		#expect(throws: NodeAlreadyExists(path: "/s", type: .symlink)) { try fs.createFile(at: "/s") }
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -99,7 +99,7 @@ extension FSTests {
 
 		try fs.createDir(at: "/d")
 		try fs.createSymlink(at: "/s", to: "/d")
-		#expect(throws: (any Error).self) { try fs.replaceContentsOfFile(at: "/s", to: "abc") }
+		#expect(throws: WrongNodeType(path: "/s", actualType: .dir)) { try fs.replaceContentsOfFile(at: "/s", to: "abc") }
 	}
 
 	@Test(arguments: FSKind.allCases)

@@ -24,7 +24,7 @@ public struct WrongNodeType: Error, Equatable {
 	}
 }
 
-public struct NodeAlreadyExists: Error {
+public struct NodeAlreadyExists: Error, Equatable {
 	public let path: FilePath
 	public let type: NodeType
 

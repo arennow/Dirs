@@ -39,7 +39,7 @@ extension FSTests {
 
 		try fs.createFile(at: "/a")
 
-		#expect(throws: (any Error).self) { try fs.createDir(at: "/a") }
+		#expect(throws: NodeAlreadyExists(path: "/a", type: .file)) { try fs.createDir(at: "/a") }
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -48,7 +48,8 @@ extension FSTests {
 
 		try fs.createFile(at: "/a").replaceContents("content")
 
-		#expect(throws: (any Error).self) { try fs.createDir(at: "/a/b") }
+		#expect(throws: NodeAlreadyExists(path: "/a", type: .file)) { try fs.createDir(at: "/a/b") }
+		#expect(throws: NodeAlreadyExists(path: "/a", type: .file)) { try fs.createDir(at: "/a/b/c/d/e") }
 		try #expect(fs.contentsOf(file: "/a") == Data("content".utf8))
 	}
 

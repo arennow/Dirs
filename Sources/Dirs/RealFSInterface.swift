@@ -293,8 +293,31 @@ public struct RealFSInterface: FilesystemInterface {
 
 	public func createDir(at ifp: some IntoFilePath) throws -> Dir {
 		try self.createNode(at: ifp, factory: { try Dir(_fs: $0, path: $1) }) { fp in
-			try FileManager.default.createDirectory(at: self.resolveToRaw(fp),
-													withIntermediateDirectories: true)
+			do {
+				return try FileManager.default.createDirectory(at: self.resolveToRaw(fp),
+															   withIntermediateDirectories: true)
+			} catch {
+				let errorIsNonDirAncestor: Bool
+				#if os(Windows)
+					errorIsNonDirAncestor = error.matchesAny(.cocoa(.fileNoSuchFile))
+				#else
+					errorIsNonDirAncestor = error.matches(outer: .cocoa(.fileWriteUnknown), underlying: .posix(.ENOTDIR))
+				#endif
+
+				if errorIsNonDirAncestor {
+					let errorPath: FilePath
+					if let firstNDA = try self.firstNonDirAncestor(of: fp) {
+						errorPath = firstNDA.path
+					} else {
+						assertionFailure("No non-dir ancestor despite error: \(error)")
+						errorPath = fp
+					}
+
+					throw NodeAlreadyExists(path: errorPath, type: self.nodeType(at: fp) ?? .file)
+				}
+
+				throw error
+			}
 		}
 	}
 
@@ -417,7 +440,8 @@ public struct RealFSInterface: FilesystemInterface {
 			case .none:
 				break
 		}
-		try mapCocoaErrorsToDirsErrors {
+
+		try mapBasicCocoaErrorsToDirsErrors {
 			try fm.copyItem(at: srcURL, to: destURL)
 		}
 
@@ -435,7 +459,7 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func deleteNode(at ifp: some IntoFilePath) throws {
-		try self.mapCocoaErrorsToDirsErrors {
+		try self.mapBasicCocoaErrorsToDirsErrors {
 			try FileManager.default.removeItem(at: self.resolveToRaw(ifp))
 		}
 	}
@@ -471,7 +495,7 @@ public struct RealFSInterface: FilesystemInterface {
 			}
 		}
 
-		try self.mapCocoaErrorsToDirsErrors {
+		try self.mapBasicCocoaErrorsToDirsErrors {
 			try fm.moveItem(at: srcURL, to: destURL)
 		}
 		return self.resolveToProjected(destURL)
@@ -481,7 +505,7 @@ public struct RealFSInterface: FilesystemInterface {
 		let fp = ifp.into()
 		let path = self.resolveToRaw(fp).string
 
-		return try self.mapCocoaErrorsToDirsErrors {
+		return try self.mapBasicCocoaErrorsToDirsErrors {
 			let attrs = try FileManager.default.attributesOfItem(atPath: path)
 			switch type {
 				case .creation:
@@ -657,22 +681,43 @@ private extension RealFSInterface {
 	func resolveToRaw(_ ifp: some IntoFilePath) -> URL {
 		(self.resolveToRaw(ifp) as FilePath).url
 	}
+}
 
-	func mapCocoaErrorsToDirsErrors<R>(in operation: () throws -> R) throws -> R {
+private extension RealFSInterface {
+	func mapBasicCocoaErrorsToDirsErrors<R>(in operation: () throws -> R) throws -> R {
 		do {
 			return try operation()
-		} catch let error as CocoaError {
-			if error.code == .fileNoSuchFile || error.code == .fileReadNoSuchFile {
-				let errorPath: FilePath = if let rawStringPath = error.userInfo[NSFilePathErrorKey] as? String {
-					self.resolveToProjected(rawStringPath)
-				} else {
-					"/__UNKNOWN__PATH__".into()
+		} catch {
+			if error.matchesAny(.cocoa(.fileNoSuchFile), .cocoa(.fileReadNoSuchFile)) {
+				if let rawStringPath = error.userInfo[NSFilePathErrorKey] as? String {
+					let errorPath = self.resolveToProjected(rawStringPath)
+					throw NoSuchNode(path: errorPath)
 				}
-				throw NoSuchNode(path: errorPath)
-			} else {
-				throw error
+			}
+
+			throw error
+		}
+	}
+
+	func firstNonDirAncestor(of fp: FilePath) throws -> Optional<any Node> {
+		let ancestorSequence: some Sequence<FilePath> = sequence(state: fp) { fp in
+			guard fp.components.isEmpty == false else { return nil }
+			fp.removeLastComponent()
+			return fp
+		}
+
+		for ancestorFP in ancestorSequence {
+			guard ancestorFP != fp else { continue }
+			do {
+				let node = try self.node(at: ancestorFP)
+				if node.nodeType != .dir {
+					return node
+				}
+			} catch is NoSuchNode {
+				continue
 			}
 		}
+		return nil
 	}
 }
 

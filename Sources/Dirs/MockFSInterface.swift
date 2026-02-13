@@ -536,25 +536,31 @@ public final class MockFSInterface: FilesystemInterface {
 	#endif
 
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
-		try self.replaceContentsOfFile(at: ifp, to: contents, using: self.pathsToNodes.acquireIntoHandle())
+		let fp = ifp.into()
+		return try self.replaceContentsOfFile(at: fp,
+											  to: contents,
+											  originalFP: fp,
+											  using: self.pathsToNodes.acquireIntoHandle())
 	}
 
-	private func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData, using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws {
-		let fp = ifp.into()
+	private func replaceContentsOfFile(at fp: FilePath, to contents: some IntoData, originalFP: FilePath, using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws {
 		let contentsData = contents.into()
 		let resolvedFP = try Self.resolveAncestorSymlinks(of: fp, in: acquisitionLock.resource)
 
 		switch acquisitionLock.resource[resolvedFP] {
 			case .none:
-				throw NoSuchNode(path: fp)
+				throw NoSuchNode(path: originalFP)
 			case .file(_, var metadata):
 				metadata.dates[.modification] = Date()
 				acquisitionLock.resource[resolvedFP] = .file(data: contentsData, metadata: metadata)
 			case .symlink(let destination, _):
 				let resolvedDestination = Symlink.resolveDestination(destination, relativeTo: resolvedFP)
-				try self.replaceContentsOfFile(at: resolvedDestination, to: contentsData, using: acquisitionLock)
+				try self.replaceContentsOfFile(at: resolvedDestination,
+											   to: contentsData,
+											   originalFP: originalFP,
+											   using: acquisitionLock)
 			case .some(let x):
-				throw WrongNodeType(path: fp, actualType: x.nodeType)
+				throw WrongNodeType(path: originalFP, actualType: x.nodeType)
 		}
 	}
 
