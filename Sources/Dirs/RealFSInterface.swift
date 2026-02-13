@@ -25,7 +25,7 @@ public struct RealFSInterface: FilesystemInterface {
 		let rawPathString = chroot.path.string
 		try FileManager.default.createDirectory(atPath: rawPathString,
 												withIntermediateDirectories: true)
-		let resolvedPathString = try realpath(rawPathString)
+		let resolvedPathString = try realpath(chroot.path, errorPathTransform: nil)
 
 		self.init(chroot: FilePath(resolvedPathString))
 	}
@@ -251,7 +251,17 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func realpathOf(node ifp: some IntoFilePath) throws -> FilePath {
-		let out = try realpath(self.resolveToRaw(ifp).string)
+		let fp = ifp.into()
+		let out = try realpath(self.resolveToRaw(fp), errorPathTransform: { rawPath in
+			let projectedPath = self.resolveToProjected(rawPath)
+			// If realpath fails on a broken symlink, the error should refer to the target path
+			if self.nodeType(at: projectedPath) == .symlink,
+			   let destination = try? self.destinationOf(symlink: projectedPath)
+			{
+				return Symlink.resolveDestination(destination, relativeTo: projectedPath)
+			}
+			return projectedPath
+		})
 		return self.resolveToProjected(out)
 	}
 
@@ -724,18 +734,18 @@ private extension RealFSInterface {
 #if os(Windows)
 	import WinSDK
 
-	private func realpath(_ path: String) throws -> String {
+	private func realpath(_ path: FilePath, errorPathTransform: Optional<(FilePath) -> FilePath>) throws -> String {
 		// 1) Make absolute (GetFullPathNameW)
-		let fullPathW: [WCHAR] = try path.withCString(encodedAs: UTF16.self) { inW -> [WCHAR] in
+		let fullPathW: [WCHAR] = try path.string.withCString(encodedAs: UTF16.self) { inW -> [WCHAR] in
 			let needed = GetFullPathNameW(inW, 0, nil, nil)
 			if needed == 0 {
-				throw windowsRealpathError(path: path, win32Error: GetLastError())
+				throw windowsRealpathError(path: path, errorPathTransform: errorPathTransform, win32Error: GetLastError())
 			}
 
 			var buf = Array<WCHAR>(repeating: 0, count: Int(needed) + 1)
 			let written = GetFullPathNameW(inW, DWORD(buf.count), &buf, nil)
 			if written == 0 {
-				throw windowsRealpathError(path: path, win32Error: GetLastError())
+				throw windowsRealpathError(path: path, errorPathTransform: errorPathTransform, win32Error: GetLastError())
 			}
 
 			// Ensure NUL-termination and trim to actual length.
@@ -761,7 +771,7 @@ private extension RealFSInterface {
 		}
 
 		if handle == INVALID_HANDLE_VALUE {
-			throw windowsRealpathError(path: path, win32Error: GetLastError())
+			throw windowsRealpathError(path: path, errorPathTransform: errorPathTransform, win32Error: GetLastError())
 		}
 		defer { CloseHandle(handle) }
 
@@ -790,7 +800,7 @@ private extension RealFSInterface {
 		}()
 
 		if finalW.isEmpty {
-			throw windowsRealpathError(path: path, win32Error: GetLastError())
+			throw windowsRealpathError(path: path, errorPathTransform: errorPathTransform, win32Error: GetLastError())
 		}
 
 		var finalStr = finalW.withUnsafeBufferPointer { p in
@@ -810,27 +820,33 @@ private extension RealFSInterface {
 		return finalStr
 	}
 
-	private func windowsRealpathError(path: String, win32Error: DWORD) -> any Error {
+	private func windowsRealpathError(path: FilePath, errorPathTransform: Optional<(FilePath) -> FilePath>, win32Error: DWORD) -> any Error {
+		let projectedPath = errorPathTransform?(path) ?? path
 		switch win32Error {
 			case DWORD(ERROR_FILE_NOT_FOUND), DWORD(ERROR_PATH_NOT_FOUND):
-				NoSuchNode(path: FilePath(path))
+				return NoSuchNode(path: projectedPath)
 			case DWORD(ERROR_CANT_RESOLVE_FILENAME):
-				CircularResolvableChain(startPath: FilePath(path))
+				return CircularResolvableChain(startPath: projectedPath)
 			default:
-				InvalidPathForCall.couldNotCanonicalize(path)
+				return InvalidPathForCall.couldNotCanonicalize(path)
 		}
 	}
 #else // Non-Windows
-	private func realpath(_ path: String) throws -> String {
-		guard let resolvedCPathString = realpath(path, nil) else {
+	private func realpath(_ path: FilePath, errorPathTransform: Optional<(FilePath) -> FilePath>) throws -> String {
+		let resolvedCPathString = realpath(path.string, nil)
+
+		guard let resolvedCPathString else {
+			let projectedPath = errorPathTransform?(path) ?? path
+
 			if errno == ENOENT {
-				throw NoSuchNode(path: FilePath(path))
+				throw NoSuchNode(path: projectedPath)
 			} else if errno == ELOOP {
-				throw CircularResolvableChain(startPath: FilePath(path))
+				throw CircularResolvableChain(startPath: projectedPath)
 			} else {
 				throw InvalidPathForCall.couldNotCanonicalize(path)
 			}
 		}
+
 		defer { free(resolvedCPathString) }
 		return String(cString: resolvedCPathString)
 	}

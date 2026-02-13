@@ -53,7 +53,7 @@ public struct CantBeCreated: Error {
 public enum InvalidPathForCall: Error, Equatable {
 	case needAbsoluteWithComponent
 	case needSingleComponent
-	case couldNotCanonicalize(String)
+	case couldNotCanonicalize(FilePath)
 }
 
 /// On some platforms, xattr names have to be namespaced (e.g. "user.foo")

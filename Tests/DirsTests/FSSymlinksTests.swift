@@ -118,8 +118,8 @@ extension FSTests {
 		try #expect(symlink.destination == "nonexistent")
 		#expect(symlink.nodeType == .symlink)
 
-		#expect(throws: NoSuchNode.self) { try symlink.resolve() }
-		#expect(throws: (any Error).self) { try symlink.realpath() }
+		#expect(throws: NoSuchNode(path: "/dir/nonexistent")) { try symlink.resolve() }
+		#expect(throws: NoSuchNode(path: "/dir/nonexistent")) { try symlink.realpath() }
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -244,8 +244,8 @@ extension FSTests {
 		#expect(throws: NodeNotDescendantError.self, performing: { try a.descendantPath(from: d) })
 
 		let brokenSym = try fs.createSymlink(at: "/broken_desc", to: "/nonexistent")
-		#expect(throws: (any Error).self) { try a.descendantPath(from: brokenSym) }
-		#expect(throws: (any Error).self) { try brokenSym.descendantPath(from: parent) }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try a.descendantPath(from: brokenSym) }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try brokenSym.descendantPath(from: parent) }
 	}
 
 	@Test(arguments: FSKind.allCases)
