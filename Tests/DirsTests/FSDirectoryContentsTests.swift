@@ -10,6 +10,15 @@ extension FSTests {
 		#expect(try fs.contentsOf(directory: "/") == [])
 	}
 
+	@Test(arguments: FSKind.allCases, NodeType.allCreatableCases.filter { $0 != .dir })
+	func dirContentsWrongNodeType(_ fsKind: FSKind, nodeType: NodeType) throws {
+		let fs = self.fs(for: fsKind)
+
+		let (node, target) = try nodeType.createNode(at: "/node", in: fs)
+		let expectedNodeType = (nodeType == .symlink) ? target!.nodeType : nodeType
+		#expect(throws: WrongNodeType(path: "/node", actualType: expectedNodeType)) { try fs.contentsOf(directory: node) }
+	}
+
 	@Test(arguments: FSKind.allCases)
 	func dirContentsNormal(_ fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)

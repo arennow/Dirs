@@ -329,7 +329,7 @@ public final class MockFSInterface: FilesystemInterface {
 				let resolvedDestination = Symlink.resolveDestination(destination, relativeTo: fp)
 				return try self.contentsOf(directory: resolvedDestination, requestedPath: requestedPath, using: acquisitionLock)
 			case .dir: break
-			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
+			case .some(let x): throw WrongNodeType(path: requestedPath, actualType: x.nodeType)
 		}
 
 		let childKeys = acquisitionLock.resource.keys

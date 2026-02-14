@@ -113,7 +113,11 @@ public struct RealFSInterface: FilesystemInterface {
 	#if os(Windows)
 		public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
 			let requestedPath = ifp.into()
-			let (resolvedPath, _) = try self.resolvedPathAndNodeType(of: requestedPath)
+			let (resolvedPath, resolvedNodeType) = try self.resolvedPathAndNodeType(of: requestedPath)
+
+			guard resolvedNodeType == .dir else {
+				throw WrongNodeType(path: requestedPath, actualType: resolvedNodeType)
+			}
 			let rawPath = self.resolveToRaw(resolvedPath)
 
 			let fm = FileManager.default
@@ -161,7 +165,12 @@ public struct RealFSInterface: FilesystemInterface {
 	#else
 		public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
 			let requestedPath = ifp.into()
-			let (resolvedPath, _) = try self.resolvedPathAndNodeType(of: requestedPath)
+			let (resolvedPath, resolvedNodeType) = try self.resolvedPathAndNodeType(of: requestedPath)
+
+			guard resolvedNodeType == .dir else {
+				throw WrongNodeType(path: requestedPath, actualType: resolvedNodeType)
+			}
+
 			let rawURL: URL = self.resolveToRaw(resolvedPath)
 
 			let fm = FileManager.default
