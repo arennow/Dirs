@@ -71,9 +71,25 @@ public protocol FilesystemInterface: Equatable, Sendable {
 }
 
 public extension FilesystemInterface {
+	func resolvedPathAndNodeType(of ifp: some IntoFilePath) throws -> (resolvedPath: FilePath, nodeType: NodeType) {
+		let resolvedPath = try self.realpathOf(node: ifp)
+		guard let nodeType = self.nodeType(at: resolvedPath) else {
+			throw NoSuchNode(path: resolvedPath)
+		}
+
+		return (resolvedPath, nodeType)
+	}
+
+	func nodeTypeResolvingSymlinks(at ifp: some IntoFilePath) throws -> NodeType {
+		try self.resolvedPathAndNodeType(of: ifp).nodeType
+	}
+
 	/// Returns the type of node after following all resolvable nodes (symlinks and Finder aliases)
 	/// to their final destination. This follows chains of resolvable nodes, such as a symlink pointing
 	/// to a Finder alias pointing to another symlink, until reaching a non-resolvable node.
+	///
+	/// On non-Darwin platforms, this behaves identically to `nodeTypeFollowingSymlinks` since
+	/// Finder aliases are Darwin-specific.
 	///
 	/// - Parameter ifp: The path to examine
 	/// - Returns: The type of the final non-resolvable node, or `nil` if the path doesn't exist

@@ -86,7 +86,8 @@ public struct RealFSInterface: FilesystemInterface {
 
 	public func contentsOf(file ifp: some IntoFilePath) throws -> Data {
 		let fp = ifp.into()
-		let (resolvedPath, nodeType) = try self.resolveSymlinksAndGetNodeType(at: fp)
+		try self.throwIfBrokenSymlinkInExistingAncestors(of: fp)
+		let (resolvedPath, nodeType) = try self.resolvedPathAndNodeType(of: fp)
 
 		guard nodeType == .file else {
 			throw WrongNodeType(path: fp, actualType: nodeType)
@@ -97,7 +98,8 @@ public struct RealFSInterface: FilesystemInterface {
 
 	public func sizeOfFile(at ifp: some IntoFilePath) throws -> UInt64 {
 		let fp = ifp.into()
-		let (resolvedPath, nodeType) = try self.resolveSymlinksAndGetNodeType(at: fp)
+		try self.throwIfBrokenSymlinkInExistingAncestors(of: fp)
+		let (resolvedPath, nodeType) = try self.resolvedPathAndNodeType(of: fp)
 
 		guard nodeType == .file else {
 			throw WrongNodeType(path: fp, actualType: nodeType)
@@ -111,7 +113,7 @@ public struct RealFSInterface: FilesystemInterface {
 	#if os(Windows)
 		public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
 			let requestedPath = ifp.into()
-			let (resolvedPath, _) = try self.resolveSymlinksAndGetNodeType(at: requestedPath)
+			let (resolvedPath, _) = try self.resolvedPathAndNodeType(of: requestedPath)
 			let rawPath = self.resolveToRaw(resolvedPath)
 
 			let fm = FileManager.default
@@ -159,7 +161,7 @@ public struct RealFSInterface: FilesystemInterface {
 	#else
 		public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
 			let requestedPath = ifp.into()
-			let (resolvedPath, _) = try self.resolveSymlinksAndGetNodeType(at: requestedPath)
+			let (resolvedPath, _) = try self.resolvedPathAndNodeType(of: requestedPath)
 			let rawURL: URL = self.resolveToRaw(resolvedPath)
 
 			let fm = FileManager.default
@@ -377,7 +379,7 @@ public struct RealFSInterface: FilesystemInterface {
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
 		let fp = ifp.into()
 		let ancestorResolvedFP = try self.resolveAncestorSymlinks(of: fp)
-		let (resolvedFP, nodeType) = try self.resolveSymlinksAndGetNodeType(at: ancestorResolvedFP)
+		let (resolvedFP, nodeType) = try self.resolvedPathAndNodeType(of: ancestorResolvedFP)
 
 		guard nodeType == .file else {
 			throw WrongNodeType(path: fp, actualType: nodeType)
@@ -392,7 +394,8 @@ public struct RealFSInterface: FilesystemInterface {
 
 	public func appendContentsOfFile(at ifp: some IntoFilePath, with addendum: some IntoData) throws {
 		let fp = ifp.into()
-		let (resolvedFP, nodeType) = try self.resolveSymlinksAndGetNodeType(at: fp)
+		try self.throwIfBrokenSymlinkInExistingAncestors(of: fp)
+		let (resolvedFP, nodeType) = try self.resolvedPathAndNodeType(of: fp)
 
 		guard nodeType == .file else {
 			throw WrongNodeType(path: fp, actualType: nodeType)
@@ -414,7 +417,7 @@ public struct RealFSInterface: FilesystemInterface {
 		let destType = self.nodeType(at: destFP)
 		switch destType {
 			case .symlink:
-				if let resolvedDestFP = try? self.realpathOf(node: destFP), self.nodeType(at: resolvedDestFP) == .dir {
+				if let resolvedType = try? self.nodeTypeResolvingSymlinks(at: destFP), resolvedType == .dir {
 					destURL.appendPathComponent(srcURL.lastPathComponent)
 				} else {
 					try fm.removeItem(at: destURL)
@@ -642,19 +645,6 @@ public extension RealFSInterface {
 }
 
 private extension RealFSInterface {
-	/// Fully resolves all symlinks in the path and returns both the resolved path and node type.
-	func resolveSymlinksAndGetNodeType(at ifp: some IntoFilePath) throws -> (resolvedPath: FilePath, nodeType: NodeType) {
-		let fp = ifp.into()
-
-		let resolvedFP = try self.realpathOf(node: fp)
-		guard let nodeType = self.nodeType(at: resolvedFP) else {
-			// This shouldn't happen since we just confirmed it exists, but handle it anyway
-			throw NoSuchNode(path: fp)
-		}
-
-		return (resolvedFP, nodeType)
-	}
-
 	func resolveToProjected(_ ifp: some IntoFilePath) -> FilePath {
 		var fp = ifp.into()
 		guard let chroot = self.chroot else {

@@ -264,6 +264,20 @@ public final class MockFSInterface: FilesystemInterface {
 		return resolvedParentFP.appending(lastComponent)
 	}
 
+	private static func throwIfBrokenSymlinkInExistingAncestors(of fp: FilePath, in ptn: PTN) throws {
+		var cumulativeFP = FilePath(root: fp.root, [])
+		for component in fp.components {
+			cumulativeFP = cumulativeFP.appending(component)
+			guard let nodeType = Self.nodeType(at: cumulativeFP, in: ptn, symRes: .dontResolve) else {
+				break
+			}
+
+			if nodeType == .symlink {
+				_ = try Self.realpath(of: cumulativeFP, in: ptn)
+			}
+		}
+	}
+
 	private func node(at ifp: some IntoFilePath, symRes: SymlinkResolutionBehavior) -> MockNode? {
 		self.pathsToNodes.read { ptn in
 			Self.node(at: ifp, in: ptn, symRes: symRes)
@@ -285,6 +299,7 @@ public final class MockFSInterface: FilesystemInterface {
 		let fp = ifp.into()
 
 		return try self.pathsToNodes.read { ptn in
+			try Self.throwIfBrokenSymlinkInExistingAncestors(of: fp, in: ptn)
 			let resolvedFP = try Self.realpath(of: fp, in: ptn)
 			switch ptn[resolvedFP] {
 				case .file(let data, _):
@@ -348,6 +363,7 @@ public final class MockFSInterface: FilesystemInterface {
 		let fp = ifp.into()
 
 		return try self.pathsToNodes.read { ptn in
+			try Self.throwIfBrokenSymlinkInExistingAncestors(of: fp, in: ptn)
 			let resolvedFP = try Self.realpath(of: fp, in: ptn)
 			switch ptn[resolvedFP] {
 				case .file(let data, _):

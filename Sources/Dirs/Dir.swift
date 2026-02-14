@@ -12,11 +12,10 @@ public struct Dir: Node {
 		let fp = path.into()
 
 		do {
-			let resolvedPath = try _fs.wrapped.realpathOf(node: fp)
-			switch _fs.wrapped.nodeType(at: resolvedPath) {
-				case .none: throw NoSuchNode(path: resolvedPath)
+			let (_, nodeType) = try _fs.wrapped.resolvedPathAndNodeType(of: fp)
+			switch nodeType {
 				case .dir: break
-				case .some(let x): throw WrongNodeType(path: fp, actualType: x)
+				default: throw WrongNodeType(path: fp, actualType: nodeType)
 			}
 		} catch is NoSuchNode {
 			if createIfNeeded {

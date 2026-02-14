@@ -320,7 +320,10 @@ extension FSTests {
 		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.createDir(at: "/broken/dir") }
 		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.createSymlink(at: "/broken/link", to: "/target") }
 		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.contentsOf(directory: "/broken") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.contentsOf(file: "/broken/file") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.sizeOfFile(at: "/broken/file") }
 		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.replaceContentsOfFile(at: "/broken/file", to: "abc") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.appendContentsOfFile(at: "/broken/file", with: "abc") }
 		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.deleteNode(at: "/broken/file") }
 		#expect(fs.nodeType(at: "/broken/file") == nil)
 	}

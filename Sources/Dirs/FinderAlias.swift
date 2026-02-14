@@ -23,12 +23,11 @@
 		// used for `File`/`Dir`)
 		init(_fs: FSInterface, path: some IntoFilePath) throws {
 			let fp = path.into()
-			let resolvedPath = try _fs.wrapped.realpathOf(node: fp)
+			let (_, nodeType) = try _fs.wrapped.resolvedPathAndNodeType(of: fp)
 
-			switch _fs.wrapped.nodeType(at: resolvedPath) {
-				case .none: throw NoSuchNode(path: resolvedPath)
+			switch nodeType {
 				case .finderAlias: break
-				case .some(let x): throw WrongNodeType(path: fp, actualType: x)
+				default: throw WrongNodeType(path: fp, actualType: nodeType)
 			}
 
 			self._fs = _fs
