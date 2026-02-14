@@ -281,20 +281,19 @@ public final class MockFSInterface: FilesystemInterface {
 		return node?.nodeType
 	}
 
-	public func nodeTypeFollowingSymlinks(at ifp: some IntoFilePath) -> NodeType? {
-		self.node(at: ifp, symRes: .resolve)?.nodeType
-	}
-
 	public func contentsOf(file ifp: some IntoFilePath) throws -> Data {
 		let fp = ifp.into()
 
-		switch self.node(at: fp, symRes: .resolve) {
-			case .file(let data, _): return data
-			case .symlink(let destination, _):
-				let resolvedDestination = Symlink.resolveDestination(destination, relativeTo: fp)
-				return try self.contentsOf(file: resolvedDestination)
-			case .none: throw NoSuchNode(path: fp)
-			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
+		return try self.pathsToNodes.read { ptn in
+			let resolvedFP = try Self.realpath(of: fp, in: ptn)
+			switch ptn[resolvedFP] {
+				case .file(let data, _):
+					return data
+				case .none:
+					throw NoSuchNode(path: resolvedFP)
+				case .some(let x):
+					throw WrongNodeType(path: fp, actualType: x.nodeType)
+			}
 		}
 	}
 
@@ -348,10 +347,16 @@ public final class MockFSInterface: FilesystemInterface {
 	public func sizeOfFile(at ifp: some IntoFilePath) throws -> UInt64 {
 		let fp = ifp.into()
 
-		switch self.node(at: fp, symRes: .resolve) {
-			case .file(let data, _): return UInt64(data.count)
-			case .none: throw NoSuchNode(path: fp)
-			case .some(let x): throw WrongNodeType(path: fp, actualType: x.nodeType)
+		return try self.pathsToNodes.read { ptn in
+			let resolvedFP = try Self.realpath(of: fp, in: ptn)
+			switch ptn[resolvedFP] {
+				case .file(let data, _):
+					return UInt64(data.count)
+				case .none:
+					throw NoSuchNode(path: resolvedFP)
+				case .some(let x):
+					throw WrongNodeType(path: fp, actualType: x.nodeType)
+			}
 		}
 	}
 
@@ -400,7 +405,7 @@ public final class MockFSInterface: FilesystemInterface {
 			comps.index(ind, offsetBy: 1, limitedBy: comps.endIndex)
 		}
 		let cumulativeFilePaths = eachIndex.map { endIndex in
-			FilePath(root: "/", fp.components[comps.startIndex..<endIndex])
+			FilePath(root: fp.root, fp.components[comps.startIndex..<endIndex])
 		}
 
 		try self.pathsToNodes.mutate { ptn in
@@ -422,8 +427,13 @@ public final class MockFSInterface: FilesystemInterface {
 						}
 
 						let resolvedDestination = Symlink.resolveDestination(destination, relativeTo: resolvedDirFP)
-						guard Self.nodeType(at: resolvedDestination, in: ptn, symRes: .resolve) == .dir else {
-							throw WrongNodeType(path: cumulativeFP, actualType: .symlink)
+						switch Self.nodeType(at: resolvedDestination, in: ptn, symRes: .resolve) {
+							case .dir:
+								break
+							case .none:
+								throw NoSuchNode(path: resolvedDestination)
+							case .some:
+								throw WrongNodeType(path: cumulativeFP, actualType: .symlink)
 						}
 					case .none:
 						let now = Date()
@@ -446,12 +456,11 @@ public final class MockFSInterface: FilesystemInterface {
 	{
 		let fp = ifp.into()
 		try self.pathsToNodes.mutate { ptn in
-			let parentFP = fp.removingLastComponent()
-			guard Self.nodeType(at: parentFP, in: ptn, symRes: .resolve) == .dir else {
-				throw NoSuchNode(path: parentFP)
-			}
-
 			let resolvedFP = try Self.resolveAncestorSymlinks(of: fp, in: ptn)
+			let resolvedParentFP = resolvedFP.removingLastComponent()
+			guard Self.nodeType(at: resolvedParentFP, in: ptn, symRes: .dontResolve) == .dir else {
+				throw NoSuchNode(path: resolvedParentFP)
+			}
 
 			if let existing = ptn[resolvedFP] {
 				throw NodeAlreadyExists(path: fp, type: existing.nodeType)
@@ -537,30 +546,20 @@ public final class MockFSInterface: FilesystemInterface {
 
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
 		let fp = ifp.into()
-		return try self.replaceContentsOfFile(at: fp,
-											  to: contents,
-											  originalFP: fp,
-											  using: self.pathsToNodes.acquireIntoHandle())
-	}
 
-	private func replaceContentsOfFile(at fp: FilePath, to contents: some IntoData, originalFP: FilePath, using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws {
-		let contentsData = contents.into()
-		let resolvedFP = try Self.resolveAncestorSymlinks(of: fp, in: acquisitionLock.resource)
+		try self.pathsToNodes.mutate { ptn in
+			let ancestorResolvedFP = try Self.resolveAncestorSymlinks(of: fp, in: ptn)
+			let resolvedFP = try Self.realpath(of: ancestorResolvedFP, in: ptn)
 
-		switch acquisitionLock.resource[resolvedFP] {
-			case .none:
-				throw NoSuchNode(path: originalFP)
-			case .file(_, var metadata):
-				metadata.dates[.modification] = Date()
-				acquisitionLock.resource[resolvedFP] = .file(data: contentsData, metadata: metadata)
-			case .symlink(let destination, _):
-				let resolvedDestination = Symlink.resolveDestination(destination, relativeTo: resolvedFP)
-				try self.replaceContentsOfFile(at: resolvedDestination,
-											   to: contentsData,
-											   originalFP: originalFP,
-											   using: acquisitionLock)
-			case .some(let x):
-				throw WrongNodeType(path: originalFP, actualType: x.nodeType)
+			switch ptn[resolvedFP] {
+				case .file(_, var metadata):
+					metadata.dates[.modification] = Date()
+					ptn[resolvedFP] = .file(data: contents.into(), metadata: metadata)
+				case .none:
+					throw NoSuchNode(path: resolvedFP)
+				case .some(let x):
+					throw WrongNodeType(path: fp, actualType: x.nodeType)
+			}
 		}
 	}
 

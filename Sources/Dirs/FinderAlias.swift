@@ -16,18 +16,17 @@
 		public var fs: any FilesystemInterface { self._fs.wrapped }
 		public private(set) var path: FilePath
 
+		// Finder aliases are effectively regular files carrying extra
+		// metadata (they are not the same kind of filesystem node as a
+		// symlink). For the purpose of validating the node type at the
+		// given path we want the resolved target type (the same rationale
+		// used for `File`/`Dir`)
 		init(_fs: FSInterface, path: some IntoFilePath) throws {
 			let fp = path.into()
+			let resolvedPath = try _fs.wrapped.realpathOf(node: fp)
 
-			// Finder aliases are effectively regular files carrying extra
-			// metadata (they are not the same kind of filesystem node as a
-			// symlink). For the purpose of validating the node type at the
-			// given path we want the resolved target type (the same rationale
-			// used for `File`/`Dir`), so we use
-			// `nodeTypeFollowingSymlinks(at:)` here rather than the symlink-
-			// preserving `nodeType(at:)`.
-			switch _fs.wrapped.nodeTypeFollowingSymlinks(at: fp) {
-				case .none: throw NoSuchNode(path: fp)
+			switch _fs.wrapped.nodeType(at: resolvedPath) {
+				case .none: throw NoSuchNode(path: resolvedPath)
 				case .finderAlias: break
 				case .some(let x): throw WrongNodeType(path: fp, actualType: x)
 			}

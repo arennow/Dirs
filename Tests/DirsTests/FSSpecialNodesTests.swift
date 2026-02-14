@@ -31,7 +31,7 @@ import Testing
 
 			// Verify detection
 			#expect(fs.nodeType(at: "/test_special") == .special)
-			#expect(fs.nodeTypeFollowingSymlinks(at: "/test_special") == .special)
+			#expect(fs.nodeTypeResolvingResolvables(at: "/test_special") == .special)
 			#expect(special.path == "/test_special")
 			#expect(special.nodeType == .special)
 

@@ -146,27 +146,27 @@ extension FSTests {
 		try fs.createSymlink(at: "/s2", to: "/s")
 
 		#expect(fs.nodeType(at: "/s") == .symlink)
-		#expect(fs.nodeTypeFollowingSymlinks(at: "/s") == .dir)
+		#expect(fs.nodeTypeResolvingResolvables(at: "/s") == .dir)
 		_ = try fs.dir(at: "/s")
 
 		#expect(fs.nodeType(at: "/s/b") == .dir)
-		#expect(fs.nodeTypeFollowingSymlinks(at: "/s/b") == .dir)
+		#expect(fs.nodeTypeResolvingResolvables(at: "/s/b") == .dir)
 		_ = try fs.dir(at: "/s/b")
 
 		#expect(fs.nodeType(at: "/s/b/c1") == .file)
-		#expect(fs.nodeTypeFollowingSymlinks(at: "/s/b/c1") == .file)
+		#expect(fs.nodeTypeResolvingResolvables(at: "/s/b/c1") == .file)
 		_ = try fs.file(at: "/s/b/c1")
 
 		#expect(fs.nodeType(at: "/s/b/c2") == .file)
-		#expect(fs.nodeTypeFollowingSymlinks(at: "/s/b/c2") == .file)
+		#expect(fs.nodeTypeResolvingResolvables(at: "/s/b/c2") == .file)
 		_ = try fs.file(at: "/s/b/c2")
 
 		#expect(fs.nodeType(at: "/s/f") == .file)
-		#expect(fs.nodeTypeFollowingSymlinks(at: "/s/f") == .file)
+		#expect(fs.nodeTypeResolvingResolvables(at: "/s/f") == .file)
 		_ = try fs.file(at: "/s/f")
 
 		#expect(fs.nodeType(at: "/s2") == .symlink)
-		#expect(fs.nodeTypeFollowingSymlinks(at: "/s2") == .dir)
+		#expect(fs.nodeTypeResolvingResolvables(at: "/s2") == .dir)
 		_ = try fs.symlink(at: "/s2")
 
 		#if FINDER_ALIASES_ENABLED
@@ -316,12 +316,12 @@ extension FSTests {
 
 		try fs.createSymlink(at: "/broken", to: "/nonexistent")
 
-		#expect(throws: (any Error).self) { try fs.createFile(at: "/broken/file") }
-		#expect(throws: (any Error).self) { try fs.createDir(at: "/broken/dir") }
-		#expect(throws: (any Error).self) { try fs.createSymlink(at: "/broken/link", to: "/target") }
-		#expect(throws: (any Error).self) { try fs.contentsOf(directory: "/broken") }
-		#expect(throws: (any Error).self) { try fs.replaceContentsOfFile(at: "/broken/file", to: "abc") }
-		#expect(throws: (any Error).self) { try fs.deleteNode(at: "/broken/file") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.createFile(at: "/broken/file") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.createDir(at: "/broken/dir") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.createSymlink(at: "/broken/link", to: "/target") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.contentsOf(directory: "/broken") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.replaceContentsOfFile(at: "/broken/file", to: "abc") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.deleteNode(at: "/broken/file") }
 		#expect(fs.nodeType(at: "/broken/file") == nil)
 	}
 
@@ -416,23 +416,16 @@ extension FSTests {
 
 		try #expect(fs.destinationOf(symlink: "/s") == "/nonexistent")
 
-		#expect(throws: (any Error).self) { try fs.replaceContentsOfFile(at: "/s", to: "abc") }
+		#expect(throws: NodeAlreadyExists(path: "/s", type: .symlink)) { try fs.createFile(at: "/s") }
+		#expect(throws: NodeAlreadyExists(path: "/s", type: .symlink)) { try fs.createDir(at: "/s") }
 
-		#expect(throws: (any Error).self) { try fs.appendContentsOfFile(at: "/s", with: "abc") }
-
-		#expect(throws: (any Error).self) { try fs.createFile(at: "/s") }
-
-		#expect(throws: (any Error).self) { try fs.createDir(at: "/s") }
-
-		#expect(throws: (any Error).self) { try fs.contentsOf(directory: "/s") }
-
-		#expect(throws: (any Error).self) { try fs.contentsOf(file: "/s") }
-
-		#expect(throws: (any Error).self) { try fs.sizeOfFile(at: "/s") }
-
-		#expect(throws: (any Error).self) { try brokenSym.realpath() }
-
-		#expect(throws: NoSuchNode.self) { try brokenSym.resolve() }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.replaceContentsOfFile(at: "/s", to: "abc") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.appendContentsOfFile(at: "/s", with: "abc") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.contentsOf(directory: "/s") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.contentsOf(file: "/s") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.sizeOfFile(at: "/s") }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try brokenSym.realpath() }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try brokenSym.resolve() }
 
 		#expect(throws: Never.self) { try fs.deleteNode(at: "/s") }
 		#expect(fs.nodeType(at: "/s") == nil)
@@ -455,9 +448,9 @@ extension FSTests {
 		try fs.createSymlink(at: "/chain2", to: "/chain3")
 		try fs.createSymlink(at: "/chain3", to: "/broken_target")
 		#expect(fs.nodeType(at: "/chain1") == .symlink)
-		#expect(throws: (any Error).self) { try fs.file(at: "/chain1") }
+		#expect(throws: NoSuchNode(path: "/broken_target")) { try fs.file(at: "/chain1") }
 		let chain1Sym = try fs.symlink(at: "/chain1")
-		#expect(throws: (any Error).self) { try chain1Sym.realpath() }
+		#expect(throws: NoSuchNode(path: "/broken_target")) { try chain1Sym.realpath() }
 
 		// Moving a broken symlink should succeed
 		var brokenSym3 = try fs.createSymlink(at: "/broken_to_move", to: "/missing")
@@ -476,7 +469,7 @@ extension FSTests {
 
 		// pointsToSameNode with broken symlinks should fail
 		let workingFile = try fs.createFile(at: "/working")
-		#expect(throws: (any Error).self) { try brokenSym4.pointsToSameNode(as: workingFile) }
+		#expect(throws: NoSuchNode(path: "/absent")) { try brokenSym4.pointsToSameNode(as: workingFile) }
 
 		// parent property should work on broken symlinks
 		let brokenParent = try brokenSym4.parent
@@ -490,14 +483,14 @@ extension FSTests {
 		// This works because /subdir/broken starts with /subdir (no realpath needed)
 		#expect(try subdir.isAncestor(of: brokenInSubdir))
 		// This fails because broken symlink's realpath can't be computed
-		#expect(throws: (any Error).self) { try brokenInSubdir.isAncestor(of: fileInSubdir) }
+		#expect(throws: NoSuchNode(path: "/void")) { try brokenInSubdir.isAncestor(of: fileInSubdir) }
 
 		#if XATTRS_ENABLED
 			// Extended attributes on broken symlinks
 			let brokenForXattr = try fs.createSymlink(at: "/broken_xattr", to: "/nowhere")
 			#if os(Linux)
 				// Linux kernel VFS prohibits user-namespaced xattrs on symlinks
-				#expect(throws: (any Error).self) {
+				#expect(throws: XAttrNotAllowed(path: "/broken_xattr")) {
 					try brokenForXattr.setExtendedAttribute(named: "user.test", to: "value")
 				}
 			#else

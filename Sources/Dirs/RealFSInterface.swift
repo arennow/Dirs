@@ -84,30 +84,15 @@ public struct RealFSInterface: FilesystemInterface {
 		}
 	#endif
 
-	public func nodeTypeFollowingSymlinks(at ifp: some IntoFilePath) -> NodeType? {
-		let fp = ifp.into()
-
-		do {
-			let resolvedPath = try self.realpathOf(node: fp)
-			return self.nodeType(at: resolvedPath)
-		} catch {
-			return nil
-		}
-	}
-
 	public func contentsOf(file ifp: some IntoFilePath) throws -> Data {
 		let fp = ifp.into()
-		let nodeType = self.nodeTypeFollowingSymlinks(at: fp)
+		let (resolvedPath, nodeType) = try self.resolveSymlinksAndGetNodeType(at: fp)
 
 		guard nodeType == .file else {
-			if let nt = nodeType {
-				throw WrongNodeType(path: fp, actualType: nt)
-			} else {
-				throw NoSuchNode(path: fp)
-			}
+			throw WrongNodeType(path: fp, actualType: nodeType)
 		}
 
-		return try Data(contentsOf: self.resolveToRaw(ifp))
+		return try Data(contentsOf: self.resolveToRaw(resolvedPath))
 	}
 
 	public func sizeOfFile(at ifp: some IntoFilePath) throws -> UInt64 {
@@ -254,11 +239,8 @@ public struct RealFSInterface: FilesystemInterface {
 		let fp = ifp.into()
 		let out = try realpath(self.resolveToRaw(fp), errorPathTransform: { rawPath in
 			let projectedPath = self.resolveToProjected(rawPath)
-			// If realpath fails on a broken symlink, the error should refer to the target path
-			if self.nodeType(at: projectedPath) == .symlink,
-			   let destination = try? self.destinationOf(symlink: projectedPath)
-			{
-				return Symlink.resolveDestination(destination, relativeTo: projectedPath)
+			if let transformed = self.terminalPathAfterFollowingSymlinkChain(startingAt: projectedPath) {
+				return transformed
 			}
 			return projectedPath
 		})
@@ -302,7 +284,8 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func createDir(at ifp: some IntoFilePath) throws -> Dir {
-		try self.createNode(at: ifp, factory: { try Dir(_fs: $0, path: $1) }) { fp in
+		try self.createNode(at: ifp, resolveAncestorSymlinks: false, factory: { try Dir(_fs: $0, path: $1) }) { fp in
+			try self.throwIfBrokenSymlinkInExistingAncestors(of: fp)
 			do {
 				return try FileManager.default.createDirectory(at: self.resolveToRaw(fp),
 															   withIntermediateDirectories: true)
@@ -347,15 +330,21 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	private func createNode<N>(at ifp: some IntoFilePath,
+							   resolveAncestorSymlinks shouldResolveAncestorSymlinks: Bool = true,
 							   factory: (FSInterface, FilePath) throws -> N,
 							   perform: (_ resolvedPath: FilePath) throws -> Void) throws -> N
 	{
 		let fp = ifp.into()
+		let resolvedFP: FilePath = if shouldResolveAncestorSymlinks {
+			try self.resolveAncestorSymlinks(of: fp)
+		} else {
+			fp
+		}
 
-		if let existingType = self.nodeType(at: fp) {
+		if let existingType = self.nodeType(at: resolvedFP) {
 			throw NodeAlreadyExists(path: fp, type: existingType)
 		}
-		try perform(fp)
+		try perform(resolvedFP)
 		return try factory(self.asInterface, self.resolveToProjected(fp))
 	}
 
@@ -387,17 +376,14 @@ public struct RealFSInterface: FilesystemInterface {
 
 	public func replaceContentsOfFile(at ifp: some IntoFilePath, to contents: some IntoData) throws {
 		let fp = ifp.into()
-		let nodeType = self.nodeTypeFollowingSymlinks(at: fp)
+		let ancestorResolvedFP = try self.resolveAncestorSymlinks(of: fp)
+		let (resolvedFP, nodeType) = try self.resolveSymlinksAndGetNodeType(at: ancestorResolvedFP)
 
 		guard nodeType == .file else {
-			if let nt = nodeType {
-				throw WrongNodeType(path: fp, actualType: nt)
-			} else {
-				throw NoSuchNode(path: fp)
-			}
+			throw WrongNodeType(path: fp, actualType: nodeType)
 		}
 
-		let fd = try FileDescriptor.open(self.resolveToRaw(ifp), .writeOnly, retryOnInterrupt: true)
+		let fd = try FileDescriptor.open(self.resolveToRaw(resolvedFP), .writeOnly, retryOnInterrupt: true)
 		defer { try? fd.close() }
 		let data = contents.into()
 		try fd.writeAll(data)
@@ -406,17 +392,13 @@ public struct RealFSInterface: FilesystemInterface {
 
 	public func appendContentsOfFile(at ifp: some IntoFilePath, with addendum: some IntoData) throws {
 		let fp = ifp.into()
-		let nodeType = self.nodeTypeFollowingSymlinks(at: fp)
+		let (resolvedFP, nodeType) = try self.resolveSymlinksAndGetNodeType(at: fp)
 
 		guard nodeType == .file else {
-			if let nt = nodeType {
-				throw WrongNodeType(path: fp, actualType: nt)
-			} else {
-				throw NoSuchNode(path: fp)
-			}
+			throw WrongNodeType(path: fp, actualType: nodeType)
 		}
 
-		let fd = try FileDescriptor.open(self.resolveToRaw(ifp), .writeOnly, options: .append, retryOnInterrupt: true)
+		let fd = try FileDescriptor.open(self.resolveToRaw(resolvedFP), .writeOnly, options: .append, retryOnInterrupt: true)
 		defer { try? fd.close() }
 		try fd.writeAll(addendum.into())
 	}
@@ -432,7 +414,7 @@ public struct RealFSInterface: FilesystemInterface {
 		let destType = self.nodeType(at: destFP)
 		switch destType {
 			case .symlink:
-				if let resolvedType = self.nodeTypeFollowingSymlinks(at: destFP), resolvedType == .dir {
+				if let resolvedDestFP = try? self.realpathOf(node: destFP), self.nodeType(at: resolvedDestFP) == .dir {
 					destURL.appendPathComponent(srcURL.lastPathComponent)
 				} else {
 					try fm.removeItem(at: destURL)
@@ -469,8 +451,19 @@ public struct RealFSInterface: FilesystemInterface {
 	}
 
 	public func deleteNode(at ifp: some IntoFilePath) throws {
-		try self.mapBasicCocoaErrorsToDirsErrors {
-			try FileManager.default.removeItem(at: self.resolveToRaw(ifp))
+		let fp = ifp.into()
+		let resolvedFP = try self.resolveAncestorSymlinks(of: fp)
+
+		do {
+			try self.mapBasicCocoaErrorsToDirsErrors {
+				try FileManager.default.removeItem(at: self.resolveToRaw(resolvedFP))
+			}
+		} catch let noSuchNode as NoSuchNode {
+			if noSuchNode.path == resolvedFP {
+				throw NoSuchNode(path: fp)
+			} else {
+				throw noSuchNode
+			}
 		}
 	}
 
@@ -694,6 +687,48 @@ private extension RealFSInterface {
 }
 
 private extension RealFSInterface {
+	func terminalPathAfterFollowingSymlinkChain(startingAt fp: FilePath) -> Optional<FilePath> {
+		try? detectCircularResolvables { recordPathVisited in
+			var current = fp
+
+			while self.nodeType(at: current) == .symlink {
+				try recordPathVisited(current)
+
+				guard let destination = try? self.destinationOf(symlink: current) else {
+					return current
+				}
+
+				current = Symlink.resolveDestination(destination, relativeTo: current)
+			}
+
+			return current
+		}
+	}
+
+	func resolveAncestorSymlinks(of fp: FilePath) throws -> FilePath {
+		guard let lastComponent = fp.lastComponent else {
+			return fp
+		}
+
+		let parentFP = fp.removingLastComponent()
+		let resolvedParentFP = try self.realpathOf(node: parentFP)
+		return resolvedParentFP.appending(lastComponent)
+	}
+
+	func throwIfBrokenSymlinkInExistingAncestors(of fp: FilePath) throws {
+		var cumulativeFP = FilePath(root: fp.root, [])
+		for component in fp.components {
+			cumulativeFP = cumulativeFP.appending(component)
+			guard let nodeType = self.nodeType(at: cumulativeFP) else {
+				break
+			}
+
+			if nodeType == .symlink {
+				_ = try self.realpathOf(node: cumulativeFP)
+			}
+		}
+	}
+
 	func mapBasicCocoaErrorsToDirsErrors<R>(in operation: () throws -> R) throws -> R {
 		do {
 			return try operation()

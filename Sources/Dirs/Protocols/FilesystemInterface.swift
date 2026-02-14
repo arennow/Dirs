@@ -26,9 +26,6 @@ public protocol FilesystemInterface: Equatable, Sendable {
 	/// while still identifying symlinks themselves (rather than what they point to).
 	func nodeType(at ifp: some IntoFilePath) -> NodeType?
 
-	/// Returns the type of node after following all symlinks to their final destination.
-	func nodeTypeFollowingSymlinks(at ifp: some IntoFilePath) -> NodeType?
-
 	func contentsOf(file ifp: some IntoFilePath) throws -> Data
 	func sizeOfFile(at ifp: some IntoFilePath) throws -> UInt64
 	func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat>
@@ -77,9 +74,6 @@ public extension FilesystemInterface {
 	/// Returns the type of node after following all resolvable nodes (symlinks and Finder aliases)
 	/// to their final destination. This follows chains of resolvable nodes, such as a symlink pointing
 	/// to a Finder alias pointing to another symlink, until reaching a non-resolvable node.
-	///
-	/// On non-Darwin platforms, this behaves identically to `nodeTypeFollowingSymlinks` since
-	/// Finder aliases are Darwin-specific.
 	///
 	/// - Parameter ifp: The path to examine
 	/// - Returns: The type of the final non-resolvable node, or `nil` if the path doesn't exist

@@ -10,9 +10,10 @@ public struct File: Node {
 
 	init(_fs: FSInterface, path: some IntoFilePath) throws {
 		let fp = path.into()
+		let resolvedPath = try _fs.wrapped.realpathOf(node: fp)
 
-		switch _fs.wrapped.nodeTypeFollowingSymlinks(at: fp) {
-			case .none: throw NoSuchNode(path: fp)
+		switch _fs.wrapped.nodeType(at: resolvedPath) {
+			case .none: throw NoSuchNode(path: resolvedPath)
 			case .file: break
 			case .some(let x): throw WrongNodeType(path: fp, actualType: x)
 		}

@@ -11,16 +11,20 @@ public struct Dir: Node {
 	init(_fs: FSInterface, path: some IntoFilePath, createIfNeeded: Bool = false) throws {
 		let fp = path.into()
 
-		switch _fs.wrapped.nodeTypeFollowingSymlinks(at: fp) {
-			case .none:
-				if createIfNeeded {
-					self = try _fs.wrapped.createDir(at: fp)
-					return
-				} else {
-					throw NoSuchNode(path: fp)
-				}
-			case .dir: break
-			case .some(let x): throw WrongNodeType(path: fp, actualType: x)
+		do {
+			let resolvedPath = try _fs.wrapped.realpathOf(node: fp)
+			switch _fs.wrapped.nodeType(at: resolvedPath) {
+				case .none: throw NoSuchNode(path: resolvedPath)
+				case .dir: break
+				case .some(let x): throw WrongNodeType(path: fp, actualType: x)
+			}
+		} catch is NoSuchNode {
+			if createIfNeeded {
+				self = try _fs.wrapped.createDir(at: fp)
+				return
+			} else {
+				throw NoSuchNode(path: fp)
+			}
 		}
 
 		self._fs = _fs
