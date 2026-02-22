@@ -372,7 +372,7 @@ public struct RealFSInterface: FilesystemInterface {
 		public func destinationOfFinderAlias(at ifp: some IntoFilePath) throws -> FilePath {
 			let linkURL: URL = self.resolveToRaw(ifp)
 			do {
-				let resolvedURL = try URL(resolvingAliasFileAt: linkURL, options: [.withoutUI])
+				let resolvedURL = try URL(resolvingAliasFileAt: linkURL, options: [.withoutUI, .withoutMounting])
 				return self.resolveToProjected(resolvedURL)
 			} catch let error as CocoaError {
 				// Darwin throws `fileReadNoSuchFile` when the reference chain is circular,
