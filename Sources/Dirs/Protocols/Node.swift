@@ -1,7 +1,7 @@
 import Foundation
 import SystemPackage
 
-public protocol Node: IntoFilePath, Hashable, Sendable {
+public protocol Node: IntoFilePath, Hashable, Sendable, CustomDebugStringConvertible {
 	static var nodeType: NodeType { get }
 
 	var fs: any FilesystemInterface { get }
@@ -12,11 +12,12 @@ public protocol Node: IntoFilePath, Hashable, Sendable {
 }
 
 public extension Node {
-	var nodeType: NodeType { Self.nodeType }
-
 	static func == (lhs: Self, rhs: Self) -> Bool {
 		lhs.fs.isEqual(to: rhs.fs) && lhs.path == rhs.path
 	}
+
+	var nodeType: NodeType { Self.nodeType }
+	var debugDescription: String { "\(Self.nodeType)['\(self.path)']" }
 
 	func hash(into hasher: inout Hasher) {
 		hasher.combine(self.path)
