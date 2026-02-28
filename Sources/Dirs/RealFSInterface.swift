@@ -490,7 +490,14 @@ public struct RealFSInterface: FilesystemInterface {
 		   isDirectory.boolValue
 		{
 			destURL.appendPathComponent(srcURL.lastPathComponent)
-		} else {
+		}
+
+		// Moving a node to its own path is a no-op.
+		if destURL.pathNonPercentEncoded() == srcURL.pathNonPercentEncoded() {
+			return self.resolveToProjected(destURL)
+		}
+
+		if !isDirectory.boolValue {
 			do {
 				try fm.removeItem(at: destURL)
 			} catch {

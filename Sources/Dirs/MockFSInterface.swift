@@ -715,7 +715,11 @@ public final class MockFSInterface: FilesystemInterface {
 
 		do {
 			let finalDestFP = try self.copyNode(from: source, to: destination, using: acquisitionLock)
-			try self.deleteNode(at: source, using: acquisitionLock)
+			// If copy resolved to the same path as the source, the node is already
+			// in place — skip the delete so the contents are not lost.
+			if finalDestFP != source.into() {
+				try self.deleteNode(at: source, using: acquisitionLock)
+			}
 			return finalDestFP
 		} catch {
 			acquisitionLock.resource = before

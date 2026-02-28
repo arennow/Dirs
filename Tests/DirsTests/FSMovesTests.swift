@@ -25,6 +25,23 @@ extension FSTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
+	func moveFileToOwnPathIsNoOp(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		var file = try fs.rootDir.createFile(at: "c")
+		try file.replaceContents("c content")
+
+		try fs.moveNode(from: "/c", to: "/c")
+		try #expect(fs.file(at: "/c").stringContents() == "c content")
+
+		try file.move(to: file)
+		try #expect(fs.file(at: "/c").stringContents() == "c content")
+
+		try file.move(to: file.parent)
+		try #expect(fs.file(at: "/c").stringContents() == "c content")
+	}
+
+	@Test(arguments: FSKind.allCases)
 	func moveFileToFileReplaces(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
