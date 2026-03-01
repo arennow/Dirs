@@ -42,3 +42,9 @@ extension String: IntoData {
 		Data(self.utf8)
 	}
 }
+
+extension Substring: IntoData {
+	public func into() -> Data {
+		Data(self.utf8)
+	}
+}
