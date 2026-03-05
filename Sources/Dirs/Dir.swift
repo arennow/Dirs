@@ -70,8 +70,14 @@ public extension Dir {
 		return children
 	}
 
+	private func absolutizeRelativeToSelf(_ ifp: some IntoFilePath) -> FilePath {
+		let fp = ifp.into()
+		return fp.isRelative ? self.path.appending(fp.components) : fp
+	}
+
 	func newOrExistingFile(at relativeIFP: some IntoFilePath) throws -> File {
-		let absolutePath = self.path.appending(relativeIFP.into().components)
+		let absolutePath = self.absolutizeRelativeToSelf(relativeIFP)
+
 		if let existing = try? self.fs.file(at: absolutePath) {
 			return existing
 		} else {
@@ -83,7 +89,8 @@ public extension Dir {
 	}
 
 	func newOrExistingDir(at relativeIFP: some IntoFilePath) throws -> Dir {
-		let absolutePath = self.path.appending(relativeIFP.into().components)
+		let absolutePath = self.absolutizeRelativeToSelf(relativeIFP)
+
 		if let existing = try? self.fs.dir(at: absolutePath) {
 			return existing
 		} else {

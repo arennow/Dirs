@@ -78,6 +78,10 @@ extension FSTests {
 		try #expect(rootDir.newOrExistingFile(at: "x/y/new").stringContents() == "")
 		try #expect(rootDir.newOrExistingFile(at: "c/d/e/deep").stringContents() == "")
 		#expect(fs.nodeType(at: "/c/d/e") == .dir)
+
+		// Missing intermediate directory
+		let subDir = try rootDir.newOrExistingDir(at: "sub")
+		try #expect(subDir.newOrExistingFile(at: "a/file").path == "/sub/a/file")
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -100,6 +104,26 @@ extension FSTests {
 		#expect(newDir.path == "/a/b/c")
 		#expect(fs.nodeType(at: "/a/b") == .dir)
 		#expect(fs.nodeType(at: "/a") == .dir)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func newOrExistingFileWithAbsolute(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let workingDir = try fs.rootDir.newOrExistingDir(at: "working")
+		let c = try workingDir.newOrExistingFile(at: "/a/b/c")
+
+		#expect(c.path == "/a/b/c")
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func newOrExistingDirWithAbsolute(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		let workingDir = try fs.rootDir.newOrExistingDir(at: "working")
+		let c = try workingDir.newOrExistingDir(at: "/a/b/c")
+
+		#expect(c.path == "/a/b/c")
 	}
 
 	@Test(arguments: FSKind.allCases)
