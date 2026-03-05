@@ -179,7 +179,7 @@ extension FSTests {
 			#expect(resolved.finderAliases.isEmpty)
 		#endif
 
-		var expectedFiles: Set<String> = ["target_file", "symlink_to_file", "symlink2_to_file", "symlink_to_symlink_to_file"]
+		var expectedFiles: Set = ["target_file", "symlink_to_file", "symlink2_to_file", "symlink_to_symlink_to_file"]
 		#if FINDER_ALIASES_ENABLED
 			expectedFiles.insert("alias_to_file")
 			expectedFiles.insert("alias_to_symlink_to_file")

@@ -7,7 +7,6 @@ import Testing
 /// `any Node` existential (24 bytes), avoiding heap allocations.
 /// See the documentation comment on `FSInterface` in Sources/Dirs/FSInterface.swift
 /// for the full explanation of this optimization.
-@Suite
 struct MemoryLayoutTests {
 	@Test
 	func nodeElementCompontentSizes() {

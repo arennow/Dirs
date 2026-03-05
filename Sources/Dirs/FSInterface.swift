@@ -19,7 +19,7 @@
 ///  24 bytes (in stride), fitting inline.
 ///
 /// See the memory layout tests in `DirsTests.swift` for verification.
-enum FSInterface: Equatable, Sendable {
+enum FSInterface: Equatable {
 	case real(RealFSInterface)
 	case mock(MockFSInterface)
 
