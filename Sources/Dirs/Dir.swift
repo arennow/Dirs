@@ -72,7 +72,9 @@ public extension Dir {
 
 	private func absolutizeRelativeToSelf(_ ifp: some IntoFilePath) -> FilePath {
 		let fp = ifp.into()
-		return fp.isRelative ? self.path.appending(fp.components) : fp
+		// On Windows, root-relative paths (e.g. `\a\b`) have a non-nil root but `isRelative == true`.
+		// Using `root == nil` correctly identifies truly relative paths across all platforms.
+		return fp.root == nil ? self.path.appending(fp.components) : fp
 	}
 
 	func newOrExistingFile(at relativeIFP: some IntoFilePath) throws -> File {
