@@ -224,24 +224,24 @@ public extension Dir {
 
 public extension Dir {
 	@discardableResult
-	func createDir(at ifpcv: some IntoFilePathComponentView) throws -> Dir {
-		try self.fs.createDir(at: self.path.appending(ifpcv.into()))
+	func createDir(at ifp: some IntoFilePath) throws -> Dir {
+		try self.fs.createDir(at: self.absolutizeRelativeToSelf(ifp))
 	}
 
 	@discardableResult
-	func createFile(at ifpcv: some IntoFilePathComponentView) throws -> File {
-		try self.fs.createFile(at: self.path.appending(ifpcv.into()))
+	func createFile(at ifp: some IntoFilePath) throws -> File {
+		try self.fs.createFile(at: self.absolutizeRelativeToSelf(ifp))
 	}
 
 	@discardableResult
-	func createSymlink(at ifpcv: some IntoFilePathComponentView, to destination: some IntoFilePath) throws -> Symlink {
-		try self.fs.createSymlink(at: self.path.appending(ifpcv.into()), to: destination.into())
+	func createSymlink(at ifp: some IntoFilePath, to destination: some IntoFilePath) throws -> Symlink {
+		try self.fs.createSymlink(at: self.absolutizeRelativeToSelf(ifp), to: destination)
 	}
 
 	#if FINDER_ALIASES_ENABLED
 		@discardableResult
-		func createFinderAlias(at ifpcv: some IntoFilePathComponentView, to destination: some IntoFilePath) throws -> FinderAlias {
-			try self.fs.createFinderAlias(at: self.path.appending(ifpcv.into()), to: destination.into())
+		func createFinderAlias(at ifp: some IntoFilePath, to destination: some IntoFilePath) throws -> FinderAlias {
+			try self.fs.createFinderAlias(at: self.absolutizeRelativeToSelf(ifp), to: destination)
 		}
 	#endif
 }

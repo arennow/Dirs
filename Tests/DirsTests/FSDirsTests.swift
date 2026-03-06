@@ -80,6 +80,50 @@ extension FSTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
+	func dirDescendantCreateFunctionsAcceptAbsolutePaths(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let subDir = try fs.createDir(at: "/a")
+		try fs.createDir(at: "/b")
+
+		// Absolute paths should be honored as-is, ignoring the receiver Dir
+		let file = try subDir.createFile(at: "/b/file")
+		#expect(file.path == "/b/file")
+
+		let dir = try subDir.createDir(at: "/b/dir")
+		#expect(dir.path == "/b/dir")
+
+		let link = try subDir.createSymlink(at: "/b/link", to: "/a")
+		#expect(link.path == "/b/link")
+
+		#if FINDER_ALIASES_ENABLED
+			let alias = try subDir.createFinderAlias(at: "/b/alias", to: "/a")
+			#expect(alias.path == "/b/alias")
+		#endif
+	}
+
+	// createDir creates intermediate dirs (inherited from FilesystemInterface.createDir);
+	// the remaining create* functions require the parent directory to already exist.
+	@Test(arguments: FSKind.allCases)
+	func dirDescendantCreateFunctionsDontCreateIntermediateDirs(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+		let root = try fs.rootDir
+
+		#expect(throws: Never.self) { try root.createDir(at: "parent/child") }
+
+		#expect(throws: NoSuchNode(path: "/nonexistent")) {
+			try root.createFile(at: "nonexistent/x")
+		}
+		#expect(throws: NoSuchNode(path: "/nonexistent")) {
+			try root.createSymlink(at: "nonexistent/x", to: "/elsewhere")
+		}
+		#if FINDER_ALIASES_ENABLED
+			#expect(throws: NoSuchNode(path: "/nonexistent")) {
+				try root.createFinderAlias(at: "nonexistent/x", to: "/elsewhere")
+			}
+		#endif
+	}
+
+	@Test(arguments: FSKind.allCases)
 	func ensureInDir(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
