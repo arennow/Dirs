@@ -130,6 +130,14 @@ public struct XAttrInvalidUTF8: Error {
 
 struct XAttrNotFound: Error {}
 
+public struct PermissionDenied: Error, Equatable {
+	public let path: FilePath
+
+	package init(path ifp: some IntoFilePath) {
+		self.path = ifp.into()
+	}
+}
+
 public struct CircularResolvableChain: Error {
 	public let startPath: FilePath
 

@@ -355,7 +355,14 @@ public struct RealFSInterface: FilesystemInterface {
 		if let existingType = self.nodeType(at: resolvedFP) {
 			throw NodeAlreadyExists(path: fp, type: existingType)
 		}
-		try perform(resolvedFP)
+		do {
+			try self.mapBasicCocoaErrorsToDirsErrors {
+				try perform(resolvedFP)
+			}
+		} catch is PermissionDenied {
+			// Foundation reports the child path, not the non-writable parent dir
+			throw PermissionDenied(path: fp.removingLastComponent())
+		}
 		return try factory(self.asInterface, self.resolveToProjected(fp))
 	}
 
@@ -394,7 +401,13 @@ public struct RealFSInterface: FilesystemInterface {
 			throw WrongNodeType(path: fp, actualType: nodeType)
 		}
 
-		let fd = try FileDescriptor.open(self.resolveToRaw(resolvedFP), .writeOnly, retryOnInterrupt: true)
+		let rawPath: FilePath = self.resolveToRaw(resolvedFP)
+		let fd: FileDescriptor
+		do {
+			fd = try FileDescriptor.open(rawPath, .writeOnly, retryOnInterrupt: true)
+		} catch let errno as Errno where errno == .permissionDenied {
+			throw PermissionDenied(path: fp)
+		}
 		defer { try? fd.close() }
 		let data = contents.into()
 		try fd.writeAll(data)
@@ -410,7 +423,13 @@ public struct RealFSInterface: FilesystemInterface {
 			throw WrongNodeType(path: fp, actualType: nodeType)
 		}
 
-		let fd = try FileDescriptor.open(self.resolveToRaw(resolvedFP), .writeOnly, options: .append, retryOnInterrupt: true)
+		let rawPath: FilePath = self.resolveToRaw(resolvedFP)
+		let fd: FileDescriptor
+		do {
+			fd = try FileDescriptor.open(rawPath, .writeOnly, options: .append, retryOnInterrupt: true)
+		} catch let errno as Errno where errno == .permissionDenied {
+			throw PermissionDenied(path: fp)
+		}
 		defer { try? fd.close() }
 		try fd.writeAll(addendum.into())
 	}
@@ -445,8 +464,13 @@ public struct RealFSInterface: FilesystemInterface {
 				break
 		}
 
-		try mapBasicCocoaErrorsToDirsErrors {
-			try fm.copyItem(at: srcURL, to: destURL)
+		do {
+			try mapBasicCocoaErrorsToDirsErrors {
+				try fm.copyItem(at: srcURL, to: destURL)
+			}
+		} catch is PermissionDenied {
+			// Foundation reports the source path, not the non-writable dest parent dir
+			throw PermissionDenied(path: self.resolveToProjected(destURL.deletingLastPathComponent()))
 		}
 
 		#if XATTRS_ENABLED && os(Linux)
@@ -470,6 +494,9 @@ public struct RealFSInterface: FilesystemInterface {
 			try self.mapBasicCocoaErrorsToDirsErrors {
 				try FileManager.default.removeItem(at: self.resolveToRaw(resolvedFP))
 			}
+		} catch is PermissionDenied {
+			// Foundation reports the child path, not the non-writable parent dir
+			throw PermissionDenied(path: fp.removingLastComponent())
 		} catch let noSuchNode as NoSuchNode {
 			if noSuchNode.path == resolvedFP {
 				throw NoSuchNode(path: fp)
@@ -517,8 +544,19 @@ public struct RealFSInterface: FilesystemInterface {
 			}
 		}
 
-		try self.mapBasicCocoaErrorsToDirsErrors {
-			try fm.moveItem(at: srcURL, to: destURL)
+		do {
+			try self.mapBasicCocoaErrorsToDirsErrors {
+				try fm.moveItem(at: srcURL, to: destURL)
+			}
+		} catch is PermissionDenied {
+			// Foundation always reports the source path regardless of which
+			// parent dir was readonly, so we check both to find the right one
+			let destParent = destURL.deletingLastPathComponent()
+			if !fm.isWritableFile(atPath: destParent.path) {
+				throw PermissionDenied(path: self.resolveToProjected(destParent))
+			}
+			let srcParent = srcURL.deletingLastPathComponent()
+			throw PermissionDenied(path: self.resolveToProjected(srcParent))
 		}
 		return self.resolveToProjected(destURL)
 	}
@@ -660,6 +698,55 @@ public extension RealFSInterface {
 	}
 }
 
+package extension RealFSInterface {
+	func setWritableForTesting(at ifp: some IntoFilePath, writable: Bool) throws -> () -> Void {
+		let rawPath: FilePath = self.resolveToRaw(ifp)
+		let pathString = rawPath.string
+
+		#if os(Windows)
+			let attrs = pathString.withCString(encodedAs: UTF16.self) { GetFileAttributesW($0) }
+			guard attrs != INVALID_FILE_ATTRIBUTES else {
+				throw NoSuchNode(path: ifp)
+			}
+
+			let newAttrs: DWORD
+			if writable {
+				newAttrs = attrs & ~DWORD(FILE_ATTRIBUTE_READONLY)
+			} else {
+				newAttrs = attrs | DWORD(FILE_ATTRIBUTE_READONLY)
+			}
+			let setResult = pathString.withCString(encodedAs: UTF16.self) { SetFileAttributesW($0, newAttrs) }
+			guard setResult else {
+				throw NoSuchNode(path: ifp)
+			}
+
+			return {
+				pathString.withCString(encodedAs: UTF16.self) { _ = SetFileAttributesW($0, attrs) }
+			}
+		#else
+			var st = stat()
+			guard stat(pathString, &st) == 0 else {
+				throw NoSuchNode(path: ifp)
+			}
+			let originalMode = st.st_mode
+
+			let newMode: mode_t
+			if writable {
+				newMode = originalMode | 0o200
+			} else {
+				newMode = originalMode & ~0o222
+			}
+			guard chmod(pathString, newMode) == 0 else {
+				throw NoSuchNode(path: ifp)
+			}
+
+			return {
+				_ = chmod(pathString, originalMode)
+			}
+		#endif
+	}
+}
+
 private extension RealFSInterface {
 	func resolveToProjected(_ ifp: some IntoFilePath) -> FilePath {
 		var fp = ifp.into()
@@ -746,8 +833,31 @@ private extension RealFSInterface {
 				}
 			}
 
+			if self.isPermissionDeniedError(error) {
+				if let rawStringPath = error.userInfo[NSFilePathErrorKey] as? String {
+					throw PermissionDenied(path: self.resolveToProjected(rawStringPath))
+				}
+				throw error
+			}
+
 			throw error
 		}
+	}
+
+	func isPermissionDeniedError(_ error: any Error) -> Bool {
+		if error.matchesAny(.cocoa(.fileWriteNoPermission), .posix(.EACCES)) {
+			return true
+		}
+		if error.matches(outer: .cocoa(.fileWriteUnknown), underlying: .posix(.EACCES)) {
+			return true
+		}
+		if error.matches(outer: .cocoa(.fileWriteNoPermission), underlying: .posix(.EACCES)) {
+			return true
+		}
+		if error.matches(outer: .cocoa(.fileReadNoPermission), underlying: .posix(.EACCES)) {
+			return true
+		}
+		return false
 	}
 
 	func firstNonDirAncestor(of fp: FilePath) throws -> Optional<any Node> {
@@ -952,6 +1062,8 @@ private extension RealFSInterface {
 				return XAttrNoSpace(attributeName: requiredAttributeName, path: path)
 		case EPERM:
 				return XAttrNotAllowed(path: path)
+		case EACCES:
+				return PermissionDenied(path: path)
 		default:
 				return NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
 		}

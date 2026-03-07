@@ -36,6 +36,7 @@ This project is cross-platform, and is well tested on macOS and Ubuntu Linux. It
 - For some changes, I'll tell you that you should also be testing on a local Ubuntu Linux virtual machine after each change, and to do that, run `just test_linux` (which is equivalent to running `swift test -q` on the VM via ssh). Likewise, I'll sometimes tell you that a local Windows virtual machine is available, and it can be used to test the code by running `just test_windows` (which is also equivalent to running `swift test -q` on that Windows VM).
 	- Only do this during sessions when I've told you to, otherwise the VM won't be available
 - Don't use string names for tests (`@Test("", …`); just name the functions clearly
+- When testing for error cases, strongly prefer to assert error instance equality over just asserting on the error type. This is specifically useful because it lets us assert the path that the error reports
 
 ## Release notes
 - When asked to generate notes for a new release, you should:

@@ -183,15 +183,6 @@ public extension FilesystemInterface {
 	}
 }
 
-public extension FilesystemInterface {
-	func appendContentsOfFile(at ifp: some IntoFilePath, with addendum: some IntoData) throws {
-		let fp = ifp.into()
-		var content = (try? self.contentsOf(file: fp)) ?? Data()
-		content.append(addendum.into())
-		try self.replaceContentsOfFile(at: fp, to: content)
-	}
-}
-
 extension FilePath {
 	var pathAndLeaf: (FilePath, FilePath.Component)? {
 		guard self.components.count > 0 else { return nil }

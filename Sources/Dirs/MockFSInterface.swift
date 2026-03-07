@@ -7,6 +7,7 @@ public final class MockFSInterface: FilesystemInterface {
 		struct Metadata: Equatable {
 			var xattrs: Dictionary<String, Data> = [:]
 			var dates: Dictionary<NodeDateType, Date> = [:]
+			var writable: Bool = true
 		}
 
 		case dir(metadata: Metadata = Metadata())
@@ -111,6 +112,48 @@ public final class MockFSInterface: FilesystemInterface {
 					#if FINDER_ALIASES_ENABLED
 						case .finderAlias(let destination, var metadata):
 							metadata.dates = newValue
+							self = .finderAlias(destination: destination, metadata: metadata)
+					#endif
+				}
+			}
+		}
+
+		var writable: Bool {
+			get {
+				switch self {
+					case .dir(let metadata),
+						 .file(_, let metadata),
+						 .symlink(_, let metadata):
+						return metadata.writable
+					#if SPECIALS_ENABLED
+						case .special(let metadata):
+							return metadata.writable
+					#endif
+					#if FINDER_ALIASES_ENABLED
+						case .finderAlias(_, let metadata):
+							return metadata.writable
+					#endif
+				}
+			}
+			set {
+				switch self {
+					case .dir(var metadata):
+						metadata.writable = newValue
+						self = .dir(metadata: metadata)
+					case .file(let data, var metadata):
+						metadata.writable = newValue
+						self = .file(data: data, metadata: metadata)
+					case .symlink(let destination, var metadata):
+						metadata.writable = newValue
+						self = .symlink(destination: destination, metadata: metadata)
+					#if SPECIALS_ENABLED
+						case .special(var metadata):
+							metadata.writable = newValue
+							self = .special(metadata: metadata)
+					#endif
+					#if FINDER_ALIASES_ENABLED
+						case .finderAlias(let destination, var metadata):
+							metadata.writable = newValue
 							self = .finderAlias(destination: destination, metadata: metadata)
 					#endif
 				}
@@ -452,6 +495,7 @@ public final class MockFSInterface: FilesystemInterface {
 								throw WrongNodeType(path: cumulativeFP, actualType: .symlink)
 						}
 					case .none:
+						try Self.throwIfParentNotWritable(of: resolvedDirFP, in: ptn, reportParentOf: cumulativeFP)
 						let now = Date()
 						var metadata = MockNode.Metadata()
 						metadata.dates[.creation] = now
@@ -474,9 +518,12 @@ public final class MockFSInterface: FilesystemInterface {
 		try self.pathsToNodes.mutate { ptn in
 			let resolvedFP = try Self.resolveAncestorSymlinks(of: fp, in: ptn)
 			let resolvedParentFP = resolvedFP.removingLastComponent()
-			guard Self.nodeType(at: resolvedParentFP, in: ptn, symRes: .dontResolve) == .dir else {
+			guard let parentNode = Self.node(at: resolvedParentFP, in: ptn, symRes: .dontResolve),
+				  parentNode.nodeType == .dir
+			else {
 				throw NoSuchNode(path: resolvedParentFP)
 			}
+			try Self.throwIfNotWritable(parentNode, at: fp.removingLastComponent())
 
 			if let existing = ptn[resolvedFP] {
 				throw NodeAlreadyExists(path: fp, type: existing.nodeType)
@@ -569,6 +616,9 @@ public final class MockFSInterface: FilesystemInterface {
 
 			switch ptn[resolvedFP] {
 				case .file(_, var metadata):
+					if !metadata.writable {
+						throw PermissionDenied(path: fp)
+					}
 					metadata.dates[.modification] = Date()
 					ptn[resolvedFP] = .file(data: contents.into(), metadata: metadata)
 				case .none:
@@ -577,6 +627,13 @@ public final class MockFSInterface: FilesystemInterface {
 					throw WrongNodeType(path: fp, actualType: x.nodeType)
 			}
 		}
+	}
+
+	public func appendContentsOfFile(at ifp: some IntoFilePath, with addendum: some IntoData) throws {
+		let fp = ifp.into()
+		var content = (try? self.contentsOf(file: fp)) ?? Data()
+		content.append(addendum.into())
+		try self.replaceContentsOfFile(at: fp, to: content)
 	}
 
 	public func copyNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws {
@@ -591,8 +648,9 @@ public final class MockFSInterface: FilesystemInterface {
 						  to destination: some IntoFilePath,
 						  using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws -> FilePath
 	{
+		let userDestFP = destination.into()
 		let srcFP = try Self.resolveAncestorSymlinks(of: source, in: acquisitionLock.resource)
-		let destFP = try Self.resolveAncestorSymlinks(of: destination, in: acquisitionLock.resource)
+		let destFP = try Self.resolveAncestorSymlinks(of: userDestFP, in: acquisitionLock.resource)
 
 		// This is usually just `destFP`, but if `destFP` is a dir, then we
 		// rehome into it, and this will be `destFP`+`srcFP.final`
@@ -600,6 +658,22 @@ public final class MockFSInterface: FilesystemInterface {
 
 		let srcType = Self.nodeType(at: srcFP, in: acquisitionLock.resource, symRes: .dontResolve)
 		let destType = Self.nodeType(at: destFP, in: acquisitionLock.resource, symRes: .dontResolve)
+
+		let effectiveDestDir: MockNode? = switch destType {
+			case .dir:
+				acquisitionLock.resource[destFP]
+			case .symlink:
+				(try? Self.realpath(of: destFP, in: acquisitionLock.resource))
+					.flatMap { acquisitionLock.resource[$0] }
+					.flatMap { $0.nodeType == .dir ? $0 : nil }
+			default:
+				nil
+		}
+		if let effectiveDestDir {
+			try Self.throwIfNotWritable(effectiveDestDir, at: userDestFP)
+		} else {
+			try Self.throwIfParentNotWritable(of: destFP, in: acquisitionLock.resource, reportParentOf: userDestFP)
+		}
 
 		func resolveDestFPSymlink() throws -> (fp: FilePath, type: NodeType?) {
 			let destSymlinkDestFP = try self.destinationOf(symlink: destFP, using: acquisitionLock)
@@ -696,6 +770,8 @@ public final class MockFSInterface: FilesystemInterface {
 		let fp = ifp.into()
 		let resolvedFP = try Self.resolveAncestorSymlinks(of: fp, in: acquisitionLock.resource)
 
+		try Self.throwIfParentNotWritable(of: resolvedFP, in: acquisitionLock.resource, reportParentOf: fp)
+
 		let keysToDelete = acquisitionLock.resource.keys
 			.filter { $0.starts(with: resolvedFP) }
 
@@ -768,6 +844,7 @@ public final class MockFSInterface: FilesystemInterface {
 
 			try self.pathsToNodes.mutate { ptn in
 				var (node, resolvedFP) = try Self.existingAncestorResolvedNode(at: fp, in: ptn)
+				try Self.throwIfNotWritable(node, at: fp)
 
 				#if os(Linux)
 					// Linux kernel VFS prohibits user-namespaced xattrs on symlinks
@@ -791,9 +868,43 @@ public final class MockFSInterface: FilesystemInterface {
 			let fp = ifp.into()
 			try self.pathsToNodes.mutate { ptn in
 				var (node, resolvedFP) = try Self.existingAncestorResolvedNode(at: fp, in: ptn)
+				try Self.throwIfNotWritable(node, at: fp)
 				node.xattrs.removeValue(forKey: name)
 				ptn[resolvedFP] = node
 			}
 		}
 	#endif
+
+	public func setWritableForTesting(at ifp: some IntoFilePath, writable: Bool) throws {
+		let fp = ifp.into()
+		try self.pathsToNodes.mutate { ptn in
+			let resolvedFP = try Self.resolveAncestorSymlinks(of: fp, in: ptn)
+			guard var node = ptn[resolvedFP] else {
+				throw NoSuchNode(path: fp)
+			}
+			node.writable = writable
+			ptn[resolvedFP] = node
+		}
+	}
+
+	private static func throwIfNotWritable(_ node: MockNode, at path: FilePath) throws {
+		#if os(Windows)
+			guard node.nodeType != .dir else { return }
+		#endif
+		if !node.writable {
+			throw PermissionDenied(path: path)
+		}
+	}
+
+	private static func throwIfParentNotWritable(of fp: FilePath, in ptn: PTN, reportParentOf userFP: FilePath? = nil) throws {
+		#if !os(Windows)
+			let parentFP = fp.removingLastComponent()
+			let resolvedParentFP = try Self.realpath(of: parentFP, in: ptn)
+			if let parentNode = ptn[resolvedParentFP] {
+				if !parentNode.writable {
+					throw PermissionDenied(path: (userFP ?? fp).removingLastComponent())
+				}
+			}
+		#endif
+	}
 }
