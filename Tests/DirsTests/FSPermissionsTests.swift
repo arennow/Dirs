@@ -166,6 +166,103 @@ extension FSTests {
 			}
 		}
 
+		// MARK: - Writable dir containing non-writable nodes
+
+		@Test(arguments: FSKind.allCases)
+		func deleteAndMoveWritableDirWithNonWritableFile(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+
+			try fs.createDir(at: "/d")
+			try fs.createFile(at: "/d/f")
+			_ = try self.makeNonWritable(at: "/d/f", in: fs)
+
+			#expect(throws: Never.self) {
+				try fs.moveNode(from: "/d", to: "/moved")
+			}
+
+			// Restore writability at the moved location for the delete test + cleanup
+			let restore = try makeNonWritable(at: "/moved/f", in: fs)
+			restore()
+
+			#expect(throws: Never.self) {
+				try fs.deleteNode(at: "/moved")
+			}
+			#expect(fs.nodeType(at: "/moved") == nil)
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func deleteWritableDirWithNonWritableSubdirContainingChildren(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+
+			try fs.createDir(at: "/d")
+			try fs.createDir(at: "/d/sub")
+			try fs.createFile(at: "/d/sub/f")
+			let restore = try makeNonWritable(at: "/d/sub", in: fs)
+			defer { restore() }
+
+			#expect(throws: PermissionDenied(path: "/d/sub")) {
+				try fs.deleteNode(at: "/d")
+			}
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func deleteWritableDirPartiallyDeletesSiblings(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+
+			try fs.createDir(at: "/d")
+			try fs.createDir(at: "/d/sub")
+			try fs.createFile(at: "/d/sub/f")
+			try fs.createDir(at: "/d/a")
+			try fs.createFile(at: "/d/a/file")
+			let restore = try makeNonWritable(at: "/d/sub", in: fs)
+			defer { restore() }
+
+			#expect(throws: PermissionDenied(path: "/d/sub")) {
+				try fs.deleteNode(at: "/d")
+			}
+
+			// /d and /d/sub survive, but the writable sibling /d/a may have
+			// been partially deleted (real FS deletes depth-first, so order
+			// is nondeterministic). We only assert the non-writable subtree
+			// survived intact.
+			#expect(fs.nodeType(at: "/d") == .dir)
+			#expect(fs.nodeType(at: "/d/sub") == .dir)
+			#expect(fs.nodeType(at: "/d/sub/f") == .file)
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func moveWritableDirWithNonWritableSubdirContainingChildren(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+
+			try fs.createDir(at: "/d")
+			try fs.createDir(at: "/d/sub")
+			try fs.createFile(at: "/d/sub/f")
+			_ = try self.makeNonWritable(at: "/d/sub", in: fs)
+
+			#expect(throws: Never.self) {
+				try fs.moveNode(from: "/d", to: "/moved")
+			}
+			#expect(fs.nodeType(at: "/d") == nil)
+
+			// Restore writability at the moved location so real FS cleanup can remove it
+			let restore = try makeNonWritable(at: "/moved/sub", in: fs)
+			restore()
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func deleteWritableDirWithEmptyNonWritableSubdir(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+
+			try fs.createDir(at: "/d")
+			try fs.createDir(at: "/d/sub")
+			_ = try self.makeNonWritable(at: "/d/sub", in: fs)
+
+			#expect(throws: Never.self) {
+				try fs.deleteNode(at: "/d")
+			}
+			#expect(fs.nodeType(at: "/d") == nil)
+		}
+
 	#endif
 
 	// MARK: - Non-writable file through symlink

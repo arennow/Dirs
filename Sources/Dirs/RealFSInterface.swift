@@ -495,8 +495,23 @@ public struct RealFSInterface: FilesystemInterface {
 				try FileManager.default.removeItem(at: self.resolveToRaw(resolvedFP))
 			}
 		} catch is PermissionDenied {
-			// Foundation reports the child path, not the non-writable parent dir
-			throw PermissionDenied(path: fp.removingLastComponent())
+			let fm = FileManager.default
+			let parentRaw = self.resolveToRaw(fp.removingLastComponent())
+			if !fm.isWritableFile(atPath: parentRaw.string) {
+				throw PermissionDenied(path: fp.removingLastComponent())
+			}
+			// Find the actual non-writable descendant dir
+			let rawFP: FilePath = self.resolveToRaw(resolvedFP)
+			if let enumerator = fm.enumerator(atPath: rawFP.string) {
+				while let item = enumerator.nextObject() as? String {
+					let itemRawPath = rawFP.appending(item)
+					if !fm.isWritableFile(atPath: itemRawPath.string) {
+						let itemProjected = fp.appending(item)
+						throw PermissionDenied(path: itemProjected)
+					}
+				}
+			}
+			throw PermissionDenied(path: fp)
 		} catch let noSuchNode as NoSuchNode {
 			if noSuchNode.path == resolvedFP {
 				throw NoSuchNode(path: fp)

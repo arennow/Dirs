@@ -761,10 +761,11 @@ public final class MockFSInterface: FilesystemInterface {
 
 	public func deleteNode(at ifp: some IntoFilePath) throws {
 		let acquisitionLock = self.pathsToNodes.acquireIntoHandle()
-		try self.deleteNode(at: ifp, using: acquisitionLock)
+		try self.deleteNode(at: ifp, checkDescendantWritability: true, using: acquisitionLock)
 	}
 
 	private func deleteNode(at ifp: some IntoFilePath,
+							checkDescendantWritability: Bool,
 							using acquisitionLock: borrowing Locked<PTN>.AcquisitionHandle) throws
 	{
 		let fp = ifp.into()
@@ -779,7 +780,26 @@ public final class MockFSInterface: FilesystemInterface {
 			throw NoSuchNode(path: fp)
 		}
 
-		for key in keysToDelete {
+		// Iterate deepest-first, matching the real FS's depth-first recursive
+		// deletion. This means siblings that were already deleted before hitting
+		// a non-writable dir stay deleted (partial deletion, as on real FS).
+		for key in keysToDelete.sorted(by: { $0.components.count > $1.components.count }) {
+			#if !os(Windows)
+				if checkDescendantWritability {
+					let parentKey = key.removingLastComponent()
+					if parentKey != resolvedFP.removingLastComponent(),
+					   let parentNode = acquisitionLock.resource[parentKey],
+					   !parentNode.writable
+					{
+						let suffix = parentKey.components.dropFirst(resolvedFP.components.count)
+						var reportPath = fp
+						for component in suffix {
+							reportPath.append(component)
+						}
+						throw PermissionDenied(path: reportPath)
+					}
+				}
+			#endif
 			acquisitionLock.resource[key] = nil
 		}
 	}
@@ -794,7 +814,9 @@ public final class MockFSInterface: FilesystemInterface {
 			// If copy resolved to the same path as the source, the node is already
 			// in place — skip the delete so the contents are not lost.
 			if finalDestFP != source.into() {
-				try self.deleteNode(at: source, using: acquisitionLock)
+				try self.deleteNode(at: source,
+									checkDescendantWritability: false, // Moving read-only nodes is allowed, so we don't need to check
+									using: acquisitionLock)
 			}
 			return finalDestFP
 		} catch {
