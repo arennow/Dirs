@@ -495,17 +495,16 @@ public struct RealFSInterface: FilesystemInterface {
 				try FileManager.default.removeItem(at: self.resolveToRaw(resolvedFP))
 			}
 		} catch is PermissionDenied {
-			let fm = FileManager.default
-			let parentRaw = self.resolveToRaw(fp.removingLastComponent())
-			if !fm.isWritableFile(atPath: parentRaw.string) {
+			let parentRaw: FilePath = self.resolveToRaw(fp.removingLastComponent())
+			if !Self.isWritablePath(parentRaw.string) {
 				throw PermissionDenied(path: fp.removingLastComponent())
 			}
 			// Find the actual non-writable descendant dir
 			let rawFP: FilePath = self.resolveToRaw(resolvedFP)
-			if let enumerator = fm.enumerator(atPath: rawFP.string) {
+			if let enumerator = FileManager.default.enumerator(atPath: rawFP.string) {
 				while let item = enumerator.nextObject() as? String {
 					let itemRawPath = rawFP.appending(item)
-					if !fm.isWritableFile(atPath: itemRawPath.string) {
+					if !Self.isWritablePath(itemRawPath.string) {
 						let itemProjected = fp.appending(item)
 						throw PermissionDenied(path: itemProjected)
 					}
@@ -567,7 +566,7 @@ public struct RealFSInterface: FilesystemInterface {
 			// Foundation always reports the source path regardless of which
 			// parent dir was readonly, so we check both to find the right one
 			let destParent = destURL.deletingLastPathComponent()
-			if !fm.isWritableFile(atPath: destParent.path) {
+			if !Self.isWritablePath(destParent.path) {
 				throw PermissionDenied(path: self.resolveToProjected(destParent))
 			}
 			let srcParent = srcURL.deletingLastPathComponent()
@@ -715,33 +714,16 @@ public extension RealFSInterface {
 
 package extension RealFSInterface {
 	func setWritableForTesting(at ifp: some IntoFilePath, writable: Bool) throws -> () -> Void {
-		let rawPath: FilePath = self.resolveToRaw(ifp)
+		let fp = ifp.into()
+		let rawPath: FilePath = self.resolveToRaw(fp)
 		let pathString = rawPath.string
 
 		#if os(Windows)
-			let attrs = pathString.withCString(encodedAs: UTF16.self) { GetFileAttributesW($0) }
-			guard attrs != INVALID_FILE_ATTRIBUTES else {
-				throw NoSuchNode(path: ifp)
-			}
-
-			let newAttrs: DWORD
-			if writable {
-				newAttrs = attrs & ~DWORD(FILE_ATTRIBUTE_READONLY)
-			} else {
-				newAttrs = attrs | DWORD(FILE_ATTRIBUTE_READONLY)
-			}
-			let setResult = pathString.withCString(encodedAs: UTF16.self) { SetFileAttributesW($0, newAttrs) }
-			guard setResult else {
-				throw NoSuchNode(path: ifp)
-			}
-
-			return {
-				pathString.withCString(encodedAs: UTF16.self) { _ = SetFileAttributesW($0, attrs) }
-			}
+			return try Self.windowsSetWritable(pathString: pathString, writable: writable, originalPath: fp)
 		#else
 			var st = stat()
 			guard stat(pathString, &st) == 0 else {
-				throw NoSuchNode(path: ifp)
+				throw NoSuchNode(path: fp)
 			}
 			let originalMode = st.st_mode
 
@@ -752,7 +734,7 @@ package extension RealFSInterface {
 				newMode = originalMode & ~0o222
 			}
 			guard chmod(pathString, newMode) == 0 else {
-				throw NoSuchNode(path: ifp)
+				throw NoSuchNode(path: fp)
 			}
 
 			return {
@@ -858,6 +840,13 @@ private extension RealFSInterface {
 			throw error
 		}
 	}
+
+	#if !os(Windows)
+		// The Windows implementation is crazy and is in RealFSInterface+WindowsReadonly.swift
+		static func isWritablePath(_ path: String) -> Bool {
+			FileManager.default.isWritableFile(atPath: path)
+		}
+	#endif
 
 	func isPermissionDeniedError(_ error: any Error) -> Bool {
 		if error.matchesAny(.cocoa(.fileWriteNoPermission), .posix(.EACCES)) {

@@ -784,22 +784,20 @@ public final class MockFSInterface: FilesystemInterface {
 		// deletion. This means siblings that were already deleted before hitting
 		// a non-writable dir stay deleted (partial deletion, as on real FS).
 		for key in keysToDelete.sorted(by: { $0.components.count > $1.components.count }) {
-			#if !os(Windows)
-				if checkDescendantWritability {
-					let parentKey = key.removingLastComponent()
-					if parentKey != resolvedFP.removingLastComponent(),
-					   let parentNode = acquisitionLock.resource[parentKey],
-					   !parentNode.writable
-					{
-						let suffix = parentKey.components.dropFirst(resolvedFP.components.count)
-						var reportPath = fp
-						for component in suffix {
-							reportPath.append(component)
-						}
-						throw PermissionDenied(path: reportPath)
+			if checkDescendantWritability {
+				let parentKey = key.removingLastComponent()
+				if parentKey != resolvedFP.removingLastComponent(),
+				   let parentNode = acquisitionLock.resource[parentKey],
+				   !parentNode.writable
+				{
+					let suffix = parentKey.components.dropFirst(resolvedFP.components.count)
+					var reportPath = fp
+					for component in suffix {
+						reportPath.append(component)
 					}
+					throw PermissionDenied(path: reportPath)
 				}
-			#endif
+			}
 			acquisitionLock.resource[key] = nil
 		}
 	}
@@ -910,23 +908,18 @@ public final class MockFSInterface: FilesystemInterface {
 	}
 
 	private static func throwIfNotWritable(_ node: MockNode, at path: FilePath) throws {
-		#if os(Windows)
-			guard node.nodeType != .dir else { return }
-		#endif
 		if !node.writable {
 			throw PermissionDenied(path: path)
 		}
 	}
 
 	private static func throwIfParentNotWritable(of fp: FilePath, in ptn: PTN, reportParentOf userFP: FilePath? = nil) throws {
-		#if !os(Windows)
-			let parentFP = fp.removingLastComponent()
-			let resolvedParentFP = try Self.realpath(of: parentFP, in: ptn)
-			if let parentNode = ptn[resolvedParentFP] {
-				if !parentNode.writable {
-					throw PermissionDenied(path: (userFP ?? fp).removingLastComponent())
-				}
+		let parentFP = fp.removingLastComponent()
+		let resolvedParentFP = try Self.realpath(of: parentFP, in: ptn)
+		if let parentNode = ptn[resolvedParentFP] {
+			if !parentNode.writable {
+				throw PermissionDenied(path: (userFP ?? fp).removingLastComponent())
 			}
-		#endif
+		}
 	}
 }

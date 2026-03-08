@@ -72,198 +72,195 @@ extension FSTests {
 
 	// MARK: - Non-writable directory
 
-	#if !os(Windows)
-		@Test(arguments: FSKind.allCases)
-		func createInNonWritableDirFails(fsKind: FSKind) throws {
-			let fs = self.fs(for: fsKind)
+	@Test(arguments: FSKind.allCases)
+	func createInNonWritableDirFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-			try fs.createDir(at: "/d")
-			let restore = try makeNonWritable(at: "/d", in: fs)
-			defer { restore() }
+		try fs.createDir(at: "/d")
+		let restore = try makeNonWritable(at: "/d", in: fs)
+		defer { restore() }
 
-			#expect(throws: PermissionDenied(path: "/d")) {
-				try fs.createFile(at: "/d/child")
-			}
-			#expect(throws: PermissionDenied(path: "/d")) {
-				try fs.createDir(at: "/d/child")
-			}
-			#expect(throws: PermissionDenied(path: "/d")) {
-				try fs.createSymlink(at: "/d/link", to: "/somewhere")
-			}
+		#expect(throws: PermissionDenied(path: "/d")) {
+			try fs.createFile(at: "/d/child")
+		}
+		#expect(throws: PermissionDenied(path: "/d")) {
+			try fs.createDir(at: "/d/child")
+		}
+		#expect(throws: PermissionDenied(path: "/d")) {
+			try fs.createSymlink(at: "/d/link", to: "/somewhere")
+		}
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func mutateNonWritableDirFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/d")
+		try fs.createFile(at: "/d/f")
+		try fs.createFile(at: "/src")
+		let restore = try makeNonWritable(at: "/d", in: fs)
+		defer { restore() }
+
+		#expect(throws: PermissionDenied(path: "/d")) {
+			try fs.deleteNode(at: "/d/f")
+		}
+		#expect(throws: PermissionDenied(path: "/d")) {
+			try fs.copyNode(from: "/src", to: "/d")
+		}
+		#expect(throws: PermissionDenied(path: "/d")) {
+			try fs.moveNode(from: "/src", to: "/d")
+		}
+		#expect(throws: PermissionDenied(path: "/d")) {
+			try fs.moveNode(from: "/d/f", to: "/elsewhere")
+		}
+		#expect(throws: PermissionDenied(path: "/d")) {
+			try fs.renameNode(at: "/d/f", to: "newname")
+		}
+	}
+
+	// MARK: - Non-writable directory through symlink
+
+	@Test(arguments: FSKind.allCases)
+	func createThroughSymlinkToNonWritableDirFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/d")
+		try fs.createSymlink(at: "/s", to: "/d")
+		let restore = try makeNonWritable(at: "/d", in: fs)
+		defer { restore() }
+
+		#expect(throws: PermissionDenied(path: "/s")) {
+			try fs.createFile(at: "/s/child")
+		}
+		#expect(throws: PermissionDenied(path: "/s")) {
+			try fs.createDir(at: "/s/child")
+		}
+		#expect(throws: PermissionDenied(path: "/s")) {
+			try fs.createSymlink(at: "/s/link", to: "/somewhere")
+		}
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func mutateThroughSymlinkToNonWritableDirFails(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/d")
+		try fs.createFile(at: "/d/f")
+		try fs.createSymlink(at: "/s", to: "/d")
+		try fs.createFile(at: "/src")
+		let restore = try makeNonWritable(at: "/d", in: fs)
+		defer { restore() }
+
+		#expect(throws: PermissionDenied(path: "/s")) {
+			try fs.deleteNode(at: "/s/f")
+		}
+		#expect(throws: PermissionDenied(path: "/s")) {
+			try fs.copyNode(from: "/src", to: "/s")
+		}
+		#expect(throws: PermissionDenied(path: "/s")) {
+			try fs.moveNode(from: "/src", to: "/s")
+		}
+		#expect(throws: PermissionDenied(path: "/s")) {
+			try fs.moveNode(from: "/s/f", to: "/elsewhere")
+		}
+	}
+
+	// MARK: - Writable dir containing non-writable nodes
+
+	@Test(arguments: FSKind.allCases)
+	func deleteAndMoveWritableDirWithNonWritableFile(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/d")
+		try fs.createFile(at: "/d/f")
+		_ = try self.makeNonWritable(at: "/d/f", in: fs)
+
+		#expect(throws: Never.self) {
+			try fs.moveNode(from: "/d", to: "/moved")
 		}
 
-		@Test(arguments: FSKind.allCases)
-		func mutateNonWritableDirFails(fsKind: FSKind) throws {
-			let fs = self.fs(for: fsKind)
+		// Restore writability at the moved location for the delete test + cleanup
+		let restore = try makeNonWritable(at: "/moved/f", in: fs)
+		restore()
 
-			try fs.createDir(at: "/d")
-			try fs.createFile(at: "/d/f")
-			try fs.createFile(at: "/src")
-			let restore = try makeNonWritable(at: "/d", in: fs)
-			defer { restore() }
+		#expect(throws: Never.self) {
+			try fs.deleteNode(at: "/moved")
+		}
+		#expect(fs.nodeType(at: "/moved") == nil)
+	}
 
-			#expect(throws: PermissionDenied(path: "/d")) {
-				try fs.deleteNode(at: "/d/f")
-			}
-			#expect(throws: PermissionDenied(path: "/d")) {
-				try fs.copyNode(from: "/src", to: "/d")
-			}
-			#expect(throws: PermissionDenied(path: "/d")) {
-				try fs.moveNode(from: "/src", to: "/d")
-			}
-			#expect(throws: PermissionDenied(path: "/d")) {
-				try fs.moveNode(from: "/d/f", to: "/elsewhere")
-			}
-			#expect(throws: PermissionDenied(path: "/d")) {
-				try fs.renameNode(at: "/d/f", to: "newname")
-			}
+	@Test(arguments: FSKind.allCases)
+	func deleteWritableDirWithNonWritableSubdirContainingChildren(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/d")
+		try fs.createDir(at: "/d/sub")
+		try fs.createFile(at: "/d/sub/f")
+		let restore = try makeNonWritable(at: "/d/sub", in: fs)
+		defer { restore() }
+
+		#expect(throws: PermissionDenied(path: "/d/sub")) {
+			try fs.deleteNode(at: "/d")
+		}
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func deleteWritableDirPartiallyDeletesSiblings(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		try fs.createDir(at: "/d")
+		try fs.createDir(at: "/d/sub")
+		try fs.createFile(at: "/d/sub/f")
+		try fs.createDir(at: "/d/a")
+		try fs.createFile(at: "/d/a/file")
+		let restore = try makeNonWritable(at: "/d/sub", in: fs)
+		defer { restore() }
+
+		#expect(throws: PermissionDenied(path: "/d/sub")) {
+			try fs.deleteNode(at: "/d")
 		}
 
-		// MARK: - Non-writable directory through symlink
+		// /d and /d/sub survive, but the writable sibling /d/a may have
+		// been partially deleted (real FS deletes depth-first, so order
+		// is nondeterministic). We only assert the non-writable subtree
+		// survived intact.
+		#expect(fs.nodeType(at: "/d") == .dir)
+		#expect(fs.nodeType(at: "/d/sub") == .dir)
+		#expect(fs.nodeType(at: "/d/sub/f") == .file)
+	}
 
-		@Test(arguments: FSKind.allCases)
-		func createThroughSymlinkToNonWritableDirFails(fsKind: FSKind) throws {
-			let fs = self.fs(for: fsKind)
+	@Test(arguments: FSKind.allCases)
+	func moveWritableDirWithNonWritableSubdirContainingChildren(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-			try fs.createDir(at: "/d")
-			try fs.createSymlink(at: "/s", to: "/d")
-			let restore = try makeNonWritable(at: "/d", in: fs)
-			defer { restore() }
+		try fs.createDir(at: "/d")
+		try fs.createDir(at: "/d/sub")
+		try fs.createFile(at: "/d/sub/f")
+		_ = try self.makeNonWritable(at: "/d/sub", in: fs)
 
-			#expect(throws: PermissionDenied(path: "/s")) {
-				try fs.createFile(at: "/s/child")
-			}
-			#expect(throws: PermissionDenied(path: "/s")) {
-				try fs.createDir(at: "/s/child")
-			}
-			#expect(throws: PermissionDenied(path: "/s")) {
-				try fs.createSymlink(at: "/s/link", to: "/somewhere")
-			}
+		#expect(throws: Never.self) {
+			try fs.moveNode(from: "/d", to: "/moved")
 		}
+		#expect(fs.nodeType(at: "/d") == nil)
 
-		@Test(arguments: FSKind.allCases)
-		func mutateThroughSymlinkToNonWritableDirFails(fsKind: FSKind) throws {
-			let fs = self.fs(for: fsKind)
+		// Restore writability at the moved location so real FS cleanup can remove it
+		let restore = try makeNonWritable(at: "/moved/sub", in: fs)
+		restore()
+	}
 
-			try fs.createDir(at: "/d")
-			try fs.createFile(at: "/d/f")
-			try fs.createSymlink(at: "/s", to: "/d")
-			try fs.createFile(at: "/src")
-			let restore = try makeNonWritable(at: "/d", in: fs)
-			defer { restore() }
+	@Test(arguments: FSKind.allCases)
+	func deleteWritableDirWithEmptyNonWritableSubdir(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
 
-			#expect(throws: PermissionDenied(path: "/s")) {
-				try fs.deleteNode(at: "/s/f")
-			}
-			#expect(throws: PermissionDenied(path: "/s")) {
-				try fs.copyNode(from: "/src", to: "/s")
-			}
-			#expect(throws: PermissionDenied(path: "/s")) {
-				try fs.moveNode(from: "/src", to: "/s")
-			}
-			#expect(throws: PermissionDenied(path: "/s")) {
-				try fs.moveNode(from: "/s/f", to: "/elsewhere")
-			}
+		try fs.createDir(at: "/d")
+		try fs.createDir(at: "/d/sub")
+		_ = try self.makeNonWritable(at: "/d/sub", in: fs)
+
+		#expect(throws: Never.self) {
+			try fs.deleteNode(at: "/d")
 		}
-
-		// MARK: - Writable dir containing non-writable nodes
-
-		@Test(arguments: FSKind.allCases)
-		func deleteAndMoveWritableDirWithNonWritableFile(fsKind: FSKind) throws {
-			let fs = self.fs(for: fsKind)
-
-			try fs.createDir(at: "/d")
-			try fs.createFile(at: "/d/f")
-			_ = try self.makeNonWritable(at: "/d/f", in: fs)
-
-			#expect(throws: Never.self) {
-				try fs.moveNode(from: "/d", to: "/moved")
-			}
-
-			// Restore writability at the moved location for the delete test + cleanup
-			let restore = try makeNonWritable(at: "/moved/f", in: fs)
-			restore()
-
-			#expect(throws: Never.self) {
-				try fs.deleteNode(at: "/moved")
-			}
-			#expect(fs.nodeType(at: "/moved") == nil)
-		}
-
-		@Test(arguments: FSKind.allCases)
-		func deleteWritableDirWithNonWritableSubdirContainingChildren(fsKind: FSKind) throws {
-			let fs = self.fs(for: fsKind)
-
-			try fs.createDir(at: "/d")
-			try fs.createDir(at: "/d/sub")
-			try fs.createFile(at: "/d/sub/f")
-			let restore = try makeNonWritable(at: "/d/sub", in: fs)
-			defer { restore() }
-
-			#expect(throws: PermissionDenied(path: "/d/sub")) {
-				try fs.deleteNode(at: "/d")
-			}
-		}
-
-		@Test(arguments: FSKind.allCases)
-		func deleteWritableDirPartiallyDeletesSiblings(fsKind: FSKind) throws {
-			let fs = self.fs(for: fsKind)
-
-			try fs.createDir(at: "/d")
-			try fs.createDir(at: "/d/sub")
-			try fs.createFile(at: "/d/sub/f")
-			try fs.createDir(at: "/d/a")
-			try fs.createFile(at: "/d/a/file")
-			let restore = try makeNonWritable(at: "/d/sub", in: fs)
-			defer { restore() }
-
-			#expect(throws: PermissionDenied(path: "/d/sub")) {
-				try fs.deleteNode(at: "/d")
-			}
-
-			// /d and /d/sub survive, but the writable sibling /d/a may have
-			// been partially deleted (real FS deletes depth-first, so order
-			// is nondeterministic). We only assert the non-writable subtree
-			// survived intact.
-			#expect(fs.nodeType(at: "/d") == .dir)
-			#expect(fs.nodeType(at: "/d/sub") == .dir)
-			#expect(fs.nodeType(at: "/d/sub/f") == .file)
-		}
-
-		@Test(arguments: FSKind.allCases)
-		func moveWritableDirWithNonWritableSubdirContainingChildren(fsKind: FSKind) throws {
-			let fs = self.fs(for: fsKind)
-
-			try fs.createDir(at: "/d")
-			try fs.createDir(at: "/d/sub")
-			try fs.createFile(at: "/d/sub/f")
-			_ = try self.makeNonWritable(at: "/d/sub", in: fs)
-
-			#expect(throws: Never.self) {
-				try fs.moveNode(from: "/d", to: "/moved")
-			}
-			#expect(fs.nodeType(at: "/d") == nil)
-
-			// Restore writability at the moved location so real FS cleanup can remove it
-			let restore = try makeNonWritable(at: "/moved/sub", in: fs)
-			restore()
-		}
-
-		@Test(arguments: FSKind.allCases)
-		func deleteWritableDirWithEmptyNonWritableSubdir(fsKind: FSKind) throws {
-			let fs = self.fs(for: fsKind)
-
-			try fs.createDir(at: "/d")
-			try fs.createDir(at: "/d/sub")
-			_ = try self.makeNonWritable(at: "/d/sub", in: fs)
-
-			#expect(throws: Never.self) {
-				try fs.deleteNode(at: "/d")
-			}
-			#expect(fs.nodeType(at: "/d") == nil)
-		}
-
-	#endif
+		#expect(fs.nodeType(at: "/d") == nil)
+	}
 
 	// MARK: - Non-writable file through symlink
 

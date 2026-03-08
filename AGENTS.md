@@ -20,6 +20,7 @@ This project is cross-platform, and is well tested on macOS and Ubuntu Linux. It
 	1. "Lookup"-style (e.g., finding a descendent node), which should accept relative paths only (where the path should be interpreted relative to the node's parent dir)
 	2. "Destination"-style, which should accept both relative paths (as above) and absolute paths
 - Functions on `FilesystemInterface` only need to handle absolute paths
+- Prefer to edit files via the attached IDE if possible (e.g., VSCode) unless there's a more appropriate MCP server available (e.g., Xcode's MCP)
 
 ## Style preferences
 - Prefer to use `self.`-style references when possible
