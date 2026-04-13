@@ -226,6 +226,7 @@ extension FSTests {
 		try fs.createFile(at: "/f1")
 		try fs.createFile(at: "/f2")
 		try fs.createFile(at: "/f3")
+		try fs.createFile(at: "/._dotdash")
 		try fs.createDir(at: "/d1")
 		try fs.createDir(at: "/d2")
 		try fs.createSymlink(at: "/s1", to: "/f1")
@@ -258,6 +259,7 @@ extension FSTests {
 		let root = try fs.rootDir
 
 		try fs.createFile(at: "/f1")
+		try fs.createFile(at: "/._dotdash")
 		try fs.createDir(at: "/d1")
 		try fs.createSymlink(at: "/s1", to: "/f1")
 		#if SPECIALS_ENABLED
@@ -274,14 +276,15 @@ extension FSTests {
 		#expect(allNodes.map(\.path) == allNodesFromSequence.map(\.path))
 
 		#if FINDER_ALIASES_ENABLED
-			#expect(allNodes.count == 5)
+			#expect(allNodes.count == 6)
 		#elseif SPECIALS_ENABLED
-			#expect(allNodes.count == 4)
+			#expect(allNodes.count == 5)
 		#else
-			#expect(allNodes.count == 3)
+			#expect(allNodes.count == 4)
 		#endif
 
 		#expect(allNodes.contains { ($0 as? File)?.path == "/f1" })
+		#expect(allNodes.contains { ($0 as? File)?.path == "/._dotdash" })
 		#expect(allNodes.contains { ($0 as? Dir)?.path == "/d1" })
 		#expect(allNodes.contains { ($0 as? Symlink)?.path == "/s1" })
 		#if SPECIALS_ENABLED

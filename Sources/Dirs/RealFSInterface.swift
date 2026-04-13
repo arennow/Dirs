@@ -49,21 +49,7 @@ public struct RealFSInterface: FilesystemInterface {
 			} catch {
 				// For any other kind of error, including `NoFinderInfoAvailable`,
 				// fall back to slower Foundation mechanisms
-				do {
-					let url: URL = self.resolveToRaw(ifp)
-					let rv = try url.resourceValues(forKeys: [.fileResourceTypeKey, .isAliasFileKey])
-					switch rv.fileResourceType {
-						case .directory: return .dir
-						case .symbolicLink: return .symlink
-						case .regular:
-							if rv.isAliasFile == true { return .finderAlias }
-							return .file
-						default:
-							return .special
-					}
-				} catch {
-					return nil
-				}
+				return Self.classifyPathKind_foundation(rawURL: self.resolveToRaw(ifp))
 			}
 		}
 	#else // !FINDER_ALIASES_ENABLED
@@ -162,7 +148,7 @@ public struct RealFSInterface: FilesystemInterface {
 				return FilePathStat(filePath: chrootRelativeFilePath, nodeType: nodeType)
 			}
 		}
-	#else
+	#else // !os(Windows)
 		public func contentsOf(directory ifp: some IntoFilePath) throws -> Array<FilePathStat> {
 			let requestedPath = ifp.into()
 			let (resolvedPath, resolvedNodeType) = try self.resolvedPathAndNodeType(of: requestedPath)
@@ -171,66 +157,77 @@ public struct RealFSInterface: FilesystemInterface {
 				throw WrongNodeType(path: requestedPath, actualType: resolvedNodeType)
 			}
 
-			let rawURL: URL = self.resolveToRaw(resolvedPath)
-
-			let fm = FileManager.default
-
-			var prefetchKeys: Array<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey]
 			#if FINDER_ALIASES_ENABLED
-				prefetchKeys.append(contentsOf: [.isAliasFileKey, .fileResourceTypeKey])
-			#endif
+				// getattrlistbulk returns names + node types (+ whether FinderInfo was present)
+				// in bulk kernel calls — unlike FileManager, it does not suppress ._-prefixed files.
+				let rawPath: FilePath = self.resolveToRaw(resolvedPath)
+				let rawEntries = try Self.contentsOfDirectory_getattrlistbulk(rawPath: rawPath)
 
-			return try fm.contentsOfDirectory(at: rawURL, includingPropertiesForKeys: prefetchKeys)
-				.map { rawURL in
-					var chrootRelativeFilePath = FilePath(rawURL.path)
-					if let chroot = self.chroot {
-						let didRemove = chrootRelativeFilePath.removePrefix(chroot)
-						precondition(didRemove)
-						// removing the prefix also turns this into a relative path so:
-						chrootRelativeFilePath.root = "/"
-					}
-
-					// If the requested path differs from the resolved path (i.e., we followed symlinks),
-					// replace the resolved path prefix with the requested path prefix
+				return rawEntries.compactMap { name, nodeTypeFromBulk in
+					var childPath = self.resolveToProjected(rawPath.appending(name))
 					if requestedPath != resolvedPath {
-						let didRemove = chrootRelativeFilePath.removePrefix(resolvedPath)
+						let didRemove = childPath.removePrefix(resolvedPath)
 						precondition(didRemove)
-						chrootRelativeFilePath = requestedPath.appending(chrootRelativeFilePath.components)
+						childPath = requestedPath.appending(childPath.components)
 					}
 
-					let nodeType: NodeType
-					if try rawURL.getBoolResourceValue(forKey: .isSymbolicLinkKey) {
-						nodeType = .symlink
-					} else if try rawURL.getBoolResourceValue(forKey: .isDirectoryKey) {
-						nodeType = .dir
+					// nodeTypeFromBulk is nil when the filesystem didn't return FNDRINFO for
+					// this entry (e.g. SMB, FAT32) — we can't distinguish .file from .finderAlias
+					// without a Foundation fallback. forceMissingFinderInfo (DEBUG only) forces
+					// the same fallback for all entries to exercise that code path in tests.
+					let needsFallback: Bool
+					#if DEBUG
+						needsFallback = nodeTypeFromBulk == nil || self.forceMissingFinderInfo
+					#else
+						needsFallback = nodeTypeFromBulk == nil
+					#endif
+
+					if needsFallback {
+						// Go directly to Foundation rather than routing through nodeType(at:),
+						// which would make a per-entry classifyPathKind_getattrlist call that is
+						// guaranteed to find FNDRINFO absent for the same reason the bulk call did.
+						guard let nodeType = Self.classifyPathKind_foundation(rawURL: self.resolveToRaw(childPath)) else {
+							// If Foundation can't stat the entry at all, skip it (e.g. it was deleted after we read the directory but before we could stat it, or it's a weird special file that FinderInfo can classify but Foundation can't)
+							return nil
+						}
+						return FilePathStat(filePath: childPath, nodeType: nodeType)
 					} else {
-						#if FINDER_ALIASES_ENABLED
-							if try rawURL.getBoolResourceValue(forKey: .isAliasFileKey) {
-								nodeType = .finderAlias
-							} else {
-								let resourceType = try rawURL.resourceValues(forKeys: [.fileResourceTypeKey]).fileResourceType
-								if resourceType == .regular {
-									nodeType = .file
-								} else {
-									nodeType = .special
-								}
-							}
-						#else
-							// On Linux, isAliasFileKey exists but throws NoResourceAvailable when accessed,
-							// so we skip checking it entirely. Also, resourceValues doesn't return
-							// fileResourceType for special files, so we use attributesOfItem to detect them.
+						// Safe force-unwrap: needsFallback covers the nil case above.
+						return FilePathStat(filePath: childPath, nodeType: nodeTypeFromBulk!)
+					}
+				}
+			#else
+				let rawURL: URL = self.resolveToRaw(resolvedPath)
+				let fm = FileManager.default
+
+				return try fm.contentsOfDirectory(at: rawURL, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+					.map { rawURL in
+						var chrootRelativeFilePath = self.resolveToProjected(rawURL)
+
+						// If the requested path differs from the resolved path (i.e., we followed symlinks),
+						// replace the resolved path prefix with the requested path prefix
+						if requestedPath != resolvedPath {
+							let didRemove = chrootRelativeFilePath.removePrefix(resolvedPath)
+							precondition(didRemove)
+							chrootRelativeFilePath = requestedPath.appending(chrootRelativeFilePath.components)
+						}
+
+						let nodeType: NodeType
+						if try rawURL.getBoolResourceValue(forKey: .isSymbolicLinkKey) {
+							nodeType = .symlink
+						} else if try rawURL.getBoolResourceValue(forKey: .isDirectoryKey) {
+							nodeType = .dir
+						} else {
+							// On Linux, `resourceValues` doesn't return `fileResourceType` for
+							// special files, so we use `attributesOfItem` to detect them
 							let attrs = try? FileManager.default.attributesOfItem(atPath: rawURL.path)
 							let fileType = attrs?[.type] as? FileAttributeType
-							if fileType == .typeRegular {
-								nodeType = .file
-							} else {
-								nodeType = .special
-							}
-						#endif
-					}
+							nodeType = fileType == .typeRegular ? .file : .special
+						}
 
-					return FilePathStat(filePath: chrootRelativeFilePath, nodeType: nodeType)
-				}
+						return FilePathStat(filePath: chrootRelativeFilePath, nodeType: nodeType)
+					}
+			#endif
 		}
 	#endif
 
@@ -745,6 +742,27 @@ package extension RealFSInterface {
 }
 
 private extension RealFSInterface {
+	#if FINDER_ALIASES_ENABLED
+		/// Classifies a node via Foundation's `resourceValues` API.
+		///
+		/// This is the fallback path used when `getattrlist`-based classification is unavailable
+		/// (e.g. `NoFinderInfoAvailable`, `forceMissingFinderInfo`). Accepting an already-resolved
+		/// raw `URL` avoids redundant path resolution by callers that already have one.
+		///
+		/// - Returns: The node type, or `nil` if Foundation could not stat the path at all.
+		static func classifyPathKind_foundation(rawURL: URL) -> NodeType? {
+			guard let rv = try? rawURL.resourceValues(forKeys: [.fileResourceTypeKey, .isAliasFileKey]) else {
+				return nil
+			}
+			switch rv.fileResourceType {
+				case .directory: return .dir
+				case .symbolicLink: return .symlink
+				case .regular: return rv.isAliasFile == true ? .finderAlias : .file
+				default: return .special
+			}
+		}
+	#endif
+
 	func resolveToProjected(_ ifp: some IntoFilePath) -> FilePath {
 		var fp = ifp.into()
 		guard let chroot = self.chroot else {
