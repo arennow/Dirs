@@ -31,7 +31,7 @@ This library's test suite runs fully on both real and mock interfaces to ensure 
 
 ## Platforms
 
-Tests are run in CI on macOS and Ubuntu Linux. Windows support is in beta. Not all features are available on every platform. Darwin is the umbrella term for all of Apple's operating systems, including macOS, iOS, tvOS, watchOS and visionOS
+Tests are run in CI on macOS and Ubuntu Linux. Windows support is in beta. Darwin is the umbrella term for all of Apple's operating systems, including macOS, iOS, tvOS, watchOS and visionOS.
 
 | Feature | Darwin | Linux | Windows |
 |---|:---:|:---:|:---:|
@@ -123,19 +123,17 @@ Note that `rename` and `move` are `mutating` and change the internally stored pa
 ### Extended attributes *(Darwin and Linux)*
 
 ```swift
-#if XATTRS_ENABLED
 try file.setExtendedAttribute(named: "user.comment", to: "first draft")
 let comment = try file.extendedAttributeString(named: "user.comment") // "first draft"
-let names   = try file.extendedAttributeNames()   // Set<String>
+let names = try file.extendedAttributeNames()
 try file.removeExtendedAttribute(named: "user.comment")
-#endif
 ```
 
 ### Finder aliases *(Darwin only)*
 
 ```swift
 #if FINDER_ALIASES_ENABLED
-let alias: FninderAlias = try fs.createFinderAlias(at: "/tmp/alias", to: "/tmp/work")
+let alias: FinderAlias = try fs.createFinderAlias(at: "/tmp/alias", to: "/tmp/work")
 let target: any Node = try alias.resolve()
 #endif
 ```
@@ -178,4 +176,4 @@ func swiftFiles(in dir: Dir) throws -> [File] {
 
 ## A note on `FilePath`
 
-The currency type for paths in Dirs is `FilePath` - specifically the one vended by Apple's `SystemPackage` [SPM module](https://github.com/apple/swift-system). Darwin OSes _also_ vend a type called `FilePath`, _also_ from a module called `System`. The two are effectively the same in terms of API and capabilities, but they aren't interchangeable because Swift sees them as different types. Dirs uses the SPM module version becuase it's also available on non-Darwin platforms. This is a bit of an awkward arrangement, but there's some movement to merge the two into a single definition in the Swift standard library, which would solve this problem (at least for clients using new versions of the stdlib).
+The currency type for paths in Dirs is `FilePath` – specifically the one vended by Apple's `SystemPackage` [SPM module](https://github.com/apple/swift-system). Darwin OSes _also_ vend a type called `FilePath`, _also_ from a module called `System`. The two are effectively the same in terms of API and capabilities, but they aren't interchangeable because Swift sees them as different types. Dirs uses the SPM module version becuase it's also available on non-Darwin platforms. This is a bit of an awkward arrangement, but there's some movement to merge the two into a single definition in the Swift standard library, which would solve this problem (at least for clients using new versions of the stdlib).
