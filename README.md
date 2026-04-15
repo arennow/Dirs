@@ -1,19 +1,19 @@
 # Dirs
 
-A Swift library that provides a high-level, type-safe abstraction over filesystem interactions. It ships two implementations of the same `FilesystemInterface` protocol—one backed by the real filesystem and one backed by an in-memory mock—so that the code you write against it is trivially testable without ever touching disk.
+A Swift library that provides a high-level, type-safe abstraction over filesystem interactions. It ships two implementations of the same `FilesystemInterface` protocol—one backed by the real filesystem and one backed by an in-memory mock—so that the code you write against it is trivially testable without ever touching the disk.
 
 ## Installation
 
 ```swift
 // Package.swift
-.package(url: "https://github.com/arennow/Dirs.git", from: "<version>")
+.package(url: "https://github.com/arennow/Dirs.git", from: "0.15.0")
 ```
 
 ---
 
 ## Real vs. Mock Filesystem
 
-The library's central design principle is the **parity guarantee**: every observable behavior of `RealFSInterface` (the on-disk implementation) is reproduced exactly by `MockFSInterface` (the in-memory implementation). This means you can write your application code against the `FilesystemInterface` protocol, swap in a `MockFSInterface` in tests, and have full confidence that you are exercising the real code paths without any disk I/O.
+The library's central design principle is its **parity guarantee**: every observable behavior of `RealFSInterface` (the on-disk implementation) is reproduced exactly by `MockFSInterface` (the in-memory implementation). This means you can write your application code against the `FilesystemInterface` protocol, swap in a `MockFSInterface` in tests, and have full confidence that you are exercising the real code paths without any disk I/O.
 
 ```swift
 // Production
@@ -23,21 +23,23 @@ let fs: any FilesystemInterface = RealFSInterface()
 let fs: any FilesystemInterface = MockFSInterface()
 ```
 
-Both types satisfy the same protocol, so your functions never need to know which one they are holding.
+Different platforms' behavior may differ (_e.g._, Linux's implementation of extended attributes is much more limited than Darwin's), but the two filesystem interfaces should always act the same on any given platform.
+
+This library's test suite runs fully on both real and mock interfaces to ensure that there's no drift between the two. Any observable difference between real and mock interfaces is a bug and should be reported (with a reproducible test case).
 
 ---
 
 ## Platforms
 
-Tests are run in CI on macOS and Ubuntu Linux. Windows support is in beta. Not all features are available on every platform; see the table below.
+Tests are run in CI on macOS and Ubuntu Linux. Windows support is in beta. Not all features are available on every platform. Darwin is the umbrella term for all of Apple's operating systems, including macOS, iOS, tvOS, watchOS and visionOS
 
-| Feature | macOS | Linux | Windows | iOS / tvOS / watchOS / visionOS |
-|---|:---:|:---:|:---:|:---:|
-| Core CRUD | ✅ | ✅ | ✅ | ✅ |
-| Symlinks | ✅ | ✅ | ✅ | ✅ |
-| Extended attributes | ✅ | ✅ | ❌ | ✅ |
-| Special files (FIFOs, sockets, devices) | ✅ | ✅ | ❌ | ✅ |
-| Finder aliases | ✅ | ❌ | ❌ | ✅ |
+| Feature | Darwin | Linux | Windows |
+|---|:---:|:---:|:---:|
+| Core CRUD | ✅ | ✅ | ✅ |
+| Symlinks | ✅ | ✅ | ✅ |
+| Finder aliases | ✅ | ❌ | ❌ |
+| Extended attributes | ✅ | ✅ | ❌ |
+| Special files (FIFOs, sockets, devices) | ✅ | ✅ | ❌ |
 
 Minimum deployment targets: macOS 10.15, iOS 13, tvOS 13, watchOS 6, visionOS 1.
 
@@ -47,17 +49,17 @@ Minimum deployment targets: macOS 10.15, iOS 13, tvOS 13, watchOS 6, visionOS 1.
 
 ### `Node` and its concrete types
 
-Every filesystem object is represented by a type that conforms to the `Node` protocol. Nodes carry a reference to the `FilesystemInterface` they belong to and a `FilePath` describing their location.
+Every filesystem object is represented by a lightweight struct that conforms to the `Node` protocol. Nodes carry a reference to the `FilesystemInterface` they belong to and a `FilePath` describing their location.
 
 | Type | Represents |
 |---|---|
 | `Dir` | A directory |
 | `File` | A regular file |
 | `Symlink` | A symbolic link |
-| `FinderAlias` | A macOS Finder alias *(macOS / Darwin only)* |
-| `Special` | A FIFO, socket, or device node *(macOS / Linux only)* |
+| `FinderAlias` | A macOS Finder alias *(Darwin only, though seldom encountered outside of macOS)* |
+| `Special` | A FIFO, socket, or device node – basically a catchall *(Darwin / Linux only)* |
 
-`Symlink` and `FinderAlias` additionally conform to `ResolvableNode`, which adds a `destination` property (the raw link target) and a `resolve()` method that follows the link and returns the target `Node`.
+`Symlink` and `FinderAlias` additionally conform to `ResolvableNode`, which adds a `destination` property (the raw link target) and a `resolve()` method that follows the immediate resolvable and any others it encounters along the way and returns the target `Node` (the real, non-resolvable node that the chain ultimately refers to).
 
 ### `FilesystemInterface`
 
@@ -76,30 +78,35 @@ Functions that accept a path take `some IntoFilePath` rather than a bare `FilePa
 ### Creating nodes
 
 ```swift
-let dir  = try fs.createDir(at: "/tmp/work")
-let file = try dir.createFile(at: "notes.txt")   // relative to dir
-let link = try fs.createSymlink(at: "/tmp/link", to: "/tmp/work")
+let dir: Dir = // some Dir
+let file: File = try dir.createFile(at: "notes.txt") // relative to `dir`
+let link: Symlink = try dir.createSymlink(at: "link", to: "/tmp/work")
 ```
 
 ### Reading and writing files
 
 ```swift
 try file.replaceContents("Hello, world!")
-let text = try file.stringContents()   // "Hello, world!"
+let text = try file.stringContents() // "Hello, world!"
 
 try file.appendContents("\nLine two.")
-let size = try file.size()             // in bytes
+let size = try file.size() // in bytes
 ```
 
 ### Directory listing
 
 ```swift
-let children = try dir.children()          // does not follow symlinks / aliases
-let resolved = try dir.resolvedChildren()  // follows all symlinks and aliases
+let children: Children = try dir.children() // does not follow symlinks / aliases
+let resolved: Children = try dir.resolvedChildren() // follows all symlinks and aliases
+```
 
-// Children groups nodes by type:
-// children.dirs, children.files, children.symlinks,
-// children.finderAliases (Darwin), children.specials (Unix)
+`Children` groups nodes by type:
+`.dirs`, `.files`, `.symlinks`,
+`.finderAliases` (Darwin), `.specials` (Darwin and Linux)
+
+But you can also access them all at once:
+```swift
+let allChildren: some Sequence<any Node> = children.all
 ```
 
 ### Moving, renaming, copying, and deleting
@@ -111,7 +118,9 @@ try fs.copyNode(from: file, to: "/tmp/backup/renamed.txt")
 try file.delete()
 ```
 
-### Extended attributes *(macOS, Linux, iOS, tvOS, watchOS, visionOS)*
+Note that `rename` and `move` are `mutating` and change the internally stored path of the receiver.
+
+### Extended attributes *(Darwin and Linux)*
 
 ```swift
 #if XATTRS_ENABLED
@@ -122,71 +131,51 @@ try file.removeExtendedAttribute(named: "user.comment")
 #endif
 ```
 
-### Finder aliases *(macOS / Darwin only)*
+### Finder aliases *(Darwin only)*
 
 ```swift
 #if FINDER_ALIASES_ENABLED
-let alias  = try fs.createFinderAlias(at: "/tmp/alias", to: "/tmp/work")
-let target = try alias.resolve()        // any Node pointing at /tmp/work
+let alias: FninderAlias = try fs.createFinderAlias(at: "/tmp/alias", to: "/tmp/work")
+let target: any Node = try alias.resolve()
 #endif
 ```
 
 ### Well-known directories
 
 ```swift
-let home    = try fs.lookUpDir(.home)
-let temp    = try fs.lookUpDir(.temporary)
-let unique  = try fs.lookUpDir(.uniqueTemporary)  // always a fresh directory
+let home = try fs.lookUpDir(.home)
+let temp = try fs.lookUpDir(.temporary)
+let unique = try fs.lookUpDir(.uniqueTemporary)  // always a fresh directory
 ```
 
 ---
 
 ## Examples
 
-### List all children whose name begins with a given prefix
+### List all immediate children whose name begins with a given prefix
 
 ```swift
 func children(of dir: Dir, startingWith prefix: String) throws -> [any Node] {
-    let children = try dir.children()
-    let allNodes: [any Node] = children.dirs + children.files + children.symlinks
-    return allNodes.filter { $0.path.lastComponent?.string.hasPrefix(prefix) == true }
-}
-```
-
-### Report the length of every extended attribute on a file
-
-```swift
-#if XATTRS_ENABLED
-func xattrLengths(of file: File) throws -> [String: Int] {
-    let names = try file.extendedAttributeNames()
-    var result = [String: Int]()
-    for name in names {
-        let data = try file.extendedAttribute(named: name)
-        result[name] = data?.count ?? 0
+    try dir.children().all.filter { childNode: any Node in
+        // `Node.name` is a plain `String` derived from the internal `path: FilePath`
+        childNode.name.hasPrefix(prefix)
     }
-    return result
 }
-#endif
 ```
 
-### Collect all `.swift` files under a directory, recursively
+### Collect all `.swift` files under a directory recursively
 
 ```swift
 func swiftFiles(in dir: Dir) throws -> [File] {
-    var results = [File]()
-    let children = try dir.resolvedChildren()
-    for file in children.files where file.path.extension == "swift" {
-        results.append(file)
+    try dir.allDescendantFiles.filter { childFile: File in
+        // Here we access `path` directly to take advantage of its filename extension logic
+        childFile.path.extension == "swift"
     }
-    for subdir in children.dirs {
-        results += try swiftFiles(in: subdir)
-    }
-    return results
 }
 ```
 
 ---
 
-## License
+## A note on `FilePath`
 
-See [LICENSE](LICENSE).
+The currency type for paths in Dirs is `FilePath` - specifically the one vended by Apple's `SystemPackage` [SPM module](https://github.com/apple/swift-system). Darwin OSes _also_ vend a type called `FilePath`, _also_ from a module called `System`. The two are effectively the same in terms of API and capabilities, but they aren't interchangeable because Swift sees them as different types. Dirs uses the SPM module version becuase it's also available on non-Darwin platforms. This is a bit of an awkward arrangement, but there's some movement to merge the two into a single definition in the Swift standard library, which would solve this problem (at least for clients using new versions of the stdlib).
