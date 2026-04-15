@@ -132,10 +132,8 @@ try file.removeExtendedAttribute(named: "user.comment")
 ### Finder aliases *(Darwin only)*
 
 ```swift
-#if FINDER_ALIASES_ENABLED
 let alias: FinderAlias = try fs.createFinderAlias(at: "/tmp/alias", to: "/tmp/work")
 let target: any Node = try alias.resolve()
-#endif
 ```
 
 ### Well-known directories
