@@ -91,7 +91,13 @@
 			guard fd >= 0 else {
 				throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .ENOENT)
 			}
-			defer { Darwin.close(fd) }
+			defer {
+				// We swallow the error case here because:
+				// 1. This is a readonly fd, so there's no risk of losing flush-on-close data
+				// 2. There's nothing (besides logging) to do with an error
+				// 3. Linux and Darwin both claim to unconditionally remove fd from the descriptor table, even on error
+				Darwin.close(fd)
+			}
 
 			// Request: RETURNED_ATTRS (required by getattrlistbulk) + name + objtype + fndrinfo.
 			// FSOPT_PACK_INVAL_ATTRS keeps the per-entry buffer layout constant regardless of

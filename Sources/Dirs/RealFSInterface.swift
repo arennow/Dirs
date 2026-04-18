@@ -405,10 +405,12 @@ public struct RealFSInterface: FilesystemInterface {
 		} catch let errno as Errno where errno == .permissionDenied {
 			throw PermissionDenied(path: fp)
 		}
-		defer { try? fd.close() }
-		let data = contents.into()
-		try fd.writeAll(data)
-		try fd.resize(to: numericCast(data.count))
+
+		try fd.closeAfter {
+			let data = contents.into()
+			try fd.writeAll(data)
+			try fd.resize(to: numericCast(data.count))
+		}
 	}
 
 	public func appendContentsOfFile(at ifp: some IntoFilePath, with addendum: some IntoData) throws {
@@ -427,8 +429,10 @@ public struct RealFSInterface: FilesystemInterface {
 		} catch let errno as Errno where errno == .permissionDenied {
 			throw PermissionDenied(path: fp)
 		}
-		defer { try? fd.close() }
-		try fd.writeAll(addendum.into())
+
+		try fd.closeAfter {
+			_ = try fd.writeAll(addendum.into())
+		}
 	}
 
 	public func copyNode(from source: some IntoFilePath, to destination: some IntoFilePath) throws {
