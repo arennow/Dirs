@@ -225,6 +225,66 @@ public extension Dir {
 }
 
 public extension Dir {
+	func allResolvedDescendantNodes() -> some Sequence<any Node> {
+		struct State {
+			var dirs: Array<Dir> = []
+			var files: Array<File> = []
+			#if SPECIALS_ENABLED
+				var specials: Array<Special> = []
+			#endif
+		}
+
+		func appendResolved(_ children: Children, to state: inout State) {
+			state.dirs.append(contentsOf: children.directories)
+			state.files.append(contentsOf: children.files)
+			#if SPECIALS_ENABLED
+				state.specials.append(contentsOf: children.specials)
+			#endif
+		}
+
+		var state = State()
+		if let children = try? self.resolvedChildren() {
+			appendResolved(children, to: &state)
+		}
+
+		return sequence(state: state) { state -> Optional<any Node> in
+			if let nextFile = state.files.popLast() {
+				return nextFile
+			}
+
+			#if SPECIALS_ENABLED
+				if let nextSpecial = state.specials.popLast() {
+					return nextSpecial
+				}
+			#endif
+
+			if let nextDir = state.dirs.popLast() {
+				if let children = try? nextDir.resolvedChildren() {
+					appendResolved(children, to: &state)
+				}
+				return nextDir
+			}
+
+			return nil
+		}
+	}
+
+	func allResolvedDescendantFiles() -> some Sequence<File> {
+		self.allResolvedDescendantNodes().compactMap { $0 as? File }
+	}
+
+	func allResolvedDescendantDirs() -> some Sequence<Dir> {
+		self.allResolvedDescendantNodes().compactMap { $0 as? Dir }
+	}
+
+	#if SPECIALS_ENABLED
+		func allResolvedDescendantSpecials() -> some Sequence<Special> {
+			self.allResolvedDescendantNodes().compactMap { $0 as? Special }
+		}
+	#endif
+}
+
+public extension Dir {
 	@discardableResult
 	func createDir(at ifp: some IntoFilePath) throws -> Dir {
 		try self.fs.createDir(at: self.absolutizeRelativeToSelf(ifp))
