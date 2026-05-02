@@ -64,10 +64,19 @@ public struct Symlink: ResolvableNode {
 		get throws { try self.fs.destinationOf(symlink: self.path) }
 	}
 
-	public func resolve() throws -> any Node {
+	public func resolve(keepingPath: Bool) throws -> any Node {
 		let destPath = try self.destination
 		let resolvedPath = Self.resolveDestination(destPath, relativeTo: self.path)
-		return try self.fs.node(at: resolvedPath)
+
+		if keepingPath {
+			if let existingResolvedNodeType = self.fs.nodeType(at: resolvedPath) {
+				return existingResolvedNodeType.instantiateUnchecked(at: self.path, in: self._fs)
+			} else {
+				throw NoSuchNode(path: self.path)
+			}
+		} else {
+			return try self.fs.node(at: resolvedPath)
+		}
 	}
 }
 

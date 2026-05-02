@@ -578,6 +578,10 @@ public final class MockFSInterface: FilesystemInterface {
 									case .finderAlias(let nextDest, _), .symlink(let nextDest, _):
 										try recordPathVisited(destination)
 										destination = nextDest
+
+									case .none:
+										throw NoSuchNode(path: ifp)
+
 									default:
 										// Final destination is not an alias or symlink
 										return destination

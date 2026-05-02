@@ -51,9 +51,18 @@
 			get throws { try self.fs.destinationOfFinderAlias(at: self.path) }
 		}
 
-		public func resolve() throws -> any Node {
+		public func resolve(keepingPath: Bool) throws -> any Node {
 			let destPath = try self.destination
-			return try self.fs.node(at: destPath)
+
+			if keepingPath {
+				if let existingResolvedNodeType = self.fs.nodeType(at: destPath) {
+					return existingResolvedNodeType.instantiateUnchecked(at: self.path, in: self._fs)
+				} else {
+					throw NoSuchNode(path: self.path)
+				}
+			} else {
+				return try self.fs.node(at: destPath)
+			}
 		}
 	}
 #endif

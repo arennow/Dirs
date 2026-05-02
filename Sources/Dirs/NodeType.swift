@@ -1,3 +1,5 @@
+import SystemPackage
+
 public enum NodeType: Sendable, CaseIterable {
 	case dir, file, symlink
 	#if SPECIALS_ENABLED
@@ -53,6 +55,20 @@ public enum NodeType: Sendable, CaseIterable {
 			try resolvableType.createTargetAndResolvableNode(at: pathIFP, in: fs)
 		} else {
 			throw CantBeCreated(nodeType: self)
+		}
+	}
+
+	func instantiateUnchecked(at path: FilePath, in fs: FSInterface) -> any Node {
+		switch self {
+			case .dir: return Dir(uncheckedAt: path, in: fs)
+			case .file: return File(uncheckedAt: path, in: fs)
+			case .symlink: return Symlink(uncheckedAt: path, in: fs)
+			#if SPECIALS_ENABLED
+				case .special: return Special(uncheckedAt: path, in: fs)
+			#endif
+			#if FINDER_ALIASES_ENABLED
+				case .finderAlias: return FinderAlias(uncheckedAt: path, in: fs)
+			#endif
 		}
 	}
 }

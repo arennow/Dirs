@@ -123,16 +123,33 @@ extension FSTests {
 	}
 
 	@Test(arguments: FSKind.allCases)
-	func resolvedSymlinkUsesTargetPathAndName(fsKind: FSKind) throws {
+	func resolvedSymlinkCanUseTargetPathAndType(fsKind: FSKind) throws {
 		let fs = self.fs(for: fsKind)
 
 		_ = try fs.createFile(at: "/a")
 		let symlink = try fs.createSymlink(at: "/s", to: "/a")
 
 		#expect(try symlink.destination == "/a")
-		let resolved = try symlink.resolve()
+		let resolved = try symlink.resolve(keepingPath: false)
 		#expect(resolved.path == "/a")
 		#expect(resolved.name == "a")
+		#expect(resolved.nodeType == .file)
+		#expect(resolved is File)
+	}
+
+	@Test(arguments: FSKind.allCases)
+	func resolvedSymlinkCanUseSourcePathAndType(fsKind: FSKind) throws {
+		let fs = self.fs(for: fsKind)
+
+		_ = try fs.createFile(at: "/a")
+		let symlink = try fs.createSymlink(at: "/s", to: "/a")
+
+		#expect(try symlink.destination == "/a")
+		let resolved = try symlink.resolve(keepingPath: true)
+		#expect(resolved.path == "/s")
+		#expect(resolved.name == "s")
+		#expect(resolved.nodeType == .file)
+		#expect(resolved is File)
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -186,7 +203,7 @@ extension FSTests {
 		try #expect(symlinks.dir.resolve() is Dir)
 		try #expect(symlinks.fileSym.resolve() is Symlink)
 		try #expect(symlinks.dirSym.resolve() is Symlink)
-		#expect(throws: NoSuchNode.self, performing: { try symlinks.broken.resolve() })
+		#expect(throws: NoSuchNode(path: "/x"), performing: { try symlinks.broken.resolve() })
 	}
 
 	@Test(arguments: FSKind.allCases)
@@ -428,7 +445,8 @@ extension FSTests {
 		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.contentsOf(file: "/s") }
 		#expect(throws: NoSuchNode(path: "/nonexistent")) { try fs.sizeOfFile(at: "/s") }
 		#expect(throws: NoSuchNode(path: "/nonexistent")) { try brokenSym.realpath() }
-		#expect(throws: NoSuchNode(path: "/nonexistent")) { try brokenSym.resolve() }
+		#expect(throws: NoSuchNode(path: "/nonexistent")) { try brokenSym.resolve(keepingPath: false) }
+		#expect(throws: NoSuchNode(path: "/s")) { try brokenSym.resolve(keepingPath: true) }
 
 		#expect(throws: Never.self) { try fs.deleteNode(at: "/s") }
 		#expect(fs.nodeType(at: "/s") == nil)

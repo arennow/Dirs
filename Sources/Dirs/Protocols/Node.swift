@@ -161,9 +161,10 @@ fileprivate enum IsAncestorProducts {
 public protocol ResolvableNode: Node {
 	static var resolvableNodeType: ResolvableNodeType { get }
 	var destination: FilePath { get throws }
-	func resolve() throws -> any Node
+	func resolve(keepingPath: Bool) throws -> any Node
 }
 
 public extension ResolvableNode {
 	var resolvableNodeType: ResolvableNodeType { Self.resolvableNodeType }
+	func resolve() throws -> any Node { try self.resolve(keepingPath: false) }
 }

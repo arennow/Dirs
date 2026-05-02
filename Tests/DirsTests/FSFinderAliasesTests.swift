@@ -206,16 +206,33 @@ import Testing
 		}
 
 		@Test(arguments: FSKind.allCases)
-		func resolvedFinderAliasUsesTargetPathAndName(fsKind: FSKind) throws {
+		func resolvedFinderAliasUsesTargetPathAndType(fsKind: FSKind) throws {
 			let fs = self.fs(for: fsKind)
 
 			try fs.createFile(at: "/target")
 			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
 
 			#expect(try alias.destination == "/target")
-			let resolved = try alias.resolve()
+			let resolved = try alias.resolve(keepingPath: false)
 			#expect(resolved.path == "/target")
 			#expect(resolved.name == "target")
+			#expect(resolved.nodeType == .file)
+			#expect(resolved is File)
+		}
+
+		@Test(arguments: FSKind.allCases)
+		func resolvedFinderAliasCanUseSourcePathAndType(fsKind: FSKind) throws {
+			let fs = self.fs(for: fsKind)
+
+			try fs.createFile(at: "/target")
+			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
+
+			#expect(try alias.destination == "/target")
+			let resolved = try alias.resolve(keepingPath: true)
+			#expect(resolved.path == "/alias")
+			#expect(resolved.name == "alias")
+			#expect(resolved.nodeType == .file)
+			#expect(resolved is File)
 		}
 
 		// Finder Alias files should not be readable through contentsOf(file:) or sizeOfFile(at:)
@@ -264,15 +281,16 @@ import Testing
 			#expect(resolved.path == "/target")
 		}
 
-		@Test(arguments: FSKind.allCases)
-		func detectsMissingTargetWhenResolvingFinderAlias(fsKind: FSKind) throws {
+		@Test(arguments: FSKind.allCases, [true, false])
+		func detectsMissingTargetWhenResolvingFinderAlias(fsKind: FSKind, keepingPath: Bool) throws {
 			let fs = self.fs(for: fsKind)
 			try fs.createFile(at: "/target")
 			let alias = try fs.createFinderAlias(at: "/alias", to: "/target")
 			try fs.deleteNode(at: "/target")
-			#expect(throws: NoSuchNode.self) {
-				try alias.resolve()
-			}
+
+			// Unlike with symlinks, we can't know the intended target path of a broken alias
+			// if it fails to resolve, so our only option is to report the alias itself as missing
+			#expect(throws: NoSuchNode(path: "/alias")) { try alias.resolve(keepingPath: keepingPath) }
 		}
 
 		@Test(arguments: FSKind.allCases)
@@ -281,9 +299,7 @@ import Testing
 			try fs.createSymlink(at: "/s1", to: "/s2")
 			try fs.createSymlink(at: "/s2", to: "/s1")
 			let alias = try fs.createFinderAlias(at: "/alias", to: "/s1")
-			#expect(throws: NoSuchNode.self) {
-				try alias.resolve()
-			}
+			#expect(throws: NoSuchNode(path: "/alias")) { try alias.resolve() }
 		}
 	}
 #endif

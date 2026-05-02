@@ -7,6 +7,8 @@ report_errors:
 _impl_format *ARGS:
 	swiftformat {{ARGS}} .
 
+test_all: test_mac test_linux test_windows
+
 alias test := test_mac
 
 test_mac:
@@ -80,14 +82,6 @@ test_non_mac_darwin PLATFORM:
 		-destination "platform=${platform} Simulator,id=${SIM_ID}" \
 		| xcbeautify --quieter
 
-build_non_mac_darwin_all:
-	just build_non_mac_darwin iOS
-	just build_non_mac_darwin tvOS
-	just build_non_mac_darwin watchOS
-	just build_non_mac_darwin visionOS
+build_non_mac_darwin_all: (build_non_mac_darwin "iOS") (build_non_mac_darwin "tvOS") (build_non_mac_darwin "watchOS") (build_non_mac_darwin "visionOS")
 
-test_non_mac_darwin_all:
-	just test_non_mac_darwin iOS
-	just test_non_mac_darwin tvOS
-	just test_non_mac_darwin watchOS
-	just test_non_mac_darwin visionOS
+test_non_mac_darwin_all: (test_non_mac_darwin "iOS") (test_non_mac_darwin "tvOS") (test_non_mac_darwin "watchOS") (test_non_mac_darwin "visionOS")
